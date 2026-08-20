@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Nix / direnv
+.direnv/
+result
+result-*
+
+# Production builds
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# IDE
+#.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+#.dockerignore
+
+# Environment
+.env
+
+# Examples
+/media/
+/.data/
+
+# Temporary files
+.tmp/
+tmp/
+*.epub
+
+# Test coverage
+coverage/
+
+# Bruno test output
+/tests/bruno/json
+
+# TypeScript
+*.tsbuildinfo
+
+# Playwright
+/src/web/playwright-report/
+/src/web/test-results/
+/src/web/blob-report/
+playwright-report/
+test-results/
