@@ -16,7 +16,7 @@ import {
 } from "./geo.js";
 
 test("WGS84 coordinates round-trip through XYZ world pixels", () => {
-  const coordinate = {lon: 13.405, lat: 52.52};
+  const coordinate = { lon: 13.405, lat: 52.52 };
   const result = worldPixelToLonLat(lonLatToWorldPixel(coordinate));
   assert.ok(Math.abs(result.lon - coordinate.lon) < 1e-10);
   assert.ok(Math.abs(result.lat - coordinate.lat) < 1e-10);
@@ -35,7 +35,7 @@ test("the configured tile corners map to the mosaic corners", () => {
 });
 
 test("latitude is clamped at the Web Mercator limit", () => {
-  const northPole = lonLatToWorldPixel({lon: 0, lat: 90});
+  const northPole = lonLatToWorldPixel({ lon: 0, lat: 90 });
   const mercatorLimit = lonLatToWorldPixel({
     lon: 0,
     lat: 85.0511287798066,

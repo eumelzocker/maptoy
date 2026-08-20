@@ -1,8 +1,8 @@
-import {createHash} from "node:crypto";
-import {mkdir, writeFile} from "node:fs/promises";
-import {availableParallelism} from "node:os";
+import { createHash } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { availableParallelism } from "node:os";
 import path from "node:path";
-import sharp, {type OverlayOptions} from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 import {
   ASSET_ROOT,
   ATTRIBUTION,
@@ -17,10 +17,10 @@ import {
   TILE_SIZE,
   ZOOM,
 } from "./config.js";
-import type {FixturePaths} from "./fixtures.js";
-import {lonLatToMosaicPixel} from "./geo.js";
-import {assertManagedFixturePath, pluginRegistry} from "./plugins.js";
-import type {LayerInstance, RenderContext} from "./types.js";
+import type { FixturePaths } from "./fixtures.js";
+import { lonLatToMosaicPixel } from "./geo.js";
+import { assertManagedFixturePath, pluginRegistry } from "./plugins.js";
+import type { LayerInstance, RenderContext } from "./types.js";
 
 function attributionOverlay(): OverlayOptions {
   const width = 230;
@@ -120,7 +120,7 @@ export async function renderNative(
       width: MOSAIC_WIDTH,
       height: MOSAIC_HEIGHT,
       channels: 4,
-      background: {r: 0, g: 0, b: 0, alpha: 0},
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
     .composite([...tileOverlays(), ...layers, attributionOverlay()])
@@ -151,7 +151,7 @@ export interface NativeMeasurement {
 export async function runNativeMeasurement(
   fixtures: FixturePaths,
 ): Promise<NativeMeasurement> {
-  await mkdir(OUTPUT_ROOT, {recursive: true});
+  await mkdir(OUTPUT_ROOT, { recursive: true });
   await renderNative(fixtures);
 
   const elapsedMilliseconds: number[] = [];

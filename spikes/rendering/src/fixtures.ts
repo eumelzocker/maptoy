@@ -1,5 +1,5 @@
-import {spawnSync} from "node:child_process";
-import {mkdir, rm, writeFile} from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import {
@@ -68,7 +68,7 @@ async function generateTrack(): Promise<string> {
     features: [
       {
         type: "Feature",
-        properties: {name: "Synthetic tile-boundary track"},
+        properties: { name: "Synthetic tile-boundary track" },
         geometry: {
           type: "LineString",
           coordinates: [
@@ -95,7 +95,7 @@ async function generateGpsImage(): Promise<string> {
       <text x="60" y="75" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#ffffff">GPS</text>
     </svg>
   `;
-  await sharp(Buffer.from(svg)).jpeg({quality: 90}).toFile(imagePath);
+  await sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toFile(imagePath);
 
   const result = spawnSync(
     "exiftool",
@@ -109,7 +109,7 @@ async function generateGpsImage(): Promise<string> {
       "-Orientation#=6",
       imagePath,
     ],
-    {encoding: "utf8"},
+    { encoding: "utf8" },
   );
   if (result.status !== 0) {
     throw new Error(`ExifTool failed: ${result.stderr.trim()}`);
@@ -130,10 +130,10 @@ async function generateBoundsImage(): Promise<string> {
 }
 
 export async function generateFixtures(): Promise<FixturePaths> {
-  await rm(ARTIFACT_ROOT, {recursive: true, force: true});
-  await mkdir(ARTIFACT_ROOT, {recursive: true});
-  await mkdir(TILE_ROOT, {recursive: true});
-  await mkdir(ASSET_ROOT, {recursive: true});
+  await rm(ARTIFACT_ROOT, { recursive: true, force: true });
+  await mkdir(ARTIFACT_ROOT, { recursive: true });
+  await mkdir(TILE_ROOT, { recursive: true });
+  await mkdir(ASSET_ROOT, { recursive: true });
   await generateTiles();
 
   const [track, gpsImage, boundsImage] = await Promise.all([
@@ -142,5 +142,5 @@ export async function generateFixtures(): Promise<FixturePaths> {
     generateBoundsImage(),
   ]);
 
-  return {track, gpsImage, boundsImage};
+  return { track, gpsImage, boundsImage };
 }

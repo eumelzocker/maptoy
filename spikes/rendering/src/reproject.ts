@@ -1,6 +1,6 @@
-import {spawnSync} from "node:child_process";
-import {readFileSync} from "node:fs";
-import {writeFile} from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import proj4 from "proj4";
 import sharp from "sharp";
@@ -13,7 +13,7 @@ import {
   MOSAIC_WIDTH,
   OUTPUT_ROOT,
 } from "./config.js";
-import {tileCornerToLonLat} from "./geo.js";
+import { tileCornerToLonLat } from "./geo.js";
 
 const WGS84 = "EPSG:4326";
 const WEB_MERCATOR = "EPSG:3857";
@@ -23,10 +23,10 @@ const PROJECTION_CASES: ReadonlyArray<{
   width: number;
   height: number;
 }> = [
-  {projection: WGS84, width: MOSAIC_WIDTH, height: MOSAIC_HEIGHT},
-  {projection: "EPSG:25833", width: MOSAIC_WIDTH, height: MOSAIC_HEIGHT},
-  {projection: "EPSG:25833", width: 4096, height: 4096},
-  {projection: "EPSG:25833", width: 8192, height: 8192},
+  { projection: WGS84, width: MOSAIC_WIDTH, height: MOSAIC_HEIGHT },
+  { projection: "EPSG:25833", width: MOSAIC_WIDTH, height: MOSAIC_HEIGHT },
+  { projection: "EPSG:25833", width: 4096, height: 4096 },
+  { projection: "EPSG:25833", width: 8192, height: 8192 },
 ];
 
 proj4.defs(
@@ -107,7 +107,7 @@ export function sourceExtent3857(): Extent {
     southeast.lon,
     southeast.lat,
   );
-  return {minX, minY, maxX, maxY};
+  return { minX, minY, maxX, maxY };
 }
 
 export function targetExtent(
@@ -119,11 +119,9 @@ export function targetExtent(
   for (let step = 0; step <= steps; step += 1) {
     const fraction = step / steps;
     const x =
-      sourceExtent.minX +
-      (sourceExtent.maxX - sourceExtent.minX) * fraction;
+      sourceExtent.minX + (sourceExtent.maxX - sourceExtent.minX) * fraction;
     const y =
-      sourceExtent.minY +
-      (sourceExtent.maxY - sourceExtent.minY) * fraction;
+      sourceExtent.minY + (sourceExtent.maxY - sourceExtent.minY) * fraction;
     points.push(
       transformedPoint(WEB_MERCATOR, targetProjection, x, sourceExtent.minY),
       transformedPoint(WEB_MERCATOR, targetProjection, x, sourceExtent.maxY),
@@ -192,19 +190,17 @@ async function warpWithNode(
   const sourceImage = await sharp(sourcePath)
     .ensureAlpha()
     .raw()
-    .toBuffer({resolveWithObject: true});
+    .toBuffer({ resolveWithObject: true });
   const output = Buffer.alloc(width * height * 4);
   const inverseTransform = proj4(projection, WEB_MERCATOR);
   const startedAt = performance.now();
 
   for (let targetY = 0; targetY < height; targetY += 1) {
     const projectedY =
-      extent.maxY -
-      ((targetY + 0.5) / height) * (extent.maxY - extent.minY);
+      extent.maxY - ((targetY + 0.5) / height) * (extent.maxY - extent.minY);
     for (let targetX = 0; targetX < width; targetX += 1) {
       const projectedX =
-        extent.minX +
-        ((targetX + 0.5) / width) * (extent.maxX - extent.minX);
+        extent.minX + ((targetX + 0.5) / width) * (extent.maxX - extent.minX);
       const [sourceCoordinateX, sourceCoordinateY] = inverseTransform.forward([
         projectedX,
         projectedY,
@@ -241,7 +237,7 @@ async function warpWithNode(
 
   const elapsed = performance.now() - startedAt;
   await sharp(output, {
-    raw: {width, height, channels: 4},
+    raw: { width, height, channels: 4 },
   })
     .png()
     .toFile(outputPath);
@@ -249,7 +245,7 @@ async function warpWithNode(
 }
 
 function runCommand(command: string, arguments_: string[]): void {
-  const result = spawnSync(command, arguments_, {encoding: "utf8"});
+  const result = spawnSync(command, arguments_, { encoding: "utf8" });
   if (result.status !== 0) {
     throw new Error(
       `${command} failed with status ${result.status}: ${result.stderr.trim()}`,
@@ -285,7 +281,7 @@ function warpWithGdal(
   width: number,
   height: number,
   outputPath: string,
-): {milliseconds: number; maxRssKilobytes: number} {
+): { milliseconds: number; maxRssKilobytes: number } {
   const measurementPath = `${outputPath}.time.txt`;
   const startedAt = performance.now();
   runCommand("time", [
@@ -338,14 +334,8 @@ async function compareImages(
   secondPath: string,
 ): Promise<DifferenceMeasurement> {
   const [first, second] = await Promise.all([
-    sharp(firstPath)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({resolveWithObject: true}),
-    sharp(secondPath)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({resolveWithObject: true}),
+    sharp(firstPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
+    sharp(secondPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
   ]);
   if (
     first.info.width !== second.info.width ||
@@ -358,7 +348,11 @@ async function compareImages(
   let totalDifference = 0;
   let maximumChannelDifference = 0;
   let pixelsAboveEight = 0;
-  for (let pixel = 0; pixel < first.info.width * first.info.height; pixel += 1) {
+  for (
+    let pixel = 0;
+    pixel < first.info.width * first.info.height;
+    pixel += 1
+  ) {
     let pixelMaximum = 0;
     for (let channel = 0; channel < 4; channel += 1) {
       const index = pixel * 4 + channel;
@@ -391,7 +385,7 @@ export async function runReprojectionMeasurements(
 
   const measurements: ProjectionMeasurement[] = [];
   for (const projectionCase of PROJECTION_CASES) {
-    const {projection, width, height} = projectionCase;
+    const { projection, width, height } = projectionCase;
     const extent = targetExtent(sourceExtent, projection);
     const suffix = projection.toLowerCase().replace(":", "-");
     const nodeOutput = path.join(

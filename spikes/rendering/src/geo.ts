@@ -1,9 +1,4 @@
-import {
-  MIN_TILE_X,
-  MIN_TILE_Y,
-  TILE_SIZE,
-  ZOOM,
-} from "./config.js";
+import { MIN_TILE_X, MIN_TILE_Y, TILE_SIZE, ZOOM } from "./config.js";
 
 const MAX_MERCATOR_LATITUDE = 85.0511287798066;
 
@@ -34,23 +29,14 @@ export function lonLatToWorldPixel(
 
   return {
     x: ((lon + 180) / 360) * size,
-    y:
-      ((1 -
-        Math.asinh(Math.tan(latitudeRadians)) / Math.PI) /
-        2) *
-      size,
+    y: ((1 - Math.asinh(Math.tan(latitudeRadians)) / Math.PI) / 2) * size,
   };
 }
 
-export function worldPixelToLonLat(
-  { x, y }: PixelPoint,
-  zoom = ZOOM,
-): LonLat {
+export function worldPixelToLonLat({ x, y }: PixelPoint, zoom = ZOOM): LonLat {
   const size = worldSize(zoom);
   const longitude = (x / size) * 360 - 180;
-  const latitudeRadians = Math.atan(
-    Math.sinh(Math.PI * (1 - (2 * y) / size)),
-  );
+  const latitudeRadians = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / size)));
 
   return {
     lon: longitude,
@@ -67,5 +53,5 @@ export function lonLatToMosaicPixel(coordinate: LonLat): PixelPoint {
 }
 
 export function tileCornerToLonLat(x: number, y: number): LonLat {
-  return worldPixelToLonLat({x: x * TILE_SIZE, y: y * TILE_SIZE});
+  return worldPixelToLonLat({ x: x * TILE_SIZE, y: y * TILE_SIZE });
 }

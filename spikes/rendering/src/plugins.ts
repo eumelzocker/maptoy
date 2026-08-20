@@ -1,9 +1,8 @@
-import {readFile} from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import exifr from "exifr";
-import sharp, {type OverlayOptions} from "sharp";
-import type {LonLat} from "./geo.js";
-import type {ServerLayerPlugin} from "./types.js";
+import sharp, { type OverlayOptions } from "sharp";
+import type { ServerLayerPlugin } from "./types.js";
 
 interface TrackConfiguration {
   assetPath: string;
@@ -64,14 +63,14 @@ function requireFiniteNumber(
 function svgPolyline(
   width: number,
   height: number,
-  points: Array<{x: number; y: number}>,
+  points: Array<{ x: number; y: number }>,
   color: string,
   lineWidth: number,
 ): Buffer {
-  const pointList = points.map(({x, y}) => `${x},${y}`).join(" ");
+  const pointList = points.map(({ x, y }) => `${x},${y}`).join(" ");
   const controls = points
     .map(
-      ({x, y}) =>
+      ({ x, y }) =>
         `<circle cx="${x}" cy="${y}" r="6" fill="#ffffff" stroke="${color}" stroke-width="3"/>`,
     )
     .join("");
@@ -92,7 +91,9 @@ export const trackPlugin: ServerLayerPlugin<TrackConfiguration> = {
     }
     const width = requireFiniteNumber(input, "width");
     if (width <= 0 || width > 32) {
-      throw new RangeError("Track width must be greater than 0 and at most 32.");
+      throw new RangeError(
+        "Track width must be greater than 0 and at most 32.",
+      );
     }
     return {
       assetPath: requireString(input, "assetPath"),
@@ -111,7 +112,7 @@ export const trackPlugin: ServerLayerPlugin<TrackConfiguration> = {
       throw new TypeError("Track fixture must contain a LineString.");
     }
     const points = line.map(([lon, lat]) =>
-      context.lonLatToPixel({lon, lat}),
+      context.lonLatToPixel({ lon, lat }),
     );
     return [
       {
@@ -176,7 +177,11 @@ export const imagePlugin: ServerLayerPlugin<ImageConfiguration> = {
         gps: true,
         pick: ["GPSLatitude", "GPSLongitude", "Orientation"],
       })) as
-        | {latitude?: number; longitude?: number; Orientation?: number | string}
+        | {
+            latitude?: number;
+            longitude?: number;
+            Orientation?: number | string;
+          }
         | undefined;
       if (
         metadata?.latitude === undefined ||
@@ -190,9 +195,9 @@ export const imagePlugin: ServerLayerPlugin<ImageConfiguration> = {
       });
       const image = await sharp(configuration.assetPath)
         .autoOrient()
-        .resize({width: configuration.width})
+        .resize({ width: configuration.width })
         .png()
-        .toBuffer({resolveWithObject: true});
+        .toBuffer({ resolveWithObject: true });
       return [
         {
           input: image.data,
@@ -213,7 +218,7 @@ export const imagePlugin: ServerLayerPlugin<ImageConfiguration> = {
     const width = Math.max(1, Math.round(southeast.x - northwest.x));
     const height = Math.max(1, Math.round(southeast.y - northwest.y));
     const image = await sharp(configuration.assetPath)
-      .resize(width, height, {fit: "fill"})
+      .resize(width, height, { fit: "fill" })
       .ensureAlpha(configuration.opacity)
       .png()
       .toBuffer();
@@ -238,6 +243,8 @@ export function assertManagedFixturePath(
 ): void {
   const relative = path.relative(assetRoot, assetPath);
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error(`Layer asset is outside the managed fixture root: ${assetPath}`);
+    throw new Error(
+      `Layer asset is outside the managed fixture root: ${assetPath}`,
+    );
   }
 }

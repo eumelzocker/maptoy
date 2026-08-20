@@ -1,23 +1,22 @@
 import path from "node:path";
 import exifr from "exifr";
-import {OUTPUT_ROOT} from "./config.js";
-import {generateFixtures} from "./fixtures.js";
-import {runNativeMeasurement} from "./render-native.js";
-import {runReprojectionMeasurements} from "./reproject.js";
+import { OUTPUT_ROOT } from "./config.js";
+import { generateFixtures } from "./fixtures.js";
+import { runNativeMeasurement } from "./render-native.js";
+import { runReprojectionMeasurements } from "./reproject.js";
 
 const fixtures = await generateFixtures();
 const gpsMetadata = (await exifr.parse(fixtures.gpsImage, {
   gps: true,
   pick: ["GPSLatitude", "GPSLongitude", "Orientation"],
 })) as
-  | {latitude?: number; longitude?: number; Orientation?: number | string}
+  | { latitude?: number; longitude?: number; Orientation?: number | string }
   | undefined;
 
 if (
   gpsMetadata?.latitude === undefined ||
   gpsMetadata.longitude === undefined ||
-  (gpsMetadata.Orientation !== 6 &&
-    gpsMetadata.Orientation !== "Rotate 90 CW")
+  (gpsMetadata.Orientation !== 6 && gpsMetadata.Orientation !== "Rotate 90 CW")
 ) {
   throw new Error(
     `Synthetic GPS metadata is invalid: ${JSON.stringify(gpsMetadata)}`,

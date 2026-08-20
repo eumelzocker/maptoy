@@ -1,5 +1,5 @@
-import type {OverlayOptions} from "sharp";
-import type {LonLat, PixelPoint} from "./geo.js";
+import type { OverlayOptions } from "sharp";
+import type { LonLat, PixelPoint } from "./geo.js";
 
 export interface RenderContext {
   width: number;
