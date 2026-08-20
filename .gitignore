@@ -1,6 +1,8 @@
-# Dependencies
+# Dependencies and package-manager state
 node_modules/
+.pnpm-store/
 npm-debug.log*
+pnpm-debug.log*
 
 # Nix / direnv
 .direnv/
@@ -16,7 +18,6 @@ logs/
 *.log
 
 # IDE
-#.vscode/
 .idea/
 *.swp
 *.swo
@@ -25,33 +26,32 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Docker
-#.dockerignore
-
-# Environment
+# Local environment; the documented example remains versioned
 .env
+.env.*
+!.env.example
 
-# Examples
-/media/
+# Local persistent application data
 /.data/
+/data/
 
 # Temporary files
 .tmp/
 tmp/
-*.epub
 
 # Test coverage
 coverage/
 
+# Generated rendering-spike fixtures and reports
+/spikes/rendering/.artifacts/
+
 # Bruno test output
-/tests/bruno/json
+/tests/bruno/json/
 
 # TypeScript
 *.tsbuildinfo
 
-# Playwright
-/src/web/playwright-report/
-/src/web/test-results/
-/src/web/blob-report/
+# Playwright output (root E2E tests or apps/web)
 playwright-report/
 test-results/
+blob-report/

@@ -88,14 +88,14 @@ Node.js HTTP server (one port)
 - Verträge: gemeinsam genutzte TypeScript-Typen und Laufzeitschemas, zum Beispiel mit TypeBox oder Zod
 - API-Referenz: aus den Backend-Schemas erzeugte OpenAPI-Spezifikation, eingebettet in die Dokumentationsoberfläche
 - Datenbank: SQLite mit Migrationen; genaue Bibliothek nach einem kleinen Kompatibilitätstest mit der gewählten Node-Version festlegen
-- Bildverarbeitung: `sharp` für Komposition und PNG/JPEG/WebP-Ausgabe
-- Projektionen: `proj4` beziehungsweise passende GIS-Bibliothek; zunächst explizit unterstützte Projektionen statt beliebiger ungetesteter Definitionen
+- Bildverarbeitung: `sharp` für Dekodierung, Komposition und PNG/JPEG/WebP-Ausgabe
+- Projektionen: `proj4` für Koordinatenberechnungen und die GDAL-CLI für Raster-Reprojektionen; zunächst `EPSG:3857`, `EPSG:4326` und `EPSG:25833`
 - Erweiterbarkeit: typisierte SDK-Verträge und Registries für Frontend-Renderer-Adapter und Layer-Plugins
 - Qualität: Biome für Formatierung und Linting, TypeScript für Typprüfung, Vitest für Unit-/Integrationstests, Playwright für wenige kritische End-to-End-Tests, Bruno Collection für API-Tests
 - Entwicklungsumgebung: Nix Flake und direnv
 - Auslieferung: mehrstufiges Dockerfile mit reproduzierbarem Produktions-Build
 
-Vor der endgültigen Bibliothekswahl ist ein kurzer technischer Spike nötig: serverseitiges Zusammenfügen von XYZ-Tiles, Reprojektion eines kleinen Ausschnitts und Export mit einem transparenten Plugin-Layer. Damit wird früh geprüft, ob `sharp` plus Projektionsbibliothek genügt oder für Reprojektionen GDAL benötigt wird.
+Der technische Spike ist abgeschlossen. Die Aufgabenverteilung, initialen Exportgrenzen und Messgrundlagen stehen in [ADR 0004](docs/internal/adr/0004-use-gdal-for-raster-reprojection.md).
 
 ### 4.2 Monorepo-Struktur
 
@@ -259,7 +259,7 @@ Ein Exportauftrag enthält:
 - Kartengebiet oder Mittelpunkt plus Maßstab
 - Ausgabegröße in Pixeln; optional DPI und physische Größe
 - Ausgabeformat `png`, `jpeg` oder `webp`
-- Zielprojektion aus einer zunächst begrenzten Allowlist
+- Zielprojektion aus der initialen Allowlist `EPSG:3857`, `EPSG:4326` und `EPSG:25833`; standardmäßig höchstens 4096², konfigurierbar bis maximal 8192² Pixel
 - Verhalten bei fehlenden Tiles: abbrechen, transparent darstellen oder online nachladen
 - ausgewählte Layer-Instanzen mit Reihenfolge, Deckkraft und exportbezogener Konfiguration
 
@@ -443,7 +443,7 @@ Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende P
 Die Flake stellt mindestens bereit:
 
 - festgelegte Node- und pnpm-Versionen
-- native Build-Abhängigkeiten für SQLite und Bildverarbeitung
+- native Build- und Laufzeitabhängigkeiten für SQLite, Bildverarbeitung, PROJ und GDAL
 - Biome und benötigte Hilfswerkzeuge
 - `devShell` mit verständlichem Shell-Hook
 - optional Checks für Formatierung, Typprüfung und Tests
@@ -852,7 +852,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 Diese Entscheidungen sollten während Phase 0 beziehungsweise vor der jeweils betroffenen Phase getroffen und als Architecture Decision Records dokumentiert werden:
 
 1. Welche konkreten Tile-Anbieter dienen als erste Beispiele, und welche rein technischen Defaults sollen dafür vorgeschlagen werden?
-2. Reicht `sharp` plus Projektionsbibliothek für die geforderten Exporte oder ist GDAL erforderlich?
+2. **Entschieden:** `sharp` und `proj4` genügen nicht als allgemeiner Raster-Warper; GDAL wird gemäß [ADR 0004](docs/internal/adr/0004-use-gdal-for-raster-reprojection.md) verwendet.
 3. Welche alternativen Projektionen müssen in v0.3 tatsächlich unterstützt werden?
 4. Welche maximalen Gebiets-, Tile-, Speicher- und Exportgrößen sind für die Zielhardware sinnvoll, und wann soll das Tile-Archiv warnen beziehungsweise neue Datenaufnahme blockieren?
 5. Sollen Map Sets ausschließlich in SQLite verwaltet oder zusätzlich als importierbare/exportierbare JSON-Dateien unterstützt werden?

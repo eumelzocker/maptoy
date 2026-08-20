@@ -163,3 +163,11 @@ The implementation work should conclude with these short ADRs:
 
 The spike report must link its generated images and measurements from the fourth
 ADR so that the dependency decision remains reproducible.
+
+## Records
+
+- [Example provider decision](./provider-example.md)
+- [ADR 0001: Frontend map-renderer adapter boundary](./adr/0001-map-renderer-adapter-boundary.md)
+- [ADR 0002: Trusted layer-plugin lifecycle](./adr/0002-trusted-layer-plugin-lifecycle.md)
+- [ADR 0003: Immutable tile revisions and snapshots](./adr/0003-tile-revision-and-snapshot-model.md)
+- [ADR 0004: Use GDAL for raster reprojection](./adr/0004-use-gdal-for-raster-reprojection.md)

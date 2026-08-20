@@ -25,6 +25,7 @@
             proj
             gdal
             exiftool
+            time
           ];
 
           PROJ_DATA = "${pkgs.proj}/share/proj";
