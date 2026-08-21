@@ -8,7 +8,7 @@ const documentationRoot = fileURLToPath(
 
 async function documentationPage(
   language: string,
-  page: "abbreviations" | "glossary" | "tile-providers",
+  page: "abbreviations" | "glossary" | "map-projections" | "tile-providers",
 ): Promise<string> {
   return readFile(`${documentationRoot}/${language}/${page}.md`, "utf8");
 }
@@ -52,6 +52,30 @@ describe("glossary documentation", () => {
       expect(providers).toContain("## Google Maps Platform");
       expect(providers).toContain("2026-08-21");
       expect(providers).toContain("https://");
+    },
+  );
+
+  it.each([
+    ["en", "Map projections", "Planned initial maptoy support"],
+    [
+      "de",
+      "Kartenprojektionen",
+      "Geplante anfängliche Unterstützung in maptoy",
+    ],
+  ])(
+    "provides a localized map-projection overview for %s",
+    async (language, title, supportTitle) => {
+      const projections = await documentationPage(language, "map-projections");
+
+      expect(projections).toContain("id: map-projections");
+      expect(projections).toContain(`language: ${language}`);
+      expect(projections).toContain(`# ${title}`);
+      expect(projections).toContain(`## ${supportTitle}`);
+      expect(projections).toContain("`EPSG:3857`");
+      expect(projections).toContain("`EPSG:4326`");
+      expect(projections).toContain("`EPSG:25833`");
+      expect(projections).toContain("### Equal Earth");
+      expect(projections).toContain("https://epsg.org/");
     },
   );
 });

@@ -105,13 +105,14 @@ nav a {
 
 .docs-sidebar nav a,
 .language-switcher a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   text-underline-offset: 0.25rem;
 }
 
 .docs-sidebar nav a {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
+  width: 100%;
 }
 
 .docs-nav-icon {
@@ -124,6 +125,16 @@ nav a {
 
 .docs-fallback-icon {
   color: #a34521;
+}
+
+.docs-current-page,
+.docs-current-language {
+  font-weight: 700;
+}
+
+.docs-current-icon {
+  color: #a34521;
+  font-size: 0.95rem;
 }
 
 .docs-sidebar nav .docs-home-link {

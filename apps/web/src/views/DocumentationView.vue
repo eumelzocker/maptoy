@@ -68,8 +68,12 @@ onMounted(refreshExternalLinks);
           v-for="link in pageLinks"
           :key="link.id"
           :to="`/docs/${requestedLanguage}/${link.id}`"
-          :class="{ 'docs-home-link': link.id === 'home' }"
+          :class="{
+            'docs-home-link': link.id === 'home',
+            'docs-current-page': link.id === requestedPageId,
+          }"
           :title="link.isFallback ? englishOnlyLabel : undefined"
+          :aria-current="link.id === requestedPageId ? 'page' : undefined"
         >
           <i
             v-if="link.id === 'home'"
@@ -77,6 +81,11 @@ onMounted(refreshExternalLinks);
             aria-hidden="true"
           ></i>
           <span>{{ link.title }}</span>
+          <i
+            v-if="link.id === requestedPageId"
+            class="mdi mdi-chevron-right-circle docs-nav-icon docs-current-icon"
+            aria-hidden="true"
+          ></i>
           <i
             v-if="link.isFallback"
             class="mdi mdi-translate-off docs-nav-icon docs-fallback-icon"
@@ -93,8 +102,19 @@ onMounted(refreshExternalLinks);
           :key="language.code"
           :lang="language.code"
           :to="`/docs/${language.code}/${requestedPageId}`"
+          :class="{
+            'docs-current-language': language.code === requestedLanguage,
+          }"
+          :aria-current="
+            language.code === requestedLanguage ? 'true' : undefined
+          "
         >
-          {{ language.label }}
+          <span>{{ language.label }}</span>
+          <i
+            v-if="language.code === requestedLanguage"
+            class="mdi mdi-check-circle docs-nav-icon docs-current-icon"
+            aria-hidden="true"
+          ></i>
         </RouterLink>
       </div>
     </aside>

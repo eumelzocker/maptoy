@@ -725,6 +725,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 
 - englisches Glossar und Abkürzungsverzeichnis mit deutschen und thailändischen Fassungen erstellen
 - englische und deutsche Übersicht wichtiger Tile-Provider mit Varianten, URL-Templates, Parametern, Policy-Einordnung, Prüfdatum und offiziellen Links erstellen
+- englische und deutsche Projektionsübersicht mit Auswahlhilfe, anfänglich unterstützten EPSG-Codes und Auswirkungen der Reprojektion erstellen
 - `CHANGELOG.md` aus dem Repository-Wurzelverzeichnis beim Build direkt als englische Dokumentationsseite mit den üblichen Sprach-Fallbacks einbinden
 
 **Aufgaben**
@@ -739,7 +740,6 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Provider-Seiten mit Attribution, Fähigkeiten, Limits, Prüfdatum und offiziellen externen Links anlegen
 - Eigenverantwortung des Nutzers, Veränderlichkeit fremder Bedingungen und fehlende rechtliche Prüfung durch maptoy deutlich dokumentieren
 - Architekturhinweise für Layer-Plugins und künftige Renderer-Adapter samt v1.0-Abgrenzung dokumentieren
-- Projektionsübersicht erstellen
 - Build-Prüfungen für vollständiges Englisch, Fallbacks, Übersetzungsstatus, Links, Assets, Anker, Sanitizing und API-Konsistenz aktivieren
 - App-, Dokumentations- und Changelog-Version sichtbar miteinander verknüpfen
 
