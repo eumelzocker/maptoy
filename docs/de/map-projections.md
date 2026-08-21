@@ -150,3 +150,7 @@ werden.
 - [EPSG:4326 — WGS 84](https://epsg.org/crs_4326/WGS-84.html)
 - [EPSG:25833 — ETRS89 / UTM-Zone 33N](https://epsg.org/crs_25833/ETRS89-UTM-zone-33N.html)
 - [PROJ-Projektionsreferenz](https://proj.org/en/stable/operations/projections/index.html)
+
+## Weitere Infos
+
+- [Wikipedia](https://de.wikipedia.org/wiki/Kartennetzentwurf)

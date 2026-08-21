@@ -1,0 +1,58 @@
+meta {
+  name: Map Sets - Create placeholder (writes data)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{appUrl}}/api/map-sets
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Placeholder XYZ source",
+    "sourceType": "xyz-raster",
+    "urlTemplate": "https://example.com/tiles/{z}/{x}/{y}.png",
+    "attribution": "Replace with provider attribution",
+    "termsUrl": "https://example.com/terms",
+    "notes": "Replace this placeholder before provider testing.",
+    "termsReviewedAt": "",
+    "minZoom": 0,
+    "maxZoom": 18,
+    "tileSize": 256,
+    "tileFormat": "png",
+    "subdomains": [],
+    "headers": {},
+    "sourceProjection": "EPSG:3857",
+    "defaultCenter": { "longitude": 13.405, "latitude": 52.52 },
+    "defaultZoom": 10,
+    "rendererId": "leaflet-xyz",
+    "capabilities": {
+      "interactive": true,
+      "tileArchive": false,
+      "batchDownload": false,
+      "serverExport": false,
+      "layerRendering": true
+    },
+    "cachePolicy": {
+      "enabled": false,
+      "maximumAgeSeconds": 604800,
+      "maximumStorageBytes": null
+    },
+    "downloadPolicy": {
+      "requestsPerSecond": 2,
+      "concurrency": 2,
+      "retryLimit": 3,
+      "dailyRequestLimit": null
+    }
+  }
+}
+
+tests {
+  test("creates a Map Set", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.name).to.equal("Placeholder XYZ source");
+  });
+}

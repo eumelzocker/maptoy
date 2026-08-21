@@ -3,9 +3,11 @@ import {
   createLayerPluginRegistry,
   type LayerPluginRegistry,
 } from "@maptoy/layer-plugin-sdk";
-import { leafletXyzManifest } from "@maptoy/leaflet-xyz";
+import { leafletXyzFactory, leafletXyzManifest } from "@maptoy/leaflet-xyz";
 import {
+  createMapRendererFactoryRegistry,
   createMapRendererManifestRegistry,
+  type MapRendererFactoryRegistry,
   type MapRendererManifestRegistry,
 } from "@maptoy/map-adapter-sdk";
 import { trackLayerPlugin } from "@maptoy/track-layer";
@@ -15,6 +17,10 @@ export const mapRendererRegistry = createMapRendererManifestRegistry([
   leafletXyzManifest,
 ]);
 
+export const mapRendererFactoryRegistry = createMapRendererFactoryRegistry([
+  leafletXyzFactory,
+]);
+
 export const layerPluginRegistry = createLayerPluginRegistry([
   trackLayerPlugin,
   imageLayerPlugin,
@@ -22,6 +28,9 @@ export const layerPluginRegistry = createLayerPluginRegistry([
 
 export const MAP_RENDERER_REGISTRY_KEY: InjectionKey<MapRendererManifestRegistry> =
   Symbol("map-renderer-registry");
+
+export const MAP_RENDERER_FACTORY_REGISTRY_KEY: InjectionKey<MapRendererFactoryRegistry> =
+  Symbol("map-renderer-factory-registry");
 
 export const LAYER_PLUGIN_REGISTRY_KEY: InjectionKey<LayerPluginRegistry> =
   Symbol("layer-plugin-registry");

@@ -1,0 +1,87 @@
+---
+id: map-sets
+title: Map Sets
+language: en
+---
+
+# Map Sets
+
+A Map Set connects an XYZ raster source to maptoy's renderer, initial viewport,
+technical capabilities, cache policy, and download limits. No public provider is
+configured automatically. Before adding a source, review its current terms,
+attribution rules, request limits, and permissions for proxying or storage. See the
+[tile-provider overview](docs/en/tile-providers) for technical orientation.
+
+## Create a Map Set
+
+Open **Map Sets**, choose **New Map Set**, and complete these essential fields:
+
+- **Name** is the local display name.
+- **XYZ URL template** must be an HTTP or HTTPS URL containing `{z}`, `{x}`, and
+  `{y}`. `{s}` is optional and requires at least one configured subdomain.
+- **Attribution** is shown by the interactive renderer. Enter it as plain text.
+- **Provider terms URL**, **Terms last reviewed**, and **Notes** record what you
+  checked; they do not constitute legal approval by maptoy.
+- **Minimum**, **maximum**, and **default zoom** must describe the source's actual
+  range. The default zoom must fall inside that range.
+- **Default longitude and latitude** determine the first viewport.
+- **Tile size** and **format** must match the provider response.
+
+The initial implementation supports the `xyz-raster` source type in Web Mercator
+(`EPSG:3857`) and the `leaflet-xyz` renderer only.
+
+## Secrets and request headers
+
+Never paste an API key directly into a Map Set. Put it in the server environment
+and reference its name in the URL or a header:
+
+```text
+https://tiles.example.test/{z}/{x}/{y}.png?key=${MAPTOY_EXAMPLE_API_KEY}
+Authorization: Bearer ${MAPTOY_EXAMPLE_API_KEY}
+```
+
+Only `MAPTOY_*` names are accepted. The referenced variable must exist when the Map
+Set is saved. SQLite stores the reference, not the resolved value; API responses,
+diagnostics, and the web interface therefore never need the secret itself.
+
+Request headers use one `Name: value` line each. Hop-by-hop headers, `Host`,
+`Cookie`, and `Content-Length` cannot be configured. If a provider redirects to a
+different origin, maptoy removes configured headers before following it.
+
+## Provider test
+
+Save the Map Set and choose **Test tile**. maptoy requests the tile containing the
+configured default centre at the default zoom and reports:
+
+- XYZ coordinate and provider HTTP status;
+- normalized content type;
+- response byte size and duration;
+- a clear error for DNS, timeout, network, size, status, or unsupported image type.
+
+The test accepts PNG, JPEG, and WebP raster responses. It does not grant permission
+to use the provider and does not enable capabilities automatically.
+
+## Network protection
+
+Provider requests allow HTTPS by default. Localhost, private, and link-local
+addresses are rejected both when configured as literal IP addresses and after DNS
+resolution. Redirect destinations are checked again. A self-hosted private tile
+server requires the explicit server setting
+`MAPTOY_ALLOW_PRIVATE_TILE_HOSTS=true`; this also permits HTTP and should be enabled
+only in a trusted network.
+
+Provider responses have a configurable timeout and byte limit. The defaults are
+10 seconds and 10 MiB per tile. Configure them with
+`MAPTOY_PROVIDER_TIMEOUT_MS` and `MAPTOY_MAX_TILE_BYTES`.
+
+## Capabilities and current scope
+
+Capability switches describe technical behavior, not provider permission. maptoy
+combines them with the selected renderer's capabilities. A disabled interactive
+capability prevents the Map Set from opening in the Map view.
+
+During Phase 2, the Map view loads every tile through the relative maptoy endpoint
+`api/map-sets/:id/tiles/:z/:x/:y`; the browser never receives the external provider
+URL or resolved secrets. Persistent tile revisions, cache refresh modes, snapshots,
+and batch downloads are implemented in later phases. Cache and download settings
+can already be recorded so the same Map Set configuration remains usable then.

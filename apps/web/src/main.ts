@@ -5,12 +5,16 @@ import App from "./App.vue";
 import {
   layerPluginRegistry,
   LAYER_PLUGIN_REGISTRY_KEY,
+  mapRendererFactoryRegistry,
+  MAP_RENDERER_FACTORY_REGISTRY_KEY,
   mapRendererRegistry,
   MAP_RENDERER_REGISTRY_KEY,
 } from "./registries.js";
 import DocumentationView from "./views/DocumentationView.vue";
-import HomeView from "./views/HomeView.vue";
+import MapSetsView from "./views/MapSetsView.vue";
+import MapView from "./views/MapView.vue";
 import "@mdi/font/css/materialdesignicons.css";
+import "@maptoy/leaflet-xyz/style.css";
 import "./style.css";
 
 function applicationBasePath(): string {
@@ -23,7 +27,11 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      component: HomeView,
+      component: MapView,
+    },
+    {
+      path: "/map-sets",
+      component: MapSetsView,
     },
     {
       path: "/docs",
@@ -38,6 +46,7 @@ const router = createRouter({
 
 createApp(App)
   .provide(MAP_RENDERER_REGISTRY_KEY, mapRendererRegistry)
+  .provide(MAP_RENDERER_FACTORY_REGISTRY_KEY, mapRendererFactoryRegistry)
   .provide(LAYER_PLUGIN_REGISTRY_KEY, layerPluginRegistry)
   .use(createPinia())
   .use(router)

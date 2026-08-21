@@ -139,3 +139,7 @@ it will be used outside maptoy.
 - [EPSG:4326 — WGS 84](https://epsg.org/crs_4326/WGS-84.html)
 - [EPSG:25833 — ETRS89 / UTM zone 33N](https://epsg.org/crs_25833/ETRS89-UTM-zone-33N.html)
 - [PROJ projection reference](https://proj.org/en/stable/operations/projections/index.html)
+
+## More infos
+
+- [Wikipedia](https://en.wikipedia.org/wiki/Map_projection)

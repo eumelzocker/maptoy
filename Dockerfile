@@ -54,7 +54,6 @@ RUN mkdir -p /data && chown node:node /data
 USER node
 
 EXPOSE 4004
-VOLUME ["/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["node", "server/dist/healthcheck.js"]

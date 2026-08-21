@@ -1,6 +1,6 @@
 {
   "name": "@maptoy/server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,6 +16,7 @@
     "@maptoy/image-layer": "workspace:*",
     "@maptoy/layer-plugin-sdk": "workspace:*",
     "@maptoy/leaflet-xyz": "workspace:*",
+    "@maptoy/map-core": "workspace:*",
     "@maptoy/map-adapter-sdk": "workspace:*",
     "@maptoy/track-layer": "workspace:*",
     "fastify": "5.12.1"

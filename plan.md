@@ -88,7 +88,7 @@ Node.js HTTP server (one port)
 - Dokumentation: Markdown-basierte Inhalte, beim Build in sichere Vue-kompatible Seiten und einen lokalen Suchindex umgewandelt
 - Verträge: gemeinsam genutzte TypeScript-Typen und Laufzeitschemas, zum Beispiel mit TypeBox oder Zod
 - API-Referenz: aus den Backend-Schemas erzeugte OpenAPI-Spezifikation, eingebettet in die Dokumentationsoberfläche
-- Datenbank: SQLite mit Migrationen; genaue Bibliothek nach einem kleinen Kompatibilitätstest mit der gewählten Node-Version festlegen
+- Datenbank: SQLite mit Migrationen über die in Node.js 24 enthaltene `node:sqlite`-API gemäß [ADR 0005](docs/internal/adr/0005-use-node-sqlite-for-metadata.md)
 - Bildverarbeitung: `sharp` für Dekodierung, Komposition und PNG/JPEG/WebP-Ausgabe
 - Projektionen: `proj4` für Koordinatenberechnungen und die GDAL-CLI für Raster-Reprojektionen; zunächst `EPSG:3857`, `EPSG:4326` und `EPSG:25833`
 - Erweiterbarkeit: typisierte SDK-Verträge und Registries für Frontend-Renderer-Adapter und Layer-Plugins
@@ -410,17 +410,18 @@ Alle Variablen erhalten das Präfix `MAPTOY_`. Eine `.env.example` dokumentiert 
 ```dotenv
 MAPTOY_HOST=0.0.0.0
 MAPTOY_PORT=4004
-MAPTOY_DATA_DIR=/data
-MAPTOY_DATABASE_PATH=/data/maptoy.sqlite
+MAPTOY_DATA_DIR=./.data
 MAPTOY_LOG_LEVEL=info
 MAPTOY_MAX_CONCURRENT_JOBS=1
 MAPTOY_MAX_EXPORT_PIXELS=100000000
-MAPTOY_TEMP_DIR=/data/tmp
+MAPTOY_TEMP_DIR=${MAPTOY_DATA_DIR}/tmp
 # Provider-specific secrets, for example:
 # MAPTOY_EXAMPLE_API_KEY=
 ```
 
 Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende Pflichtwerte führen zu einer klaren Fehlermeldung. Konfigurationsschemata unterscheiden `server-secret`, `public-client` und `public`. Das Backend gibt echte Server-Secrets weder an das Frontend noch in Logs oder Jobparameter weiter. Die Kategorie `public-client` ist als Adapter-Vertrag vorgesehen, wird in v1.0 aber von keinem ausgelieferten Adapter benötigt.
+
+`MAPTOY_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Datenpfad. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Datenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Für persistente Anwendungsdaten werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar.
 
 ### 8.2 Reverse-Proxy-Fähigkeit
 
@@ -436,7 +437,7 @@ Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende P
 - Mehrstufiger Build: Dependencies, Test/Build, minimale Runtime
 - Betrieb als nicht privilegierter Benutzer
 - genau ein veröffentlichter HTTP-Port
-- `/data` als persistentes Volume
+- ausschließlich ein expliziter Host-Bind-Mount von `MAPTOY_DATA_DIR` nach `/data`; keine benannten oder anonymen Docker-Volumes für persistente Anwendungsdaten
 - Healthcheck gegen den Liveness-Endpunkt
 - sauberer Shutdown: keine neuen Jobs, laufende Dateischreibvorgänge abschließen, Jobstatus sichern
 - temporäre Dateien beim Start prüfen und verwaiste Dateien kontrolliert bereinigen
@@ -587,19 +588,22 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Vue-SPA bauen und durch Fastify auf demselben Port ausliefern
 - Health-/Readiness-Endpunkte und strukturiertes Logging ergänzen
 - Bruno Collection mit lokaler Beispielumgebung und ersten Health-/Readiness-Requests anlegen
-- mehrstufiges Dockerfile und Compose-Beispiel mit Datenvolume erstellen
+- mehrstufiges Dockerfile und Compose-Beispiel mit explizitem Host-Bind-Mount für das Datenverzeichnis erstellen
 - gemeinsame semantische Versionierung aller auslieferungsrelevanten Paketmanifeste und einen Changelog einführen; Spikes werden unabhängig und nur bei eigenen Änderungen versioniert
 
 **Ergebnis/Akzeptanz**
 
 - Ein Befehl startet die Entwicklungsumgebung, ein weiterer alle Qualitätschecks.
 - Der Container startet ohne Root-Rechte, liefert SPA und API auf einem Port und wird gesund gemeldet.
+- Datenbank und spätere persistente Artefakte liegen über `MAPTOY_DATA_DIR` in einem direkt zugänglichen Hostverzeichnis; Compose legt dafür kein Docker-verwaltetes Volume an.
 - Die vollständige englische Startseite sowie deutsche und thailändische Routen mit funktionierendem Englisch-Fallback sind über die Hauptnavigation erreichbar.
 - Ein automatisierter Test bestätigt den Betrieb hinter einem Präfix-entfernenden Proxy-Unterpfad.
 - Der Abschluss der Phase 1 ist als gemeinsame Version `0.0.1` in allen Paketmanifesten und im Changelog nachvollziehbar.
 - Ein automatisierter Test verhindert voneinander abweichende Versionen in den auslieferungsrelevanten Paketmanifesten; Spike-Manifeste sind davon ausgenommen.
 
 ### Phase 2: Map Sets und interaktive Karte
+
+**Status:** abgeschlossen am 21. August 2026 als Version `0.0.2`
 
 **Aufgaben**
 

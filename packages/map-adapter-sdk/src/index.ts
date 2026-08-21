@@ -22,6 +22,7 @@ export interface MapRendererCapabilities {
   layerRendering: boolean;
   serverExport: boolean;
   tileArchive: boolean;
+  batchDownload: boolean;
 }
 
 export interface MapRendererManifest {
@@ -72,6 +73,85 @@ export interface MapRendererFactory {
   create: (
     options: CreateMapRendererOptions,
   ) => MaybePromise<MapRendererInstance>;
+}
+
+export interface MapRendererFactoryRegistry {
+  get: (id: string) => MapRendererFactory | undefined;
+  list: () => readonly MapRendererFactory[];
+}
+
+export function createMapRendererFactoryRegistry(
+  factories: readonly MapRendererFactory[],
+): MapRendererFactoryRegistry {
+  const byId = new Map<string, MapRendererFactory>();
+  for (const factory of factories) {
+    assertValidMapRendererManifest(factory.manifest);
+    invariant(
+      !byId.has(factory.manifest.id),
+      `duplicate adapter id: ${factory.manifest.id}`,
+    );
+    byId.set(factory.manifest.id, factory);
+  }
+  const registered = Object.freeze([...byId.values()]);
+  return Object.freeze({
+    get: (id: string) => byId.get(id),
+    list: () => registered,
+  });
+}
+
+export function createFakeMapRendererFactory(): MapRendererFactory {
+  return {
+    manifest: {
+      id: "fake",
+      version: "1.0.0",
+      sdkVersion: MAP_ADAPTER_SDK_VERSION,
+      displayName: "Contract fake",
+      configurationSchema: { type: "object" },
+      capabilities: {
+        interactive: true,
+        layerRendering: true,
+        serverExport: false,
+        tileArchive: false,
+        batchDownload: false,
+      },
+    },
+    create(options): MapRendererInstance {
+      let viewport: MapViewport = options.initialViewport;
+      const layers = new Map<string, MapLayerDescriptor>();
+      return {
+        getViewport: () => viewport,
+        setViewport: (value) => {
+          viewport = value;
+        },
+        subscribe: () => () => undefined,
+        attachLayer: (layer) => {
+          layers.set(layer.id, layer);
+        },
+        updateLayer: (layer) => {
+          if (!layers.has(layer.id)) {
+            throw new Error("Layer is not attached.");
+          }
+          layers.set(layer.id, layer);
+        },
+        reorderLayers: (layerIds) => {
+          if (layerIds.some((id) => !layers.has(id))) {
+            throw new Error("Unknown layer in order.");
+          }
+        },
+        removeLayer: (layerId) => {
+          layers.delete(layerId);
+        },
+        geographicToScreen: ({ longitude, latitude }) => ({
+          x: longitude,
+          y: latitude,
+        }),
+        screenToGeographic: ({ x, y }) => ({ longitude: x, latitude: y }),
+        destroy: () => {
+          layers.clear();
+        },
+      };
+    },
+  };
 }
 
 function invariant(condition: boolean, message: string): asserts condition {

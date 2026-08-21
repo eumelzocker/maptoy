@@ -4,6 +4,7 @@
       <RouterLink class="brand" to="/" aria-label="maptoy home">maptoy</RouterLink>
       <nav aria-label="Main navigation">
         <RouterLink to="/">Map</RouterLink>
+        <RouterLink to="/map-sets">Map Sets</RouterLink>
         <RouterLink to="/docs/en">Documentation</RouterLink>
       </nav>
     </header>

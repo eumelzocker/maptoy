@@ -3,7 +3,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MaptoyConfig } from "@maptoy/config";
+import { createDefaultMapSetInput } from "@maptoy/contracts";
 import { afterEach, describe, expect, it } from "vitest";
+import type { ProviderClient } from "./providerClient.js";
 import { buildServer } from "./server.js";
 
 const temporaryDirectories: string[] = [];
@@ -17,9 +19,21 @@ async function testConfig(): Promise<MaptoyConfig> {
     host: "127.0.0.1",
     port: 4004,
     dataDirectory,
+    databasePath: path.join(dataDirectory, "maptoy.sqlite"),
     logLevel: "silent",
+    allowPrivateTileHosts: true,
+    providerTimeoutMilliseconds: 1000,
+    maximumTileBytes: 1024 * 1024,
   };
 }
+
+const providerClient: ProviderClient = {
+  request: async () => ({
+    statusCode: 200,
+    headers: { "content-type": "image/png" },
+    body: Buffer.from("fake-png"),
+  }),
+};
 
 afterEach(async () => {
   await Promise.all(
@@ -67,6 +81,82 @@ describe("maptoy server", () => {
       ],
     });
     await server.close();
+  });
+
+  it("creates, updates, tests, persists, and deletes Map Sets", async () => {
+    const config = await testConfig();
+    const server = await buildServer({
+      config,
+      environment: { MAPTOY_TEST_KEY: "secret-value" },
+      providerClient,
+      serveWeb: false,
+    });
+    const input = {
+      ...createDefaultMapSetInput(),
+      name: "Local test map",
+      urlTemplate:
+        "http://tiles.example.test/{z}/{x}/{y}.png?key=$" + "{MAPTOY_TEST_KEY}",
+    };
+
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: input,
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.body).not.toContain("secret-value");
+    const mapSet = created.json();
+
+    const updated = await server.inject({
+      method: "PATCH",
+      url: `/api/map-sets/${mapSet.id}`,
+      payload: { name: "Updated map" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ name: "Updated map" });
+
+    const tested = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSet.id}/test`,
+    });
+    expect(tested.statusCode).toBe(200);
+    expect(tested.json()).toMatchObject({
+      ok: true,
+      statusCode: 200,
+      contentType: "image/png",
+    });
+    const tile = await server.inject({
+      method: "GET",
+      url: `/api/map-sets/${mapSet.id}/tiles/10/550/335`,
+    });
+    expect(tile.statusCode).toBe(200);
+    expect(tile.headers["content-type"]).toContain("image/png");
+    expect(tile.body).toBe("fake-png");
+    await server.close();
+
+    const restarted = await buildServer({
+      config,
+      providerClient,
+      serveWeb: false,
+    });
+    const listed = await restarted.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    expect(listed.json()).toMatchObject({ items: [{ name: "Updated map" }] });
+
+    const deleted = await restarted.inject({
+      method: "DELETE",
+      url: `/api/map-sets/${mapSet.id}`,
+    });
+    expect(deleted.statusCode).toBe(204);
+    expect(
+      await restarted.inject({
+        method: "GET",
+        url: `/api/map-sets/${mapSet.id}`,
+      }),
+    ).toMatchObject({ statusCode: 404 });
+    await restarted.close();
   });
 
   it("uses a route-relative base for clean SPA routes and assets", async () => {

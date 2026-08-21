@@ -8,7 +8,12 @@ const documentationRoot = fileURLToPath(
 
 async function documentationPage(
   language: string,
-  page: "abbreviations" | "glossary" | "map-projections" | "tile-providers",
+  page:
+    | "abbreviations"
+    | "glossary"
+    | "map-projections"
+    | "map-sets"
+    | "tile-providers",
 ): Promise<string> {
   return readFile(`${documentationRoot}/${language}/${page}.md`, "utf8");
 }
@@ -76,6 +81,23 @@ describe("glossary documentation", () => {
       expect(projections).toContain("`EPSG:25833`");
       expect(projections).toContain("### Equal Earth");
       expect(projections).toContain("https://epsg.org/");
+    },
+  );
+
+  it.each([
+    ["en", "Secrets and request headers", "Provider test"],
+    ["de", "Secrets und Request-Header", "Provider testen"],
+  ])(
+    "documents Map Set configuration and secret handling for %s",
+    async (language, secretsTitle, testTitle) => {
+      const mapSets = await documentationPage(language, "map-sets");
+      expect(mapSets).toContain("id: map-sets");
+      expect(mapSets).toContain(`language: ${language}`);
+      expect(mapSets).toContain(`## ${secretsTitle}`);
+      expect(mapSets).toContain(`## ${testTitle}`);
+      expect(mapSets).toContain("$" + "{MAPTOY_EXAMPLE_API_KEY}");
+      expect(mapSets).toContain("MAPTOY_ALLOW_PRIVATE_TILE_HOSTS");
+      expect(mapSets).toContain("api/map-sets/:id/tiles/:z/:x/:y");
     },
   );
 });

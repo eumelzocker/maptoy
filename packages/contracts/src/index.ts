@@ -1,4 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 
 export const HealthResponseSchema = Type.Object(
   {
@@ -17,3 +18,204 @@ export const ReadyResponseSchema = Type.Object(
 );
 
 export type ReadyResponse = Static<typeof ReadyResponseSchema>;
+
+export const TileFormatSchema = Type.Union([
+  Type.Literal("png"),
+  Type.Literal("jpeg"),
+  Type.Literal("webp"),
+]);
+
+export type TileFormat = Static<typeof TileFormatSchema>;
+
+export const MapSetCapabilitiesSchema = Type.Object(
+  {
+    interactive: Type.Boolean(),
+    tileArchive: Type.Boolean(),
+    batchDownload: Type.Boolean(),
+    serverExport: Type.Boolean(),
+    layerRendering: Type.Boolean(),
+  },
+  { additionalProperties: false, $id: "MapSetCapabilities" },
+);
+
+export type MapSetCapabilities = Static<typeof MapSetCapabilitiesSchema>;
+
+export const MapSetInputSchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 120 }),
+    sourceType: Type.Literal("xyz-raster"),
+    urlTemplate: Type.String({ minLength: 1, maxLength: 4096 }),
+    attribution: Type.String({ minLength: 1, maxLength: 2000 }),
+    termsUrl: Type.String({ maxLength: 4096 }),
+    notes: Type.String({ maxLength: 10_000 }),
+    termsReviewedAt: Type.String({ maxLength: 64 }),
+    minZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    maxZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    tileSize: Type.Union([Type.Literal(256), Type.Literal(512)]),
+    tileFormat: TileFormatSchema,
+    subdomains: Type.Array(
+      Type.String({ minLength: 1, maxLength: 64, pattern: "^[a-zA-Z0-9.-]+$" }),
+      { maxItems: 16, uniqueItems: true },
+    ),
+    headers: Type.Record(
+      Type.String({ minLength: 1, maxLength: 128 }),
+      Type.String({ maxLength: 4096 }),
+    ),
+    sourceProjection: Type.Literal("EPSG:3857"),
+    defaultCenter: Type.Object(
+      {
+        longitude: Type.Number({ minimum: -180, maximum: 180 }),
+        latitude: Type.Number({ minimum: -85.05112878, maximum: 85.05112878 }),
+      },
+      { additionalProperties: false },
+    ),
+    defaultZoom: Type.Number({ minimum: 0, maximum: 24 }),
+    rendererId: Type.String({ minLength: 1, maxLength: 128 }),
+    capabilities: MapSetCapabilitiesSchema,
+    cachePolicy: Type.Object(
+      {
+        enabled: Type.Boolean(),
+        maximumAgeSeconds: Type.Integer({ minimum: 0, maximum: 31_536_000 }),
+        maximumStorageBytes: Type.Union([
+          Type.Null(),
+          Type.Integer({ minimum: 1 }),
+        ]),
+      },
+      { additionalProperties: false },
+    ),
+    downloadPolicy: Type.Object(
+      {
+        requestsPerSecond: Type.Number({ exclusiveMinimum: 0, maximum: 1000 }),
+        concurrency: Type.Integer({ minimum: 1, maximum: 64 }),
+        retryLimit: Type.Integer({ minimum: 0, maximum: 20 }),
+        dailyRequestLimit: Type.Union([
+          Type.Null(),
+          Type.Integer({ minimum: 1 }),
+        ]),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false, $id: "MapSetInput" },
+);
+
+export type MapSetInput = Static<typeof MapSetInputSchema>;
+
+export const MapSetPatchSchema = Type.Partial(MapSetInputSchema, {
+  additionalProperties: false,
+  $id: "MapSetPatch",
+});
+
+export type MapSetPatch = Static<typeof MapSetPatchSchema>;
+
+export const MapSetSchema = Type.Composite(
+  [
+    MapSetInputSchema,
+    Type.Object(
+      {
+        id: Type.String({
+          pattern:
+            "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        }),
+        createdAt: Type.String(),
+        updatedAt: Type.String(),
+      },
+      { additionalProperties: false },
+    ),
+  ],
+  { additionalProperties: false, $id: "MapSet" },
+);
+
+export type MapSet = Static<typeof MapSetSchema>;
+
+export const MapSetListResponseSchema = Type.Object(
+  {
+    items: Type.Array(MapSetSchema),
+  },
+  { additionalProperties: false, $id: "MapSetListResponse" },
+);
+
+export type MapSetListResponse = Static<typeof MapSetListResponseSchema>;
+
+export const MapSetTestResponseSchema = Type.Object(
+  {
+    ok: Type.Boolean(),
+    tile: Type.Object(
+      {
+        zoom: Type.Integer(),
+        x: Type.Integer(),
+        y: Type.Integer(),
+      },
+      { additionalProperties: false },
+    ),
+    statusCode: Type.Union([Type.Integer(), Type.Null()]),
+    contentType: Type.Union([Type.String(), Type.Null()]),
+    byteLength: Type.Union([Type.Integer(), Type.Null()]),
+    durationMilliseconds: Type.Integer({ minimum: 0 }),
+    message: Type.String(),
+  },
+  { additionalProperties: false, $id: "MapSetTestResponse" },
+);
+
+export type MapSetTestResponse = Static<typeof MapSetTestResponseSchema>;
+
+export const ErrorResponseSchema = Type.Object(
+  {
+    error: Type.Object(
+      {
+        code: Type.String(),
+        message: Type.String(),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false, $id: "ErrorResponse" },
+);
+
+export type ErrorResponse = Static<typeof ErrorResponseSchema>;
+
+export function createDefaultMapSetInput(): MapSetInput {
+  return {
+    name: "New Map Set",
+    sourceType: "xyz-raster",
+    urlTemplate: "https://example.com/tiles/{z}/{x}/{y}.png",
+    attribution: "Add the attribution required by the provider",
+    termsUrl: "",
+    notes: "",
+    termsReviewedAt: "",
+    minZoom: 0,
+    maxZoom: 18,
+    tileSize: 256,
+    tileFormat: "png",
+    subdomains: [],
+    headers: {},
+    sourceProjection: "EPSG:3857",
+    defaultCenter: { longitude: 13.405, latitude: 52.52 },
+    defaultZoom: 10,
+    rendererId: "leaflet-xyz",
+    capabilities: {
+      interactive: true,
+      tileArchive: true,
+      batchDownload: true,
+      serverExport: true,
+      layerRendering: true,
+    },
+    cachePolicy: {
+      enabled: true,
+      maximumAgeSeconds: 604_800,
+      maximumStorageBytes: null,
+    },
+    downloadPolicy: {
+      requestsPerSecond: 2,
+      concurrency: 2,
+      retryLimit: 3,
+      dailyRequestLimit: null,
+    },
+  };
+}
+
+export function mapSetInputValidationErrors(value: unknown): string[] {
+  return [...Value.Errors(MapSetInputSchema, value)].map(
+    ({ message, path }) => `${path || "value"}: ${message}`,
+  );
+}

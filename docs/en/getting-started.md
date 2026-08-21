@@ -6,8 +6,10 @@ language: en
 
 # Getting started
 
-maptoy is currently in its foundation phase. The development environment is defined
-by the repository's Nix flake and loaded through direnv.
+maptoy can store XYZ Map Sets and display them through its Leaflet renderer. No
+public tile provider is configured automatically: open **Map Sets** to add a source,
+then select it on **Map**. Provider URLs remain on the server side and browser tile
+requests use relative maptoy API URLs.
 
 ## Development commands
 
@@ -18,3 +20,23 @@ checks, and tests.
 The server defaults to port `4004`. A reverse proxy can publish it below a subpath by
 removing that prefix before forwarding requests. Application routes, assets, the
 generated HTML base, and API calls remain relative to the public entry URL.
+
+Continue with [Map Sets](docs/en/map-sets) for configuration, secret references,
+provider testing, and network-safety details.
+
+## Docker data directory
+
+Copy `.env.example` to `.env`, choose a host directory with `MAPTOY_DATA_DIR`,
+and create it before starting Compose. The default setup is:
+
+```sh
+cp .env.example .env
+mkdir -p .data
+docker compose up --build
+```
+
+Compose bind-mounts that host directory to `/data` in the container. The SQLite
+database is stored as `maptoy.sqlite` in it; future tile archives and exports use
+the same host-controlled directory. maptoy does not use a Docker-managed named or
+anonymous volume for persistent application data. The directory must be writable
+by UID `1000`, which is the non-root user running the container.

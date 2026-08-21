@@ -2,6 +2,8 @@ services:
   maptoy:
     build:
       context: .
+    env_file:
+      - .env
     environment:
       MAPTOY_DATA_DIR: /data
       MAPTOY_HOST: 0.0.0.0
@@ -14,7 +16,6 @@ services:
     tmpfs:
       - /tmp
     volumes:
-      - maptoy-data:/data
-
-volumes:
-  maptoy-data:
+      - type: bind
+        source: ${MAPTOY_DATA_DIR:-./.data}
+        target: /data

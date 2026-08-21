@@ -9,12 +9,19 @@ import Fastify, {
   type FastifyServerOptions,
 } from "fastify";
 import { layerPluginRegistry, mapRendererRegistry } from "./registries.js";
+import { openDatabase } from "./database.js";
+import { MapSetRepository } from "./mapSets/repository.js";
+import { registerMapSetRoutes } from "./mapSets/routes.js";
+import { MapSetService } from "./mapSets/service.js";
+import { SafeProviderClient, type ProviderClient } from "./providerClient.js";
 
 export interface BuildServerOptions {
   config?: MaptoyConfig;
   logger?: FastifyServerOptions["logger"];
   serveWeb?: boolean;
   staticDirectory?: string;
+  environment?: NodeJS.ProcessEnv;
+  providerClient?: ProviderClient;
 }
 
 function relativeBaseHref(pathname: string): string {
@@ -49,6 +56,62 @@ export async function buildServer(
 ): Promise<FastifyInstance> {
   const config = options.config ?? loadConfig();
   const server = Fastify({ logger: options.logger ?? false });
+  await mkdir(config.dataDirectory, { recursive: true });
+  const database = await openDatabase(config.databasePath);
+  const mapSetRepository = new MapSetRepository(database.sqlite);
+  const providerClient =
+    options.providerClient ??
+    new SafeProviderClient({
+      allowPrivateHosts: config.allowPrivateTileHosts,
+      timeoutMilliseconds: config.providerTimeoutMilliseconds,
+      maximumResponseBytes: config.maximumTileBytes,
+    });
+  const mapSetService = new MapSetService(
+    mapSetRepository,
+    mapRendererRegistry,
+    providerClient,
+    {
+      allowPrivateTileHosts: config.allowPrivateTileHosts,
+      environment: options.environment ?? process.env,
+    },
+  );
+
+  server.addHook("onClose", async () => {
+    database.close();
+  });
+
+  server.setErrorHandler((error, _request, reply) => {
+    if (
+      error instanceof Error &&
+      "validation" in error &&
+      error.validation !== undefined
+    ) {
+      return reply.code(400).send({
+        error: {
+          code: "REQUEST_INVALID",
+          message: error.message,
+        },
+      });
+    }
+    if (
+      error instanceof Error &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number" &&
+      "code" in error &&
+      typeof error.code === "string"
+    ) {
+      return reply.code(error.statusCode).send({
+        error: { code: error.code, message: error.message },
+      });
+    }
+    server.log.error({ error }, "Request failed");
+    return reply.code(500).send({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "The request failed unexpectedly.",
+      },
+    });
+  });
   server.get<{ Reply: HealthResponse }>("/api/health", async () => ({
     status: "ok",
   }));
@@ -58,6 +121,7 @@ export async function buildServer(
     async (_request, reply) => {
       try {
         await assertWritableDirectory(config.dataDirectory);
+        database.assertReady();
         return { status: "ready" };
       } catch (error) {
         server.log.error({ error }, "Readiness check failed");
@@ -73,6 +137,8 @@ export async function buildServer(
   server.get("/api/layer-plugins", async () => ({
     items: layerPluginRegistry.list().map(({ manifest }) => manifest),
   }));
+
+  registerMapSetRoutes(server, mapSetService);
 
   if (options.serveWeb ?? true) {
     const root = options.staticDirectory ?? defaultStaticDirectory();

@@ -1,6 +1,6 @@
 {
   "name": "maptoy",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.21.0",
@@ -13,10 +13,13 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
-    "restart": "docker compose down && docker compose up --build --detach && docker compose ps && echo -n \"🚀 \" && date",
     "start": "pnpm build && pnpm --filter @maptoy/server start",
     "test": "vitest run",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "d:down": "docker compose down",
+    "d:up": "docker compose up --detach",
+    "d:logs": "docker compose logs",
+    "d:rebuild": "docker compose down && docker compose up --build --detach && docker compose ps && echo -n \"🚀 \" && date"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
