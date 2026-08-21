@@ -15,7 +15,10 @@ try {
 }
 
 const config = loadConfig();
-const server = await buildServer({ config, logger: true });
+const server = await buildServer({
+  config,
+  logger: { level: config.logLevel },
+});
 
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   server.log.info({ signal }, "Shutting down maptoy");

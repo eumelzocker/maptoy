@@ -1,35 +1,24 @@
 import path from "node:path";
 
 export const DEFAULT_HTTP_HOST = "0.0.0.0";
-export const DEFAULT_HTTP_PORT = 3000;
-export const DEFAULT_BASE_PATH = "/";
-export const DEFAULT_DATA_DIRECTORY = ".data";
+export const DEFAULT_HTTP_PORT = 4004;
+export const DEFAULT_DATA_DIR = ".data";
+export const DEFAULT_LOG_LEVEL = "info";
+
+export type LogLevel =
+  | "fatal"
+  | "error"
+  | "warn"
+  | "info"
+  | "debug"
+  | "trace"
+  | "silent";
 
 export interface MaptoyConfig {
   host: string;
   port: number;
-  basePath: string;
   dataDirectory: string;
-}
-
-export function normalizeBasePath(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed === "" || trimmed === "/") {
-    return "/";
-  }
-
-  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  const normalized = withLeadingSlash.replace(/\/+$/, "");
-  const segments = normalized.slice(1).split("/");
-  if (
-    !/^\/(?:[A-Za-z0-9._~-]+\/)*[A-Za-z0-9._~-]+$/.test(normalized) ||
-    segments.some((segment) => segment === "." || segment === "..")
-  ) {
-    throw new Error(
-      "MAPTOY_BASE_PATH must contain only URL-safe path segments.",
-    );
-  }
-  return normalized;
+  logLevel: LogLevel;
 }
 
 function parsePort(value: string | undefined): number {
@@ -43,20 +32,30 @@ function parsePort(value: string | undefined): number {
   return port;
 }
 
+function parseLogLevel(value: string | undefined): LogLevel {
+  const logLevel = value?.trim() || DEFAULT_LOG_LEVEL;
+  if (
+    !["fatal", "error", "warn", "info", "debug", "trace", "silent"].includes(
+      logLevel,
+    )
+  ) {
+    throw new Error("MAPTOY_LOG_LEVEL is invalid.");
+  }
+  return logLevel as LogLevel;
+}
+
 export function loadConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): MaptoyConfig {
   const host = environment.MAPTOY_HOST?.trim() || DEFAULT_HTTP_HOST;
   const dataDirectory = path.resolve(
-    environment.MAPTOY_DATA_DIRECTORY?.trim() || DEFAULT_DATA_DIRECTORY,
+    environment.MAPTOY_DATA_DIR?.trim() || DEFAULT_DATA_DIR,
   );
 
   return {
     host,
     port: parsePort(environment.MAPTOY_PORT),
-    basePath: normalizeBasePath(
-      environment.MAPTOY_BASE_PATH ?? DEFAULT_BASE_PATH,
-    ),
     dataDirectory,
+    logLevel: parseLogLevel(environment.MAPTOY_LOG_LEVEL),
   };
 }

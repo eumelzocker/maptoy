@@ -1,0 +1,12 @@
+.data
+.direnv
+.env
+.git
+**/dist
+**/node_modules
+coverage
+playwright-report
+result
+result-*
+test-results
+spikes/rendering/.artifacts

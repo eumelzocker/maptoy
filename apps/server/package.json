@@ -13,6 +13,11 @@
     "@fastify/static": "10.1.3",
     "@maptoy/config": "workspace:*",
     "@maptoy/contracts": "workspace:*",
+    "@maptoy/image-layer": "workspace:*",
+    "@maptoy/layer-plugin-sdk": "workspace:*",
+    "@maptoy/leaflet-xyz": "workspace:*",
+    "@maptoy/map-adapter-sdk": "workspace:*",
+    "@maptoy/track-layer": "workspace:*",
     "fastify": "5.12.1"
   },
   "devDependencies": {

@@ -3,15 +3,12 @@ import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import fastifyStatic from "@fastify/static";
 import { loadConfig, type MaptoyConfig } from "@maptoy/config";
-import type {
-  HealthResponse,
-  PublicConfig,
-  ReadyResponse,
-} from "@maptoy/contracts";
+import type { HealthResponse, ReadyResponse } from "@maptoy/contracts";
 import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions,
 } from "fastify";
+import { layerPluginRegistry, mapRendererRegistry } from "./registries.js";
 
 export interface BuildServerOptions {
   config?: MaptoyConfig;
@@ -20,20 +17,19 @@ export interface BuildServerOptions {
   staticDirectory?: string;
 }
 
-function applicationPrefix(basePath: string): string {
-  return basePath === "/" ? "" : basePath;
-}
-
-function staticPrefix(basePath: string): string {
-  return basePath === "/" ? "/" : `${basePath}/`;
+function relativeBaseHref(pathname: string): string {
+  const segmentCount = pathname.split("/").filter(Boolean).length;
+  const routeDepth = pathname.endsWith("/")
+    ? segmentCount
+    : Math.max(0, segmentCount - 1);
+  return routeDepth === 0 ? "./" : "../".repeat(routeDepth);
 }
 
 function injectBaseHref(indexHtml: string, basePath: string): string {
-  const baseElement = `<base href="${staticPrefix(basePath)}" />`;
   if (!indexHtml.includes("<head>")) {
     throw new Error("The web index does not contain a head element.");
   }
-  return indexHtml.replace("<head>", `<head>\n    ${baseElement}`);
+  return indexHtml.replace("<head>", `<head>\n    <base href="${basePath}" />`);
 }
 
 async function assertWritableDirectory(directory: string): Promise<void> {
@@ -53,14 +49,12 @@ export async function buildServer(
 ): Promise<FastifyInstance> {
   const config = options.config ?? loadConfig();
   const server = Fastify({ logger: options.logger ?? false });
-  const prefix = applicationPrefix(config.basePath);
-
-  server.get<{ Reply: HealthResponse }>(`${prefix}/api/health`, async () => ({
+  server.get<{ Reply: HealthResponse }>("/api/health", async () => ({
     status: "ok",
   }));
 
   server.get<{ Reply: ReadyResponse }>(
-    `${prefix}/api/ready`,
+    "/api/ready",
     async (_request, reply) => {
       try {
         await assertWritableDirectory(config.dataDirectory);
@@ -72,42 +66,31 @@ export async function buildServer(
     },
   );
 
-  server.get<{ Reply: PublicConfig }>(
-    `${prefix}/api/config/public`,
-    async () => ({
-      basePath: config.basePath,
-    }),
-  );
+  server.get("/api/map-renderers", async () => ({
+    items: mapRendererRegistry.list(),
+  }));
+
+  server.get("/api/layer-plugins", async () => ({
+    items: layerPluginRegistry.list().map(({ manifest }) => manifest),
+  }));
 
   if (options.serveWeb ?? true) {
     const root = options.staticDirectory ?? defaultStaticDirectory();
-    const indexPath = path.join(root, "index.html");
-    const indexHtml = injectBaseHref(
-      await readFile(indexPath, "utf8"),
-      config.basePath,
-    );
+    const indexHtml = await readFile(path.join(root, "index.html"), "utf8");
 
     await server.register(fastifyStatic, {
       root,
-      prefix: staticPrefix(config.basePath),
+      prefix: "/",
       index: false,
       wildcard: false,
     });
 
     server.setNotFoundHandler((request, reply) => {
       const pathname = new URL(request.url, "http://maptoy.invalid").pathname;
-      const apiPrefix = `${prefix}/api/`;
-      const insideApplication =
-        config.basePath === "/" ||
-        pathname === config.basePath ||
-        pathname.startsWith(`${config.basePath}/`);
-
-      if (
-        request.method === "GET" &&
-        insideApplication &&
-        !pathname.startsWith(apiPrefix)
-      ) {
-        return reply.type("text/html; charset=utf-8").send(indexHtml);
+      if (request.method === "GET" && !pathname.startsWith("/api/")) {
+        return reply
+          .type("text/html; charset=utf-8")
+          .send(injectBaseHref(indexHtml, relativeBaseHref(pathname)));
       }
       return reply.code(404).send({ error: "Not Found" });
     });

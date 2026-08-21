@@ -4,6 +4,11 @@ packages:
   - adapters/*
   - plugins/*
 
+injectWorkspacePackages: true
+
+syncInjectedDepsAfterScripts:
+  - build
+
 allowBuilds:
   esbuild: true
 

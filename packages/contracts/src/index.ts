@@ -17,12 +17,3 @@ export const ReadyResponseSchema = Type.Object(
 );
 
 export type ReadyResponse = Static<typeof ReadyResponseSchema>;
-
-export const PublicConfigSchema = Type.Object(
-  {
-    basePath: Type.String(),
-  },
-  { $id: "PublicConfig" },
-);
-
-export type PublicConfig = Static<typeof PublicConfigSchema>;

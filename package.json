@@ -13,6 +13,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
+    "restart": "docker compose down && docker compose up --build --detach && docker compose ps && date",
     "start": "pnpm build && pnpm --filter @maptoy/server start",
     "test": "vitest run",
     "typecheck": "pnpm -r --if-present typecheck"

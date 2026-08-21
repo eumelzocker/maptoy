@@ -1,0 +1,20 @@
+services:
+  maptoy:
+    build:
+      context: .
+    environment:
+      MAPTOY_DATA_DIR: /data
+      MAPTOY_HOST: 0.0.0.0
+      MAPTOY_LOG_LEVEL: ${MAPTOY_LOG_LEVEL:-info}
+      MAPTOY_PORT: ${MAPTOY_PORT:-4004}
+    ports:
+      - "${MAPTOY_PORT:-4004}:${MAPTOY_PORT:-4004}"
+    read_only: true
+    restart: unless-stopped
+    tmpfs:
+      - /tmp
+    volumes:
+      - maptoy-data:/data
+
+volumes:
+  maptoy-data:

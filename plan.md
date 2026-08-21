@@ -4,7 +4,7 @@
 
 `maptoy` wird eine selbst gehostete Docker-Anwendung für den privaten Gebrauch. Sie stellt frei konfigurierbare Kartenquellen in einer Weboberfläche dar, speichert abgerufene Kartenkacheln mit dauerhaft nachvollziehbarer Revisionshistorie, unterstützt kontrollierte Batch-Downloads und erzeugt exportierbare Kartenbilder mit optionaler Projektion und erweiterbaren Zusatzlayern. Eine in die Weboberfläche integrierte, mehrsprachige Dokumentation erklärt Anwendung, API und kartografische Grundlagen unmittelbar in der jeweils installierten Version.
 
-Frontend und Backend werden über denselben HTTP-Port ausgeliefert. Alle maptoy-eigenen URLs verwenden relative beziehungsweise aus der aktuellen Basis-URL abgeleitete Pfade, damit die Anwendung sowohl unter einer Domain-Wurzel als auch unter einem Reverse-Proxy-Unterpfad funktioniert. Externe URLs sind ausschließlich für ausdrücklich konfigurierte Provider und Dokumentationsreferenzen zulässig.
+Frontend und Backend werden über denselben HTTP-Port ausgeliefert. Alle maptoy-eigenen URLs sind relativ zur öffentlichen Einstiegs-URL, damit die Anwendung sowohl unter einer Domain-Wurzel als auch unter einem Reverse-Proxy-Unterpfad funktioniert. Externe URLs sind ausschließlich für ausdrücklich konfigurierte Provider und Dokumentationsreferenzen zulässig.
 
 Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprachig. Die integrierte Dokumentation ist auf Englisch vollständig; deutsche, thailändische und optionale weitere Lokalisierungen fallen bei fehlenden Inhalten kontrolliert auf Englisch zurück. Projektplanung und die Zusammenarbeit mit dem KI-Assistenten erfolgen auf Deutsch.
 
@@ -66,7 +66,7 @@ Browser
        |-> Leaflet/XYZ adapter (v1)
        |-> future adapters, e.g. Google Maps JavaScript API (not in v1)
        |-> layer-plugin registry
-  -> relative requests to current maptoy base path
+  -> relative requests to the public maptoy entry URL
 Node.js HTTP server (one port)
   -> serves Vue SPA including bundled documentation
   -> REST API
@@ -267,7 +267,7 @@ Der XYZ-Renderer bestimmt die benötigten Tiles, lädt sie bevorzugt aus dem gew
 
 ## 6. API-Entwurf
 
-Alle Endpunkte liegen relativ unter `api/`; keine Antwort darf absolute interne Hostnamen voraussetzen. Der genaue Basispfad wird nicht hart codiert.
+Alle Endpunkte liegen relativ unter `api/`; keine Antwort darf absolute interne Hostnamen voraussetzen.
 
 ### 6.1 System
 
@@ -356,7 +356,7 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 - Nicht unterstützte Funktionen werden anhand der Adapter-/Provider-Capabilities deaktiviert und mit einer Begründung versehen.
 - Plugin-Editoren erscheinen innerhalb einer einheitlichen Layer-Oberfläche und dürfen Navigation, globale Stores oder andere Plugins nicht direkt manipulieren.
 - Formulare verwenden gemeinsame Schemas, damit Frontend- und Backend-Validierung übereinstimmen.
-- Die SPA verwendet relative Assets und API-Aufrufe. Der Router erhält den Basis-Pfad zur Laufzeit aus dem ausgelieferten Dokument, nicht aus einer fest eingebauten Domain.
+- Die SPA verwendet relative Assets und API-Aufrufe. Der Server setzt anhand der internen Routentiefe eine relative Dokumentbasis, die der Router übernimmt.
 
 ### 7.3 Integrierte Dokumentation
 
@@ -405,11 +405,10 @@ Alle Variablen erhalten das Präfix `MAPTOY_`. Eine `.env.example` dokumentiert 
 
 ```dotenv
 MAPTOY_HOST=0.0.0.0
-MAPTOY_PORT=3000
+MAPTOY_PORT=4004
 MAPTOY_DATA_DIR=/data
 MAPTOY_DATABASE_PATH=/data/maptoy.sqlite
 MAPTOY_LOG_LEVEL=info
-MAPTOY_TRUST_PROXY=false
 MAPTOY_MAX_CONCURRENT_JOBS=1
 MAPTOY_MAX_EXPORT_PIXELS=100000000
 MAPTOY_TEMP_DIR=/data/tmp
@@ -421,10 +420,11 @@ Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende P
 
 ### 8.2 Reverse-Proxy-Fähigkeit
 
-- Keine absoluten maptoy-internen Pfade wie `/api`, `/assets` oder `/docs` im Client; sie werden relativ zur dokumentierten App-Basis erzeugt. Künftige Adapter dürfen deklarierte externe Provider-Ursprünge verwenden.
-- Weitergeleitete Header werden nur bei aktiviertem `MAPTOY_TRUST_PROXY` ausgewertet.
-- Redirects, Download-Links, Dokumentations-Deep-Links und Fehlerseiten berücksichtigen den effektiven Basis-Pfad.
-- Tests decken mindestens Betrieb unter `/` und `/tools/maptoy/` ab.
+- Keine absoluten maptoy-internen Pfade wie `/api` oder `/assets` im Client; sie werden relativ zur öffentlichen Einstiegs-URL erzeugt. Künftige Adapter dürfen deklarierte externe Provider-Ursprünge verwenden.
+- Ein Reverse Proxy entfernt einen öffentlichen Unterpfad vor dem Weiterleiten.
+- Die SPA verwendet pfadbasierte Routen und eine aus der internen Routentiefe erzeugte relative HTML-Basis, damit Navigation und direkte Deep Links unter dem vorgeschalteten Unterpfad funktionieren.
+- Redirects, Download-Links, Dokumentations-Deep-Links und Fehlerseiten verwenden die relative beziehungsweise öffentliche URL-Basis.
+- Tests decken mindestens Betrieb unter `/` und einen Präfix-entfernenden Proxy unter `/tools/maptoy/` ab.
 - README enthält Beispielkonfigurationen für einen verbreiteten Reverse-Proxy.
 
 ### 8.3 Docker
@@ -469,8 +469,6 @@ Auch als private Anwendung verarbeitet maptoy fremde URLs und potenziell große 
 - nur beim Build/Deployment zugelassene Plugins laden; Plugin-Hooks erhalten kontrollierte Asset-, Logging- und Rendering-Schnittstellen statt beliebiger Pfad- oder Secret-Zugriffe
 - Content-Security-Policy standardmäßig auf maptoy selbst beschränken und externe Ursprünge erst mit einem künftig tatsächlich aktivierten Adapter gezielt freigeben
 - Datenbankmigrationen und Cache-Löschungen transaktional beziehungsweise wiederaufnehmbar gestalten
-
-Wenn die Instanz aus einem nicht vertrauenswürdigen Netz erreichbar ist, muss der Reverse-Proxy Authentifizierung und TLS übernehmen. Dies ist deutlich in der Betriebsdokumentation festzuhalten.
 
 ## 10. Eigenverantwortung und verantwortliche Downloads
 
@@ -536,7 +534,7 @@ Tests verwenden keine echten öffentlichen Tile-Dienste.
 - Export mit Plugin-Layern erstellen und Ergebnis herunterladen
 - englische, deutsche und thailändische Dokumentationsroute öffnen, Fallback prüfen und einen kontextbezogenen Hilfelink verfolgen
 - englische und deutsche Suche prüfen; für Thai entweder funktionsfähige Suche oder den ausdrücklich deaktivierten Zustand mit Verweis auf die englische Suche prüfen
-- Anwendung unter Reverse-Proxy-Unterpfad laden; Assets, API, Tiles, Downloads, Dokumentation, Suche und Deep Links funktionieren
+- Anwendung unter einem Präfix-entfernenden Reverse-Proxy-Unterpfad laden; Assets, API, Tiles, Downloads, Dokumentation, Suche und pfadbasierte Deep Links funktionieren
 - Container mit leerem sowie vorhandenem Volume starten
 - SIGTERM während eines Jobs und anschließender konsistenter Neustart
 
@@ -592,7 +590,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Ein Befehl startet die Entwicklungsumgebung, ein weiterer alle Qualitätschecks.
 - Der Container startet ohne Root-Rechte, liefert SPA und API auf einem Port und wird gesund gemeldet.
 - Die vollständige englische Startseite sowie deutsche und thailändische Routen mit funktionierendem Englisch-Fallback sind über die Hauptnavigation erreichbar.
-- Ein automatisierter Test bestätigt den Betrieb unter einem Unterpfad.
+- Ein automatisierter Test bestätigt den Betrieb hinter einem Präfix-entfernenden Proxy-Unterpfad.
 
 ### Phase 2: Map Sets und interaktive Karte
 
@@ -807,7 +805,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 | Dauerhaft erhaltene Tile-Revisionen lassen den Speicher wachsen | neue Abrufe oder Exporte scheitern wegen Platzmangel | getrennte Statistik, Warn-/Aufnahmelimits, Kapazitätsschätzung und ausschließlich explizite bestätigte Löschung |
 | SQLite und Dateisystem laufen auseinander | Historie, aktuelle Zeiger oder Snapshots werden unzuverlässig | atomare Writes, transaktionale Zustände, Backup sowie nicht destruktive Reparatur-/Scan-Funktion |
 | Historische oder von Snapshots referenzierte Revision wird versehentlich gelöscht | reproduzierbare Stände und Vergleiche gehen verloren | Referenzschutz, ausdrückliche Bestätigung, Vorschau der Auswirkungen und Backup |
-| Reverse-Proxy-Unterpfad bricht Assets oder API | Anwendung nicht erreichbar | relative URL-Helfer und automatisierter Unterpfad-E2E-Test ab Phase 1 |
+| Reverse-Proxy-Unterpfad bricht Assets oder API | Anwendung nicht erreichbar | ausschließlich relative URL-Helfer und automatisierter Proxy-E2E-Test ab Phase 1 |
 | Bösartige oder falsche Quell-URL ermöglicht SSRF | Zugriff auf interne Dienste | IP-/DNS-Prüfung, Redirect-Prüfung, Protokoll-Allowlist und explizite Ausnahmen |
 | Export verbraucht zu viel RAM | Containerabsturz | Pixelgrenzen, Worker-Limit, Streaming/Tile-basierte Verarbeitung und Messungen |
 | Nutzer konfiguriert Limits zu hoch oder mehrere Jobs addieren ihre Last | Providerfehler, Sperrung oder Terms-Verstoß | zentraler Limiter pro Provider, sichtbare Schätzung und Verantwortungshinweis statt vermeintlicher Rechtsprüfung |
