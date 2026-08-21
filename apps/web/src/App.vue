@@ -7,6 +7,8 @@
         <RouterLink to="/docs/en">Documentation</RouterLink>
       </nav>
     </header>
-    <RouterView />
+    <div class="app-viewport">
+      <RouterView />
+    </div>
   </div>
 </template>

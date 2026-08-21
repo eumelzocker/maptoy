@@ -10,6 +10,7 @@ import {
 } from "./registries.js";
 import DocumentationView from "./views/DocumentationView.vue";
 import HomeView from "./views/HomeView.vue";
+import "@mdi/font/css/materialdesignicons.css";
 import "./style.css";
 
 function applicationBasePath(): string {

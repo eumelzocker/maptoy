@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { documentation } from "virtual:maptoy-docs";
-import { computed } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { decorateExternalDocumentationLinks } from "../documentationLinks.js";
+import {
+  englishOnlyDocumentationLabel,
+  sortDocumentationPages,
+} from "../documentationNavigation.js";
 import { documentationPageId } from "../documentationRoute.js";
 
 const route = useRoute();
@@ -19,7 +24,6 @@ const requestedPageId = computed(() =>
   documentationPageId(route.params.pageId),
 );
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const page = computed(() =>
   documentation.pages.find(
     ({ requestedLanguage: language, id }) =>
@@ -29,10 +33,30 @@ const page = computed(() =>
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const pageLinks = computed(() =>
-  documentation.pages.filter(
-    ({ requestedLanguage: language }) => language === requestedLanguage.value,
+  sortDocumentationPages(
+    documentation.pages.filter(
+      ({ requestedLanguage: language }) => language === requestedLanguage.value,
+    ),
+    requestedLanguage.value,
   ),
 );
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const englishOnlyLabel = computed(() =>
+  englishOnlyDocumentationLabel(requestedLanguage.value),
+);
+
+const pageContent = ref<HTMLElement | null>(null);
+
+async function refreshExternalLinks(): Promise<void> {
+  await nextTick();
+  if (pageContent.value !== null) {
+    decorateExternalDocumentationLinks(pageContent.value);
+  }
+}
+
+watch(page, refreshExternalLinks);
+onMounted(refreshExternalLinks);
 </script>
 
 <template>
@@ -44,8 +68,23 @@ const pageLinks = computed(() =>
           v-for="link in pageLinks"
           :key="link.id"
           :to="`/docs/${requestedLanguage}/${link.id}`"
+          :class="{ 'docs-home-link': link.id === 'home' }"
+          :title="link.isFallback ? englishOnlyLabel : undefined"
         >
-          {{ link.title }}
+          <i
+            v-if="link.id === 'home'"
+            class="mdi mdi-map-legend docs-nav-icon"
+            aria-hidden="true"
+          ></i>
+          <span>{{ link.title }}</span>
+          <i
+            v-if="link.isFallback"
+            class="mdi mdi-translate-off docs-nav-icon docs-fallback-icon"
+            aria-hidden="true"
+          ></i>
+          <span v-if="link.isFallback" class="visually-hidden">
+            — {{ englishOnlyLabel }}
+          </span>
         </RouterLink>
       </nav>
       <div class="language-switcher" aria-label="Documentation language">
@@ -65,7 +104,7 @@ const pageLinks = computed(() =>
         This page is not translated yet. Showing the English version.
       </p>
       <!-- The documentation build sanitizes this repository-owned HTML. -->
-      <div v-html="page.html"></div>
+      <div ref="pageContent" v-html="page.html"></div>
     </article>
     <article v-else class="docs-page">
       <h1>Page not found</h1>

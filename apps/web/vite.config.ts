@@ -21,7 +21,12 @@ function documentationPlugin(): Plugin {
       const documentationRoot = fileURLToPath(
         new URL("../../docs", import.meta.url),
       );
-      const documentation = await loadDocumentation(documentationRoot);
+      const changelogPath = fileURLToPath(
+        new URL("../../CHANGELOG.md", import.meta.url),
+      );
+      const documentation = await loadDocumentation(documentationRoot, {
+        changelogPath,
+      });
       return `export const documentation = ${JSON.stringify(documentation)};`;
     },
   };

@@ -84,6 +84,7 @@ Node.js HTTP server (one port)
 - Monorepo: pnpm Workspaces
 - Backend: Fastify mit Schema-Validierung und strukturiertem Logging
 - Frontend: Vue 3, Vite, Vue Router, Pinia sowie Leaflet hinter einer maptoy-eigenen Renderer-Adapter-Schnittstelle
+- Styling: modernes Pure CSS ohne Utility-CSS-Framework; zentrale Design-Tokens und gemeinsame Basis-/Layoutregeln statt wiederholter Einzelwerte
 - Dokumentation: Markdown-basierte Inhalte, beim Build in sichere Vue-kompatible Seiten und einen lokalen Suchindex umgewandelt
 - Verträge: gemeinsam genutzte TypeScript-Typen und Laufzeitschemas, zum Beispiel mit TypeBox oder Zod
 - API-Referenz: aus den Backend-Schemas erzeugte OpenAPI-Spezifikation, eingebettet in die Dokumentationsoberfläche
@@ -356,6 +357,9 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 - Nicht unterstützte Funktionen werden anhand der Adapter-/Provider-Capabilities deaktiviert und mit einer Begründung versehen.
 - Plugin-Editoren erscheinen innerhalb einer einheitlichen Layer-Oberfläche und dürfen Navigation, globale Stores oder andere Plugins nicht direkt manipulieren.
 - Formulare verwenden gemeinsame Schemas, damit Frontend- und Backend-Validierung übereinstimmen.
+- Wiederkehrende Farben, Abstände, Typografie, Radien, Schatten und Zustände werden als zentrale CSS Custom Properties beziehungsweise gemeinsame CSS-Primitives definiert. Komponentenspezifische Regeln bleiben bei der jeweiligen Komponente oder Domäne; eine einzige anwachsende globale Stylesheet-Datei ist ebenso zu vermeiden wie kopierte Einzelregeln.
+- Views komponieren kleine, klar verantwortliche und wiederverwendbare Vue-Komponenten. Wiederkehrende Interaktionsmuster wie Buttons, Felder, Panels, Statusanzeigen, Toolbars und Bestätigungsdialoge erhalten gemeinsame Basiskomponenten statt dupliziertem Markup und Verhalten.
+- Datenzugriff, fachliche Zustandslogik, Darstellung und komplexe Interaktionen werden frühzeitig in Stores, Composables und Komponenten getrennt. Dateien, die mehrere unabhängige Verantwortlichkeiten sammeln, werden aufgeteilt, bevor daraus schwer testbare God-Files entstehen.
 - Die SPA verwendet relative Assets und API-Aufrufe. Der Server setzt anhand der internen Routentiefe eine relative Dokumentbasis, die der Router übernimmt.
 
 ### 7.3 Integrierte Dokumentation
@@ -584,6 +588,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Health-/Readiness-Endpunkte und strukturiertes Logging ergänzen
 - Bruno Collection mit lokaler Beispielumgebung und ersten Health-/Readiness-Requests anlegen
 - mehrstufiges Dockerfile und Compose-Beispiel mit Datenvolume erstellen
+- gemeinsame semantische Versionierung aller auslieferungsrelevanten Paketmanifeste und einen Changelog einführen; Spikes werden unabhängig und nur bei eigenen Änderungen versioniert
 
 **Ergebnis/Akzeptanz**
 
@@ -591,6 +596,8 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Der Container startet ohne Root-Rechte, liefert SPA und API auf einem Port und wird gesund gemeldet.
 - Die vollständige englische Startseite sowie deutsche und thailändische Routen mit funktionierendem Englisch-Fallback sind über die Hauptnavigation erreichbar.
 - Ein automatisierter Test bestätigt den Betrieb hinter einem Präfix-entfernenden Proxy-Unterpfad.
+- Der Abschluss der Phase 1 ist als gemeinsame Version `0.0.1` in allen Paketmanifesten und im Changelog nachvollziehbar.
+- Ein automatisierter Test verhindert voneinander abweichende Versionen in den auslieferungsrelevanten Paketmanifesten; Spike-Manifeste sind davon ausgenommen.
 
 ### Phase 2: Map Sets und interaktive Karte
 
@@ -714,6 +721,12 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 
 ### Phase 8: Integrierte Dokumentation
 
+**Vorgezogen umgesetzt**
+
+- englisches Glossar und Abkürzungsverzeichnis mit deutschen und thailändischen Fassungen erstellen
+- englische und deutsche Übersicht wichtiger Tile-Provider mit Varianten, URL-Templates, Parametern, Policy-Einordnung, Prüfdatum und offiziellen Links erstellen
+- `CHANGELOG.md` aus dem Repository-Wurzelverzeichnis beim Build direkt als englische Dokumentationsseite mit den üblichen Sprach-Fallbacks einbinden
+
 **Aufgaben**
 
 - Dokumentationslayout mit Navigation, Inhaltsverzeichnis, Breadcrumbs, Sprachwechsel und Deep Links fertigstellen
@@ -726,7 +739,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Provider-Seiten mit Attribution, Fähigkeiten, Limits, Prüfdatum und offiziellen externen Links anlegen
 - Eigenverantwortung des Nutzers, Veränderlichkeit fremder Bedingungen und fehlende rechtliche Prüfung durch maptoy deutlich dokumentieren
 - Architekturhinweise für Layer-Plugins und künftige Renderer-Adapter samt v1.0-Abgrenzung dokumentieren
-- Projektionsübersicht und englisches Glossar mit lokalisierten Fassungen erstellen
+- Projektionsübersicht erstellen
 - Build-Prüfungen für vollständiges Englisch, Fallbacks, Übersetzungsstatus, Links, Assets, Anker, Sanitizing und API-Konsistenz aktivieren
 - App-, Dokumentations- und Changelog-Version sichtbar miteinander verknüpfen
 
@@ -748,7 +761,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - README als knappen Schnellstart mit Verweis auf die integrierte Konfigurations-, Reverse-Proxy- und Provider-Dokumentation erstellen
 - Beispiel-Map-Set ohne geheimen Schlüssel bereitstellen, sofern dessen Bedingungen dies erlauben
 - vollständige Testmatrix und Container-Smoke-Test ausführen
-- Versionierung, Changelog und Release-Artefakte einführen
+- Versionierung und Changelog fortführen sowie versionierte Release-Artefakte einführen
 
 **Ergebnis/Akzeptanz**
 
