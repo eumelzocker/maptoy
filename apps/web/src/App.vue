@@ -5,6 +5,7 @@
       <nav aria-label="Main navigation">
         <RouterLink to="/">Map</RouterLink>
         <RouterLink to="/map-sets">Map Sets</RouterLink>
+        <RouterLink to="/cache">Tile Cache</RouterLink>
         <RouterLink to="/docs/en">Documentation</RouterLink>
       </nav>
     </header>

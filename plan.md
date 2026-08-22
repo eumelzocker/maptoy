@@ -34,7 +34,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Map Sets anlegen, bearbeiten, validieren, duplizieren und löschen
 - Rasterkarten im Vue-/Leaflet-Frontend anzeigen
 - Tiles über das Backend laden und lokal cachen
-- Quellstände und sämtliche inhaltlich unterschiedlichen Tile-Revisionen dauerhaft nachvollziehbar speichern
+- sämtliche inhaltlich unterschiedlichen Tile-Revisionen dauerhaft nachvollziehbar speichern
 - aktuelle, historische, zeitbezogene oder als Snapshot benannte Cache-Stände auswählen und vergleichen
 - Cache-Abdeckung für ein Gebiet und Zoomstufen sichtbar machen
 - Batch-Downloads für Gebiet und Zoomstufen planen, starten, beobachten, pausieren beziehungsweise abbrechen und erneut versuchen
@@ -176,17 +176,17 @@ Ein Map Set enthält mindestens:
 - Standardmittelpunkt und Standardzoom
 - ID des Frontend-Renderer-Adapters, in v1 ausschließlich `leaflet-xyz`
 - effektive Capability-Flags des Quellen-/Renderer-Paars
-- Cache-Policy mit aktivem Quellstand, maximalem Alter und optionalem Speicherwarn-/Aufnahmelimit
+- Cache-Policy mit maximalem Alter und optionalem Speicherwarn-/Aufnahmelimit
 - Download-Policy mit Requests pro Sekunde, Parallelität, Retry-Limit und optionaler täglicher Obergrenze
 - optionale Standard-Layer-Instanzen und Darstellungsparameter
 
 Die Anwendung validiert URL-Templates, Wertebereiche und Secret-Referenzen vor dem Speichern. Eine Testfunktion ruft genau ein Tile ab und zeigt Status, Content-Type und Attribution an. Hinweise, Notizen oder ein Prüfdatum zu Nutzungsbedingungen sind rein informativ und werden von maptoy nicht als rechtliche Freigabe interpretiert.
 
-### 5.2 Quellstände, Tile-Revisionen und Cache-Snapshots
+### 5.2 Tile-Revisionen und Cache-Snapshots
 
-Ein **Quellstand** (`Source Revision`) ist eine unveränderliche Fassung der für Tile-Abrufe relevanten Map-Set-Konfiguration, beispielsweise URL-Template, Stil, Header, Tile-Größe, Format und Projektion. Jede relevante Konfigurationsänderung erzeugt einen neuen Quellstand mit Konfigurations-Fingerprint; das Map Set verweist auf den aktiven Quellstand.
+Ein Map Set bildet die stabile Grenze einer Kartenquelle. Sobald seine erste Tile-Revision gespeichert wurde, dürfen die für Abruf oder Interpretation der Tile-Bytes relevanten Felder nicht mehr geändert werden: Quelltyp, URL-Template, Header, Subdomains, Tile-Größe, Format und Quellprojektion. Für eine andere Quelle wird das Map Set dupliziert. Metadaten, Startausschnitt, Zoomgrenzen, Capabilities sowie Cache- und Download-Regeln bleiben editierbar. Eine Rotation des Werts einer per Environment referenzierten Secret-Variable ändert die gespeicherte Map-Set-Konfiguration nicht.
 
-Ein **logisches Tile** wird durch Map Set, Quellstand und Koordinate `(z, x, y)` identifiziert. Zu einem logischen Tile können beliebig viele unveränderliche **Tile-Revisionen** gehören. Eine Tile-Revision enthält mindestens:
+Ein **logisches Tile** wird durch Map Set und Koordinate `(z, x, y)` identifiziert. Zu einem logischen Tile können beliebig viele unveränderliche **Tile-Revisionen** gehören. Eine Tile-Revision enthält mindestens:
 
 - stabile Revisions-ID und Bezug zum logischen Tile
 - kryptografischen Content-Hash, Dateiformat, Content-Type, Byte-Größe und Dateipfad
@@ -202,7 +202,7 @@ Empfohlener Dateipfad ohne separates Versionssegment im Verzeichnisbaum:
 data/tiles/<map-set-id>/<z>/<x>/<y>.<content-hash>.<ext>
 ```
 
-Die Datenbank ordnet Quellstände, logische Tiles, sämtliche Revisionen und die jeweils aktuelle Revision zu. Identische Inhalte verschiedener Quellstände dürfen dieselbe Datei innerhalb des Map Sets referenzieren. Tile-Dateien werden zunächst temporär geschrieben, geprüft und danach atomar an den hashbasierten Zielort verschoben. Fehlerantworten oder unerwartete Dateitypen werden nicht als gültige Revisionen abgelegt.
+Die Datenbank ordnet logische Tiles, sämtliche Revisionen und die jeweils aktuelle Revision zu. Identische Inhalte dürfen dieselbe Datei innerhalb des Map Sets referenzieren. Tile-Dateien werden zunächst temporär geschrieben, geprüft und danach atomar an den hashbasierten Zielort verschoben. Fehlerantworten oder unerwartete Dateitypen werden nicht als gültige Revisionen abgelegt.
 
 Die Aktualisierungsstrategie wird pro Abruf beziehungsweise Job explizit gewählt:
 
@@ -212,7 +212,7 @@ Die Aktualisierungsstrategie wird pro Abruf beziehungsweise Job explizit gewähl
 
 Bei einer Validierung nutzt das Backend nach Möglichkeit `If-None-Match` oder `If-Modified-Since`. Eine `304`-Antwort aktualisiert nur den Validierungszeitpunkt. Eine erfolgreiche Inhaltsantwort wird vollständig geprüft und gehasht, bevor entschieden wird, ob bereits dieselbe oder eine neue Revision vorliegt. Provider-Rate-Limits, zentral konfigurierte Parallelität und `Retry-After` gelten auch bei erzwungenen Prüfungen.
 
-Ein **Cache-Snapshot** ist eine benannte, unveränderliche Auswahl konkreter Tile-Revisionen für ein Map Set und einen Quellstand. Snapshots ermöglichen reproduzierbare Anzeige, Exporte und Vergleiche. Ohne Snapshot kann ein Stand als `current` oder zeitbezogen als jeweils jüngste bekannte Revision bis zu einem Zeitpunkt ausgewählt werden.
+Ein **Cache-Snapshot** ist eine benannte, unveränderliche Auswahl konkreter Tile-Revisionen für ein Map Set. Snapshots ermöglichen reproduzierbare Anzeige, Exporte und Vergleiche. Ohne Snapshot kann ein Stand als `current` oder zeitbezogen als jeweils jüngste bekannte Revision bis zu einem Zeitpunkt ausgewählt werden.
 
 Historische Tile-Revisionen werden nicht automatisch gelöscht. Speicherwarn- oder Aufnahmelimits dürfen warnen beziehungsweise neue Abrufe blockieren, aber keine Historie stillschweigend bereinigen. Eine Löschung ist nur als ausdrückliche, bestätigte Nutzeraktion zulässig und muss aktuelle Revisionen sowie Snapshot-Referenzen schützen. Eine Content-Datei darf erst entfernt werden, wenn keine Tile-Revision mehr auf ihren Hash verweist. Automatisch bereinigt werden dürfen lediglich eindeutig temporäre, beschädigte oder nach einem abgebrochenen Schreibvorgang nie registrierte Dateien.
 
@@ -256,7 +256,7 @@ Das Track-Plugin importiert GPX und GeoJSON, bewahrt sinnvolle Quellmetadaten au
 
 Ein Exportauftrag enthält:
 
-- Map Set und Quellstand sowie Auswahlmodus `current`, `snapshot`, `asOf` oder explizite Tile-Revisionen
+- Map Set sowie Auswahlmodus `current`, `snapshot`, `asOf` oder explizite Tile-Revisionen
 - Kartengebiet oder Mittelpunkt plus Maßstab
 - Ausgabegröße in Pixeln; optional DPI und physische Größe
 - Ausgabeformat `png`, `jpeg` oder `webp`
@@ -287,13 +287,10 @@ Alle Endpunkte liegen relativ unter `api/`; keine Antwort darf absolute interne 
 - `PATCH api/map-sets/:id`
 - `DELETE api/map-sets/:id`
 - `POST api/map-sets/:id/test`
-- `GET api/map-sets/:id/tiles/:z/:x/:y` – Auswahl über Quellstand sowie `current`, `snapshot`, `asOf` oder Revisions-ID; Aktualisierung über `refresh=auto|force|cache-only`
+- `GET api/map-sets/:id/tiles/:z/:x/:y` – Auswahl über `current`, `snapshot`, `asOf` oder Revisions-ID; Aktualisierung über `refresh=auto|force|cache-only`
 
 ### 6.3 Cache und Abdeckung
 
-- `GET api/map-sets/:id/source-revisions`
-- `GET api/map-sets/:id/source-revisions/:sourceRevisionId`
-- `POST api/map-sets/:id/source-revisions/:sourceRevisionId/activate`
 - `GET api/map-sets/:id/tile-revisions?z=:z&x=:x&y=:y`
 - `DELETE api/map-sets/:id/tile-revisions/:tileRevisionId` – nur explizit und nur ohne aktuelle/Snapshot-Referenz
 - `GET api/map-sets/:id/cache/stats`
@@ -340,7 +337,7 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 
 1. **Map** – ausgewähltes Map Set im aktiven Renderer-Adapter, Layer-Steuerung, Koordinatenanzeige und Navigation.
 2. **Map Sets** – Übersicht, Editor, Validierung und Testabruf.
-3. **Cache** – Quellstände, Tile-Historie, Snapshots, aktuelle/historische Speicherbelegung und ausdrücklich bestätigte Löschaktionen.
+3. **Cache** – Tile-Historie, Snapshots, aktuelle/historische Speicherbelegung und ausdrücklich bestätigte Löschaktionen.
 4. **Coverage** – Übersichtskarte mit farblicher Cache-Abdeckung sowie Auswahl und Vergleich von aktuellem Stand, Snapshot oder Zeitpunkt.
 5. **Downloads** – Gebietsauswahl auf der Karte, Schätzung, Terms-/Limit- und Verantwortungshinweise sowie Jobfortschritt.
 6. **Layers** – Plugin-Auswahl, Import, Konfiguration, Reihenfolge, Sichtbarkeit und Asset-Verwaltung.
@@ -368,7 +365,7 @@ Die Dokumentation ist ein fester Teil der SPA und über die Hauptnavigation sowi
 
 **Inhaltsbereiche**
 
-- **App-Handbuch:** Schnellstart, Navigation und vollständige Anleitungen für Map Sets, Quellstände, Tile-Revisionen, Snapshots, Vergleiche, Coverage, Downloads, Jobs, Layer-Plugins und Exporte
+- **App-Handbuch:** Schnellstart, Navigation und vollständige Anleitungen für Map Sets, Tile-Revisionen, Snapshots, Vergleiche, Coverage, Downloads, Jobs, Layer-Plugins und Exporte
 - **API:** authentizitätsgetreue OpenAPI-Referenz, Request-/Response-Beispiele, Fehlercodes, relative URL-Nutzung und Versionshinweise
 - **Map-Provider:** Konfigurationsfelder, URL-Templates, Attribution, Header, API-Schlüssel, Rate-Limits, technische Cache-/Export-Fähigkeiten sowie Links zu offiziellen Nutzungsbedingungen und Provider-Dokumentationen
 - **Erweiterungen:** Renderer-Adapter- und Layer-Plugin-Verträge, Capability-Modell, Referenz-Plugins, Versionskompatibilität und klarer Hinweis, dass Google Maps in v1.0 noch nicht implementiert ist
@@ -502,7 +499,7 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Antimeridian-, Pol- und Bounds-Fälle
 - URL-Template-Auflösung ohne Secret-Leak
 - Konfigurations- und Map-Set-Validierung
-- Quellstand-Fingerprint, logische Tile-Schlüssel, Content-Hash und hashbasierte Pfadbildung
+- Sperre relevanter Quellenfelder nach der ersten Tile-Revision, logische Tile-Schlüssel, Content-Hash und hashbasierte Pfadbildung
 - Auswahlregeln für `current`, Snapshot, `asOf` und explizite Tile-Revision
 - Retry-/Backoff- und Rate-Limit-Logik mit kontrollierter Zeit
 - Exportgrößen- und Tile-Anzahlschätzung
@@ -553,6 +550,8 @@ Eine eingecheckte lokale Beispielumgebung definiert die relative beziehungsweise
 
 Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und Build bestehen. Adapter und Plugins müssen ihre jeweiligen Contract-Test-Suites bestehen. Der Dokumentations-Build prüft zusätzlich vollständige englische Inhalte, Frontmatter, lokalisierte Fallback-Ziele, interne Links, lokale Assets, doppelte IDs/Anker und OpenAPI-Konsistenz; ein Bericht weist den Übersetzungsgrad pro Sprache aus. Externe Links werden regelmäßig separat geprüft, dürfen wegen temporärer Fremdausfälle aber nicht jeden normalen Build blockieren. Kritische Integrations- und E2E-Tests laufen in CI beziehungsweise vor einem Release. Abhängigkeiten und Containerbasis werden regelmäßig auf bekannte Schwachstellen geprüft.
 
+Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery-Reihenfolgen sowie begründete Workarounds werden knapp direkt am betroffenen Code kommentiert. Kommentare erklären das **Warum**; selbsterklärende Syntax und triviale Abläufe werden nicht nacherzählt.
+
 ## 12. Umsetzungsphasen
 
 ### Phase 0: Technische Klärung und Spike
@@ -562,7 +561,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Provider-Anforderungen und gewünschte Beispielquelle dokumentieren
 - Adaptergrenze zwischen fachlicher Kartenoberfläche, Leaflet-/XYZ-Renderer und späteren Frontend-Renderern als ADR festlegen
 - Plugin-Lebenszyklus, Vertrauensmodell, SDK-Versionierung und Frontend-/Server-Hooks als ADR festlegen
-- Datenmodell für Quellstände, unveränderliche Tile-Revisionen, Snapshots und zeitbezogene Auswahl als ADR festlegen
+- Datenmodell für stabile Map-Set-Quellen, unveränderliche Tile-Revisionen, Snapshots und zeitbezogene Auswahl als ADR festlegen
 - Tile-Mathematik für WGS84/XYZ prototypisch prüfen
 - 2x2- oder 3x3-Tile-Raster serverseitig zusammensetzen
 - einen Track und ein GPS-getaggtes Testbild über prototypische Plugin-Hooks rendern und einen Testausschnitt nach einer zweiten Projektion exportieren
@@ -625,17 +624,20 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 
 ### Phase 3: Revisionsfähiges Tile-Archiv
 
+**Status:** abgeschlossen am 22. August 2026 als Version `0.0.3`
+
 **Aufgaben**
 
-- DB-Schema für Quellstände, logische Tiles, unveränderliche Tile-Revisionen, aktuelle Zeiger und Snapshots implementieren
+- DB-Schema für logische Tiles, unveränderliche Tile-Revisionen, aktuelle Zeiger und Snapshots implementieren
+- Quellenfelder eines Map Sets nach der ersten gespeicherten Tile-Revision sperren und für abweichende Quellen das Duplizieren vorsehen
 - hashbasiertes Dateilayout `data/tiles/<map-set-id>/<z>/<x>/<y>.<content-hash>.<ext>` umsetzen
 - Tile-Proxy mit Cache-Miss/Hit, Inhaltsprüfung, Timeout und atomarem Schreiben bauen
 - parallele Abrufe desselben Tiles deduplizieren
 - Refresh-Modi `auto`, `force` und `cache-only` sowie bedingte HTTP-Validierung umsetzen
 - Auswahl über aktuellen Stand, Snapshot, `asOf` und explizite Tile-Revision implementieren
 - Snapshot-Erstellung und Hash-/Metadatenvergleich zweier Stände ergänzen
-- Cache-Statistiken für aktuelle/historische Revisionen, Snapshots und Gesamtspeicher sowie Verwaltungsansicht ergänzen
-- explizite, referenzsichere Löschung ohne automatische Bereinigung historischer Revisionen implementieren
+- DB-basierte Cache-Statistiken je Zoomstufe, expliziten Dateisystem-Audit und eine cursor-paginierte, gefilterte Revisionsansicht ergänzen
+- explizite, referenzsichere Löschung ohne automatische Bereinigung historischer Revisionen sowie bestätigten bidirektionalen Abgleich zwischen DB und Dateisystem implementieren
 
 **Ergebnis/Akzeptanz**
 
@@ -645,7 +647,8 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - Vergleiche erkennen identische, geänderte, hinzugekommene und fehlende Tiles anhand der gespeicherten Revisionen.
 - Speicherlimits löschen keine historischen Revisionen; eine referenzierte Revision kann nicht versehentlich entfernt werden.
 - Ein Prozessabbruch hinterlässt kein scheinbar gültiges, unvollständiges Tile.
-- Revisionsanzahl und belegter Speicher stimmen mit den gespeicherten Dateien überein beziehungsweise können repariert werden.
+- Revisionsanzahl und belegter Speicher stimmen mit den gespeicherten Dateien überein; ein bestätigter Abgleich entfernt sowohl verwaiste Dateien als auch unbrauchbare DB-Revisionen für extern gelöschte Dateien.
+- Der normale Aufruf der Cache-Seite lädt weder sämtliche Revisionen noch scannt er das Tile-Verzeichnis; beide teuren Operationen erfolgen begrenzt beziehungsweise ausdrücklich.
 
 ### Phase 4: Batch-Downloads und Job-System
 
@@ -785,7 +788,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 
 ### v0.2 – Offline-Vorbereitung
 
-- mehrere Map Sets und Quellstände
+- mehrere Map Sets mit jeweils stabiler Quellenkonfiguration
 - Cache-Snapshots, Zeitstände und Hash-/Metadatenvergleiche
 - belastbares Job-System
 - Batch-Download mit Limits
@@ -844,7 +847,7 @@ Jeder Merge muss mindestens Formatprüfung, Linting, Typprüfung, Unit-Tests und
 - der Leaflet-/XYZ-Renderer ausschließlich über den versionierten Adaptervertrag angebunden ist und derselbe Vertrag mit einem Fake-Adapter getestet wird;
 - keine Google-Maps-Laufzeitabhängigkeit oder Google-spezifische Implementierung enthalten ist, die Adapterarchitektur eine spätere Implementierung aber ohne Umbau fachlicher Komponenten erlaubt;
 - Map Sets ohne Secret-Leaks verwaltet und validiert werden können;
-- Quellstände und sämtliche unterschiedlichen Tile-Revisionen hashbasiert, unveränderlich und dauerhaft in Dateien sowie Datenbank nachvollziehbar sind;
+- sämtliche unterschiedlichen Tile-Revisionen hashbasiert, unveränderlich und dauerhaft in Dateien sowie Datenbank nachvollziehbar sind und Quellenfelder nach dem ersten Cache-Eintrag nicht mehr verändert werden können;
 - aktueller Stand, Snapshot, Zeitstand und explizite Revision reproduzierbar auswählbar und vergleichbar sind;
 - keine historische Revision automatisch gelöscht wird und explizite Löschungen aktuelle beziehungsweise von Snapshots referenzierte Revisionen schützen;
 - Batch-Jobs konfigurierte technische Limits und Provider-Signale respektieren sowie Neustart, Pause und Abbruch konsistent behandeln;

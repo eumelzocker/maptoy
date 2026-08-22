@@ -16,6 +16,7 @@ const { selected, selectedId } = storeToRefs(store);
 const mapHost = ref<HTMLElement | null>(null);
 const mapError = ref<string | null>(null);
 const pointer = ref<{ longitude: number; latitude: number } | null>(null);
+const zoom = ref<number | null>(null);
 let renderer: MapRendererInstance | null = null;
 let renderGeneration = 0;
 
@@ -31,6 +32,7 @@ async function renderSelectedMap(): Promise<void> {
   await destroyRenderer();
   mapError.value = null;
   pointer.value = null;
+  zoom.value = null;
   await nextTick();
   if (generation !== renderGeneration) {
     return;
@@ -68,6 +70,7 @@ async function renderSelectedMap(): Promise<void> {
       return;
     }
     renderer = nextRenderer;
+    zoom.value = nextRenderer.getViewport().zoom;
     nextRenderer.subscribe("pointer", (payload) => {
       if (
         typeof payload === "object" &&
@@ -78,6 +81,19 @@ async function renderSelectedMap(): Promise<void> {
           longitude: number;
           latitude: number;
         };
+      }
+    });
+    nextRenderer.subscribe("viewport", (payload) => {
+      if (
+        typeof payload === "object" &&
+        payload !== null &&
+        "viewport" in payload &&
+        typeof payload.viewport === "object" &&
+        payload.viewport !== null &&
+        "zoom" in payload.viewport &&
+        typeof payload.viewport.zoom === "number"
+      ) {
+        zoom.value = payload.viewport.zoom;
       }
     });
   } catch (error) {
@@ -135,8 +151,11 @@ onBeforeUnmount(destroyRenderer);
           <dd>{{ selected.minZoom }}–{{ selected.maxZoom }}</dd>
         </div>
       </dl>
-      <p v-if="pointer" class="coordinates">
-        {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
+      <p v-if="zoom !== null || pointer" class="viewport-status">
+        <span v-if="zoom !== null">Zoom {{ Math.round(zoom) }}</span>
+        <span v-if="pointer" class="coordinates">
+          {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
+        </span>
       </p>
     </aside>
 
@@ -224,9 +243,16 @@ select {
   font-weight: 700;
 }
 
-.coordinates {
-  font-family: ui-monospace, monospace;
+.viewport-status {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
   font-size: 0.8rem;
+}
+
+.coordinates,
+.viewport-status {
+  font-family: ui-monospace, monospace;
 }
 
 .map-stage {

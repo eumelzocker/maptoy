@@ -1,4 +1,8 @@
 import {
+  CacheSnapshotCreateInputSchema,
+  type CacheSnapshotCreateInput,
+  CacheSnapshotListResponseSchema,
+  CacheSnapshotSchema,
   ErrorResponseSchema,
   type MapSet,
   type MapSetInput,
@@ -8,10 +12,18 @@ import {
   MapSetPatchSchema,
   MapSetSchema,
   MapSetTestResponseSchema,
+  TileCacheAuditResultSchema,
+  TileCacheComparisonSchema,
+  TileCacheRepairResultSchema,
+  TileCacheStatsSchema,
+  TileRevisionListResponseSchema,
 } from "@maptoy/contracts";
 import type { FastifyInstance } from "fastify";
 import { ProviderRequestError } from "../providerClient.js";
+import type { TileSelection } from "../tiles/repository.js";
+import type { TileArchiveService } from "../tiles/service.js";
 import type { MapSetService } from "./service.js";
+import { MapSetValidationError } from "./validation.js";
 
 const idParametersSchema = {
   type: "object",
@@ -38,9 +50,49 @@ const tileParametersSchema = {
   },
 } as const;
 
+const archiveIdParametersSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "archiveId"],
+  properties: {
+    id: idParametersSchema.properties.id,
+    archiveId: idParametersSchema.properties.id,
+  },
+} as const;
+
+function tileSelection(query: {
+  snapshot?: string;
+  asOf?: string;
+  revision?: string;
+}): TileSelection {
+  const selectors = [query.snapshot, query.asOf, query.revision].filter(
+    (value) => value !== undefined,
+  );
+  if (selectors.length > 1) {
+    throw new MapSetValidationError(
+      "Use only one of snapshot, asOf, or revision for a tile request.",
+    );
+  }
+  if (query.snapshot !== undefined) {
+    return { kind: "snapshot", snapshotId: query.snapshot };
+  }
+  if (query.revision !== undefined) {
+    return { kind: "revision", revisionId: query.revision };
+  }
+  if (query.asOf !== undefined) {
+    const timestamp = new Date(query.asOf);
+    if (Number.isNaN(timestamp.getTime())) {
+      throw new MapSetValidationError("asOf must be a valid timestamp.");
+    }
+    return { kind: "as-of", timestamp: timestamp.toISOString() };
+  }
+  return { kind: "current" };
+}
+
 export function registerMapSetRoutes(
   server: FastifyInstance,
   service: MapSetService,
+  tileArchive: TileArchiveService,
 ): void {
   server.get(
     "/api/map-sets",
@@ -86,6 +138,7 @@ export function registerMapSetRoutes(
           200: MapSetSchema,
           400: ErrorResponseSchema,
           404: ErrorResponseSchema,
+          409: ErrorResponseSchema,
         },
       },
     },
@@ -96,7 +149,7 @@ export function registerMapSetRoutes(
     "/api/map-sets/:id",
     { schema: { params: idParametersSchema } },
     async (request, reply) => {
-      service.delete(request.params.id);
+      await service.delete(request.params.id);
       return reply.code(204).send();
     },
   );
@@ -117,22 +170,57 @@ export function registerMapSetRoutes(
 
   server.get<{
     Params: { id: string; z: number; x: number; y: number };
+    Querystring: {
+      refresh?: "auto" | "force" | "cache-only";
+      snapshot?: string;
+      asOf?: string;
+      revision?: string;
+    };
   }>(
     "/api/map-sets/:id/tiles/:z/:x/:y",
-    { schema: { params: tileParametersSchema } },
+    {
+      schema: {
+        params: tileParametersSchema,
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            refresh: {
+              type: "string",
+              enum: ["auto", "force", "cache-only"],
+              default: "auto",
+            },
+            snapshot: { type: "string" },
+            asOf: { type: "string" },
+            revision: { type: "string" },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
-        const response = await service.tile(request.params.id, {
-          zoom: request.params.z,
-          x: request.params.x,
-          y: request.params.y,
-        });
+        const response = await service.tile(
+          request.params.id,
+          {
+            zoom: request.params.z,
+            x: request.params.x,
+            y: request.params.y,
+          },
+          {
+            refresh: request.query.refresh ?? "auto",
+            selection: tileSelection(request.query),
+          },
+        );
         const contentTypeHeader = response.headers["content-type"];
         const contentType = Array.isArray(contentTypeHeader)
           ? contentTypeHeader[0]
           : contentTypeHeader;
         if (contentType !== undefined) {
           reply.type(contentType);
+        }
+        reply.header("x-maptoy-cache", response.cacheStatus);
+        if (response.revisionId !== null) {
+          reply.header("x-maptoy-tile-revision", response.revisionId);
         }
         return reply.code(response.statusCode).send(response.body);
       } catch (error) {
@@ -143,6 +231,212 @@ export function registerMapSetRoutes(
         }
         throw error;
       }
+    },
+  );
+
+  server.get<{ Params: { id: string } }>(
+    "/api/map-sets/:id/cache/stats",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: { 200: TileCacheStatsSchema, 404: ErrorResponseSchema },
+      },
+    },
+    async (request) => {
+      service.get(request.params.id);
+      return tileArchive.stats(request.params.id);
+    },
+  );
+
+  server.post<{ Params: { id: string } }>(
+    "/api/map-sets/:id/cache/audit",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: {
+          200: TileCacheAuditResultSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      service.get(request.params.id);
+      return tileArchive.audit(request.params.id);
+    },
+  );
+
+  server.post<{ Params: { id: string } }>(
+    "/api/map-sets/:id/cache/repair",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: {
+          200: TileCacheRepairResultSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      service.get(request.params.id);
+      return tileArchive.repair(request.params.id);
+    },
+  );
+
+  server.get<{
+    Params: { id: string };
+    Querystring: {
+      limit?: number;
+      cursor?: string;
+      zoom?: number;
+      state?: "all" | "current" | "historical";
+    };
+  }>(
+    "/api/map-sets/:id/tile-revisions",
+    {
+      schema: {
+        params: idParametersSchema,
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            limit: {
+              type: "integer",
+              minimum: 1,
+              maximum: 200,
+              default: 50,
+            },
+            cursor: { type: "string", pattern: "^[1-9][0-9]*$" },
+            zoom: { type: "integer", minimum: 0, maximum: 24 },
+            state: {
+              type: "string",
+              enum: ["all", "current", "historical"],
+              default: "all",
+            },
+          },
+        },
+        response: {
+          200: TileRevisionListResponseSchema,
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      service.get(request.params.id);
+      const cursor =
+        request.query.cursor === undefined
+          ? undefined
+          : Number(request.query.cursor);
+      if (cursor !== undefined && !Number.isSafeInteger(cursor)) {
+        throw new MapSetValidationError("The revision cursor is invalid.");
+      }
+      return tileArchive.revisionPage(request.params.id, {
+        limit: request.query.limit ?? 50,
+        state: request.query.state ?? "all",
+        ...(cursor === undefined ? {} : { cursor }),
+        ...(request.query.zoom === undefined
+          ? {}
+          : { zoom: request.query.zoom }),
+      });
+    },
+  );
+
+  server.delete<{ Params: { id: string; archiveId: string } }>(
+    "/api/map-sets/:id/tile-revisions/:archiveId",
+    { schema: { params: archiveIdParametersSchema } },
+    async (request, reply) => {
+      service.get(request.params.id);
+      await tileArchive.deleteRevision(
+        request.params.id,
+        request.params.archiveId,
+      );
+      return reply.code(204).send();
+    },
+  );
+
+  server.get<{ Params: { id: string } }>(
+    "/api/map-sets/:id/snapshots",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: {
+          200: CacheSnapshotListResponseSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      service.get(request.params.id);
+      return { items: tileArchive.listSnapshots(request.params.id) };
+    },
+  );
+
+  server.post<{
+    Params: { id: string };
+    Body: CacheSnapshotCreateInput;
+  }>(
+    "/api/map-sets/:id/snapshots",
+    {
+      schema: {
+        params: idParametersSchema,
+        body: CacheSnapshotCreateInputSchema,
+        response: {
+          201: CacheSnapshotSchema,
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+          409: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      service.get(request.params.id);
+      return reply
+        .code(201)
+        .send(tileArchive.createSnapshot(request.params.id, request.body.name));
+    },
+  );
+
+  server.delete<{ Params: { id: string; archiveId: string } }>(
+    "/api/map-sets/:id/snapshots/:archiveId",
+    { schema: { params: archiveIdParametersSchema } },
+    async (request, reply) => {
+      service.get(request.params.id);
+      tileArchive.deleteSnapshot(request.params.id, request.params.archiveId);
+      return reply.code(204).send();
+    },
+  );
+
+  server.get<{
+    Params: { id: string };
+    Querystring: { left: string; right: string };
+  }>(
+    "/api/map-sets/:id/cache/compare",
+    {
+      schema: {
+        params: idParametersSchema,
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          required: ["left", "right"],
+          properties: {
+            left: { type: "string", minLength: 1 },
+            right: { type: "string", minLength: 1 },
+          },
+        },
+        response: {
+          200: TileCacheComparisonSchema,
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      service.get(request.params.id);
+      return tileArchive.compare(
+        request.params.id,
+        request.query.left,
+        request.query.right,
+      );
     },
   );
 }

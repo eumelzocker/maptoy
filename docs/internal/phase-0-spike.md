@@ -158,7 +158,7 @@ The implementation work should conclude with these short ADRs:
 
 1. frontend map-renderer adapter boundary;
 2. trusted layer-plugin lifecycle and hook boundary;
-3. source revision, tile revision, snapshot, and temporal-selection model;
+3. stable Map Set source, tile revision, snapshot, and temporal-selection model;
 4. raster reprojection dependency decision.
 
 The spike report must link its generated images and measurements from the fourth

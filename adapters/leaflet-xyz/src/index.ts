@@ -68,20 +68,6 @@ function configuration(value: unknown): LeafletXyzConfiguration {
   };
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#039;",
-      })[character] ?? character,
-  );
-}
-
 async function createLeafletInstance(
   options: CreateMapRendererOptions,
   leafletConfiguration: LeafletXyzConfiguration,
@@ -99,7 +85,10 @@ async function createLeafletInstance(
     options.initialViewport.zoom,
   );
   L.tileLayer(leafletConfiguration.tileUrl, {
-    attribution: escapeHtml(leafletConfiguration.attribution),
+    // Leaflet intentionally renders attribution as HTML. Map Sets are trusted,
+    // administrator-authored configuration in this single-user application, so
+    // links are passed through unchanged instead of applying XSS sanitization.
+    attribution: leafletConfiguration.attribution,
     minZoom: leafletConfiguration.minZoom,
     maxZoom: leafletConfiguration.maxZoom,
     tileSize: leafletConfiguration.tileSize,

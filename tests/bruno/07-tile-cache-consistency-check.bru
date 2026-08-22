@@ -1,0 +1,20 @@
+meta {
+  name: Tile Cache - Consistency Check (read only, scans files)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/cache/audit
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns file-system consistency counts", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.scannedFileCount).to.be.a("number");
+    expect(res.body.missingFileCount).to.be.a("number");
+    expect(res.body.orphanFileCount).to.be.a("number");
+  });
+}

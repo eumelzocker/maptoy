@@ -4,6 +4,36 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-08-22
+
+### Added
+
+- Revision-aware Tile Archive with immutable Tile Revisions, content-addressed
+  atomic storage, concurrent miss deduplication, conditional validation, and
+  `auto`, `force`, and `cache-only` refresh modes.
+- Reproducible current, snapshot, time-based, and explicit-revision tile selection,
+  snapshot comparison, cache statistics, protected deletion, and explicit orphan
+  file repair.
+- Tile Cache management view, English and German documentation, and manual Bruno
+  cache requests.
+- Bidirectional cache-index repair that removes unusable revision metadata
+  after Tile files were deleted outside maptoy.
+- Scalable Tile Cache overview with per-zoom database summaries, explicit
+  file-system consistency checks, a filtered cursor-paginated Revision Explorer,
+  and SQL-aggregated snapshot comparisons.
+- Stable Map Set source identity: source-defining fields become immutable after the
+  first cached Tile Revision; a different source uses a duplicated Map Set instead
+  of separate Source Revision and activation tables.
+- `d:rebuild:all` for a complete no-cache Compose rebuild with recreation and
+  health waiting, while the regular `d:rebuild` keeps the faster cached workflow.
+
+### Fixed
+
+- Trusted HTML links in Map Set attribution are rendered by Leaflet instead of
+  being displayed as escaped markup.
+- Map zoom controls and Tile API requests consistently enforce each Map Set's
+  configured minimum and maximum zoom.
+
 ## [0.0.2] - 2026-08-21
 
 ### Added

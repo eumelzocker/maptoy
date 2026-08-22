@@ -6,11 +6,13 @@ const props = defineProps<{
   modelValue: MapSetInput;
   submitLabel: string;
   busy?: boolean;
+  sourceLocked?: boolean;
 }>();
 
 const emit = defineEmits<{
   submit: [value: MapSetInput];
   cancel: [];
+  duplicate: [];
 }>();
 
 const draft = reactive<MapSetInput>(props.modelValue);
@@ -116,12 +118,14 @@ function submit(): void {
           required
           maxlength="4096"
           spellcheck="false"
+          :disabled="sourceLocked"
         />
         <small>Required placeholders: {z}, {x}, {y}; optional: {s}.</small>
       </label>
       <label class="wide-field">
         <span>Attribution</span>
         <input v-model.trim="draft.attribution" required maxlength="2000" />
+        <small>Leaflet link markup such as &lt;a href="https://…"&gt;…&lt;/a&gt; is supported.</small>
       </label>
       <label class="wide-field">
         <span>Provider terms URL</span>
@@ -139,6 +143,16 @@ function submit(): void {
 
     <fieldset>
       <legend>Tile source</legend>
+      <p id="source-lock-note" class="wide-field field-note" :class="{ locked: sourceLocked }">
+        <i v-if="sourceLocked" class="mdi mdi-lock" aria-hidden="true"></i>
+        <template v-if="sourceLocked">
+          Source settings are locked because this Map Set contains cached Tiles.
+        </template>
+        <template v-else>
+          URL, headers, subdomains, tile size, format, and projection become locked
+          after the first Tile Revision is cached.
+        </template>
+      </p>
       <label>
         <span>Minimum zoom</span>
         <input v-model.number="draft.minZoom" type="number" min="0" max="24" />
@@ -149,14 +163,14 @@ function submit(): void {
       </label>
       <label>
         <span>Tile size</span>
-        <select v-model.number="draft.tileSize">
+        <select v-model.number="draft.tileSize" :disabled="sourceLocked">
           <option :value="256">256 px</option>
           <option :value="512">512 px</option>
         </select>
       </label>
       <label>
         <span>Format</span>
-        <select v-model="draft.tileFormat">
+        <select v-model="draft.tileFormat" :disabled="sourceLocked">
           <option value="png">PNG</option>
           <option value="jpeg">JPEG</option>
           <option value="webp">WebP</option>
@@ -164,7 +178,7 @@ function submit(): void {
       </label>
       <label class="wide-field">
         <span>Subdomains</span>
-        <input v-model="subdomains" placeholder="a, b, c" />
+        <input v-model="subdomains" placeholder="a, b, c" :disabled="sourceLocked" />
       </label>
       <label class="wide-field">
         <span>Request headers</span>
@@ -173,6 +187,7 @@ function submit(): void {
           rows="3"
           spellcheck="false"
           placeholder="User-Agent: maptoy/0.0.1"
+          :disabled="sourceLocked"
         ></textarea>
         <small>
           One “Name: value” per line. Secrets use ${MAPTOY_PROVIDER_KEY} and are
@@ -302,6 +317,9 @@ function submit(): void {
         {{ submitLabel }}
       </button>
       <button type="button" :disabled="busy" @click="emit('cancel')">Cancel</button>
+      <button v-if="sourceLocked" type="button" :disabled="busy" @click="emit('duplicate')">
+        Duplicate to change source
+      </button>
       <RouterLink to="/docs/en/map-sets">Map Set help</RouterLink>
     </div>
   </form>
@@ -337,6 +355,19 @@ label {
   font-weight: 700;
 }
 
+.field-note {
+  margin: 0;
+  color: #5d746d;
+  font-size: 0.88rem;
+}
+
+.field-note.locked {
+  padding: 0.65rem 0.75rem;
+  border-left: 0.2rem solid #a34521;
+  background: #fff3ed;
+  color: #71331d;
+}
+
 .wide-field {
   grid-column: 1 / -1;
 }
@@ -361,6 +392,14 @@ button {
 
 textarea {
   resize: vertical;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  color: #66756f;
+  background: #e7ece9;
 }
 
 small {

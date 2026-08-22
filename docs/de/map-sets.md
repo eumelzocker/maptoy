@@ -21,8 +21,11 @@ als technische Orientierung.
 - Das **XYZ URL template** muss eine HTTP- oder HTTPS-URL mit `{z}`, `{x}` und
   `{y}` sein. `{s}` ist optional und benötigt mindestens eine konfigurierte
   Subdomain.
-- **Attribution** wird vom interaktiven Renderer angezeigt. Gib sie als Klartext
-  ein.
+- **Attribution** wird vom interaktiven Renderer angezeigt. Klartext und
+  vertrauenswürdiges, Leaflet-kompatibles Link-Markup wie
+  `<a href="https://…">…</a>` werden unterstützt. Das Markup wird unverändert
+  gespeichert und dargestellt; deshalb sollte nur der Administrator Map Sets
+  bearbeiten.
 - **Provider terms URL**, **Terms last reviewed** und **Notes** halten deine Prüfung
   fest; daraus leitet maptoy keine rechtliche Freigabe ab.
 - **Minimum**, **Maximum** und **Default zoom** müssen zum tatsächlichen Zoombereich
@@ -32,6 +35,23 @@ als technische Orientierung.
 
 Die erste Implementierung unterstützt ausschließlich den Quelltyp `xyz-raster` in
 Web Mercator (`EPSG:3857`) und den Renderer `leaflet-xyz`.
+
+## Quelle nach dem ersten Cache-Eintrag
+
+Sobald ein Map Set seine erste Tile-Revision im Cache enthält, sperrt maptoy die
+Felder, welche die Quelle festlegen: Quelltyp, URL-Template, Request-Header,
+Subdomains, Tile-Größe, Format und Quellprojektion. Metadaten, Startausschnitt,
+Zoomgrenzen, Capabilities sowie Cache- und Download-Regeln bleiben editierbar.
+
+Dupliziere das Map Set und bearbeite die Kopie, wenn sich ein gesperrtes Quellfeld
+ändern soll. So bleibt jede gespeicherte Koordinate eindeutig einer verständlichen
+Quelle zugeordnet, ohne eine zusätzliche Versionshistorie für Quellen zu führen.
+Ändert sich nur der Wert einer referenzierten Environment-Variable, etwa bei der
+Rotation eines API-Schlüssels, ändert das weder das gespeicherte Map Set noch seine
+bereits gecachten Tiles.
+
+Der Editor stellt gesperrte Quellenfelder deaktiviert dar und bietet **Duplicate to
+change source** an. Für direkte API-Aufrufe erzwingt der Server dieselbe Regel.
 
 ## Secrets und Request-Header
 
@@ -90,6 +110,6 @@ Kartenansicht.
 In Phase 2 lädt die Kartenansicht jedes Tile über den relativen maptoy-Endpunkt
 `api/map-sets/:id/tiles/:z/:x/:y`; der Browser erhält weder die externe
 Provider-URL noch aufgelöste Secrets. Dauerhafte Tile-Revisionen,
-Cache-Aktualisierungsmodi, Snapshots und Batch-Downloads folgen in späteren Phasen.
-Cache- und Downloadregeln können bereits gespeichert und später mit demselben Map
-Set verwendet werden.
+Aktualisierungsmodi, Snapshots und Vergleiche von Cache-Ständen beschreibt die
+[Tile-Cache-Dokumentation](docs/de/tile-cache). Batch-Downloads folgen in einer
+späteren Phase.

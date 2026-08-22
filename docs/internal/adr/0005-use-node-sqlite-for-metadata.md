@@ -8,7 +8,7 @@ Date: 2026-08-21
 maptoy needs transactional, persistent metadata without an external database. The
 runtime is pinned to Node.js 24, which includes the `node:sqlite` API. Phase 2 uses
 SQLite for Map Sets and establishes the migration mechanism that later phases will
-extend for source revisions, tiles, snapshots, layers, and jobs.
+extend for Tile Revisions, snapshots, layers, and jobs.
 
 ## Decision
 

@@ -10,6 +10,11 @@ import { wgs84ToXyz } from "@maptoy/map-core";
 import type { MapRendererManifestRegistry } from "@maptoy/map-adapter-sdk";
 import type { ProviderClient, ProviderResponse } from "../providerClient.js";
 import { ProviderRequestError } from "../providerClient.js";
+import type { TileSelection } from "../tiles/repository.js";
+import type {
+  ArchivedTileResponse,
+  TileArchiveService,
+} from "../tiles/service.js";
 import type { MapSetRepository } from "./repository.js";
 import {
   MapSetValidationError,
@@ -28,13 +33,15 @@ export class MapSetNotFoundError extends Error {
   }
 }
 
-export class MapSetTileError extends Error {
-  readonly code = "PROVIDER_TILE_INVALID";
-  readonly statusCode = 502;
+export class MapSetSourceLockedError extends Error {
+  readonly code = "MAP_SET_SOURCE_LOCKED";
+  readonly statusCode = 409;
 
-  constructor(message: string) {
-    super(message);
-    this.name = "MapSetTileError";
+  constructor() {
+    super(
+      "Tile source settings cannot be changed after this Map Set has cached tiles. Duplicate the Map Set to use a different source.",
+    );
+    this.name = "MapSetSourceLockedError";
   }
 }
 
@@ -48,6 +55,22 @@ function inputFromMapSet(mapSet: MapSet): MapSetInput {
   return input;
 }
 
+function tileSourceIdentity(mapSet: MapSetInput): string {
+  // A Map Set is the stable source boundary once its first Tile Revision exists.
+  // Sorting headers avoids treating a harmless object-key reordering as a change.
+  return JSON.stringify({
+    sourceType: mapSet.sourceType,
+    urlTemplate: mapSet.urlTemplate,
+    headers: Object.entries(mapSet.headers).sort(([left], [right]) =>
+      left.localeCompare(right),
+    ),
+    subdomains: mapSet.subdomains,
+    tileSize: mapSet.tileSize,
+    tileFormat: mapSet.tileFormat,
+    sourceProjection: mapSet.sourceProjection,
+  });
+}
+
 const acceptedTileContentTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -59,6 +82,7 @@ export class MapSetService {
     private readonly repository: MapSetRepository,
     private readonly renderers: MapRendererManifestRegistry,
     private readonly providerClient: ProviderClient,
+    private readonly tileArchive: TileArchiveService,
     private readonly options: {
       allowPrivateTileHosts: boolean;
       environment: NodeJS.ProcessEnv;
@@ -96,6 +120,12 @@ export class MapSetService {
       ...inputFromMapSet(current),
       ...patch,
     });
+    if (
+      this.tileArchive.hasCachedTiles(id) &&
+      tileSourceIdentity(current) !== tileSourceIdentity(updatedInput)
+    ) {
+      throw new MapSetSourceLockedError();
+    }
     const updated: MapSet = {
       ...updatedInput,
       id,
@@ -106,10 +136,11 @@ export class MapSetService {
     return updated;
   }
 
-  delete(id: string): void {
+  async delete(id: string): Promise<void> {
     if (!this.repository.delete(id)) {
       throw new MapSetNotFoundError();
     }
+    await this.tileArchive.deleteMapSetFiles(id);
   }
 
   async test(id: string): Promise<MapSetTestResponse> {
@@ -159,7 +190,11 @@ export class MapSetService {
   async tile(
     id: string,
     tile: { zoom: number; x: number; y: number },
-  ): Promise<ProviderResponse> {
+    options: {
+      refresh: import("@maptoy/contracts").TileRefreshMode;
+      selection: TileSelection;
+    },
+  ): Promise<ArchivedTileResponse> {
     const mapSet = this.get(id);
     if (tile.zoom < mapSet.minZoom || tile.zoom > mapSet.maxZoom) {
       throw new MapSetValidationError(
@@ -172,35 +207,22 @@ export class MapSetService {
         "The requested XYZ tile is out of range.",
       );
     }
-    const response = await this.requestTile(mapSet, tile);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw new MapSetTileError(
-        `The provider returned HTTP ${response.statusCode} for the requested tile.`,
-      );
-    }
-    const contentTypeHeader = response.headers["content-type"];
-    const contentType = Array.isArray(contentTypeHeader)
-      ? contentTypeHeader[0]
-      : contentTypeHeader;
-    const normalizedContentType = contentType?.split(";", 1)[0]?.toLowerCase();
-    if (
-      normalizedContentType === undefined ||
-      !acceptedTileContentTypes.has(normalizedContentType)
-    ) {
-      throw new MapSetTileError(
-        "The provider response is not a supported PNG, JPEG, or WebP tile.",
-      );
-    }
-    return response;
+    return this.tileArchive.tile(mapSet, tile, options, (additionalHeaders) =>
+      this.requestTile(mapSet, tile, additionalHeaders),
+    );
   }
 
   private requestTile(
     input: MapSetInput,
     tile: { zoom: number; x: number; y: number },
+    additionalHeaders: Readonly<Record<string, string>> = {},
   ): Promise<ProviderResponse> {
     return this.providerClient.request(
       tileUrl(input, tile, this.options.environment),
-      providerHeaders(input, this.options.environment),
+      {
+        ...providerHeaders(input, this.options.environment),
+        ...additionalHeaders,
+      },
     );
   }
 

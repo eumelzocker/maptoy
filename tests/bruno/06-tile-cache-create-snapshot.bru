@@ -1,0 +1,24 @@
+meta {
+  name: Tile Cache - Create snapshot (writes data)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/snapshots
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno manual snapshot"
+  }
+}
+
+tests {
+  test("creates an immutable snapshot", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.name).to.equal("Bruno manual snapshot");
+  });
+}

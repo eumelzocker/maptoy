@@ -159,6 +159,149 @@ export const MapSetTestResponseSchema = Type.Object(
 
 export type MapSetTestResponse = Static<typeof MapSetTestResponseSchema>;
 
+export const TileRefreshModeSchema = Type.Union([
+  Type.Literal("auto"),
+  Type.Literal("force"),
+  Type.Literal("cache-only"),
+]);
+
+export type TileRefreshMode = Static<typeof TileRefreshModeSchema>;
+
+export const TileRevisionSummarySchema = Type.Object(
+  {
+    id: Type.String(),
+    zoom: Type.Integer(),
+    x: Type.Integer(),
+    y: Type.Integer(),
+    contentHash: Type.String(),
+    contentType: Type.String(),
+    byteLength: Type.Integer({ minimum: 0 }),
+    firstSeenAt: Type.String(),
+    lastSeenAt: Type.String(),
+    lastValidatedAt: Type.String(),
+    current: Type.Boolean(),
+  },
+  { additionalProperties: false, $id: "TileRevisionSummary" },
+);
+
+export type TileRevisionSummary = Static<typeof TileRevisionSummarySchema>;
+
+export const TileRevisionListResponseSchema = Type.Object(
+  {
+    items: Type.Array(TileRevisionSummarySchema),
+    total: Type.Integer({ minimum: 0 }),
+    nextCursor: Type.Union([Type.String(), Type.Null()]),
+  },
+  { additionalProperties: false, $id: "TileRevisionListResponse" },
+);
+
+export type TileRevisionListResponse = Static<
+  typeof TileRevisionListResponseSchema
+>;
+
+export const CacheSnapshotCreateInputSchema = Type.Object(
+  { name: Type.String({ minLength: 1, maxLength: 120 }) },
+  { additionalProperties: false, $id: "CacheSnapshotCreateInput" },
+);
+
+export type CacheSnapshotCreateInput = Static<
+  typeof CacheSnapshotCreateInputSchema
+>;
+
+export const CacheSnapshotSchema = Type.Object(
+  {
+    id: Type.String(),
+    mapSetId: Type.String(),
+    name: Type.String(),
+    createdAt: Type.String(),
+    tileCount: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false, $id: "CacheSnapshot" },
+);
+
+export type CacheSnapshot = Static<typeof CacheSnapshotSchema>;
+
+export const CacheSnapshotListResponseSchema = Type.Object(
+  { items: Type.Array(CacheSnapshotSchema) },
+  { additionalProperties: false, $id: "CacheSnapshotListResponse" },
+);
+
+export type CacheSnapshotListResponse = Static<
+  typeof CacheSnapshotListResponseSchema
+>;
+
+export const TileCacheZoomStatsSchema = Type.Object(
+  {
+    zoom: Type.Integer({ minimum: 0 }),
+    logicalTileCount: Type.Integer({ minimum: 0 }),
+    currentRevisionCount: Type.Integer({ minimum: 0 }),
+    historicalRevisionCount: Type.Integer({ minimum: 0 }),
+    totalRevisionCount: Type.Integer({ minimum: 0 }),
+    indexedStorageBytes: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false, $id: "TileCacheZoomStats" },
+);
+
+export type TileCacheZoomStats = Static<typeof TileCacheZoomStatsSchema>;
+
+export const TileCacheStatsSchema = Type.Object(
+  {
+    logicalTileCount: Type.Integer({ minimum: 0 }),
+    currentRevisionCount: Type.Integer({ minimum: 0 }),
+    historicalRevisionCount: Type.Integer({ minimum: 0 }),
+    totalRevisionCount: Type.Integer({ minimum: 0 }),
+    snapshotCount: Type.Integer({ minimum: 0 }),
+    uniqueContentCount: Type.Integer({ minimum: 0 }),
+    totalStorageBytes: Type.Integer({ minimum: 0 }),
+    zoomLevels: Type.Array(TileCacheZoomStatsSchema),
+  },
+  { additionalProperties: false, $id: "TileCacheStats" },
+);
+
+export type TileCacheStats = Static<typeof TileCacheStatsSchema>;
+
+export const TileCacheAuditResultSchema = Type.Object(
+  {
+    scannedFileCount: Type.Integer({ minimum: 0 }),
+    physicalStorageBytes: Type.Integer({ minimum: 0 }),
+    missingFileCount: Type.Integer({ minimum: 0 }),
+    orphanFileCount: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false, $id: "TileCacheAuditResult" },
+);
+
+export type TileCacheAuditResult = Static<typeof TileCacheAuditResultSchema>;
+
+export const TileCacheRepairResultSchema = Type.Object(
+  {
+    scannedFileCount: Type.Integer({ minimum: 0 }),
+    removedOrphanFileCount: Type.Integer({ minimum: 0 }),
+    removedOrphanBytes: Type.Integer({ minimum: 0 }),
+    removedMissingFileCount: Type.Integer({ minimum: 0 }),
+    removedMissingRevisionCount: Type.Integer({ minimum: 0 }),
+    removedLogicalTileCount: Type.Integer({ minimum: 0 }),
+    removedSnapshotReferenceCount: Type.Integer({ minimum: 0 }),
+    audit: TileCacheAuditResultSchema,
+  },
+  { additionalProperties: false, $id: "TileCacheRepairResult" },
+);
+
+export type TileCacheRepairResult = Static<typeof TileCacheRepairResultSchema>;
+
+export const TileCacheComparisonSchema = Type.Object(
+  {
+    left: Type.String(),
+    right: Type.String(),
+    identical: Type.Integer({ minimum: 0 }),
+    changed: Type.Integer({ minimum: 0 }),
+    added: Type.Integer({ minimum: 0 }),
+    missing: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false, $id: "TileCacheComparison" },
+);
+
+export type TileCacheComparison = Static<typeof TileCacheComparisonSchema>;
+
 export const ErrorResponseSchema = Type.Object(
   {
     error: Type.Object(

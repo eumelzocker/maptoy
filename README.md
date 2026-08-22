@@ -6,9 +6,9 @@ history, snapshots, and optional track or image layers under the user's control.
 
 > maptoy is under active development. The repository currently provides the
 > application shell, persistent XYZ Map Sets, a server-side provider proxy, the
-> Leaflet map renderer, extension contracts, integrated documentation, and the
-> container foundation. Tile revision history, batch downloads, and exports are
-> implemented in later phases.
+> Leaflet map renderer, immutable Tile Revisions and snapshots, extension contracts,
+> integrated documentation, and the container foundation. Batch downloads and
+> exports are implemented in later phases.
 
 ## Start with Docker Compose
 
@@ -79,6 +79,7 @@ The operational endpoints are available relative to the public entry URL:
 - `api/health` — process liveness
 - `api/ready` — data-directory readiness
 - `api/map-sets` — persistent Map Set management
+- `api/map-sets/:id/tiles/:z/:x/:y` — revision-aware Tile Cache and proxy
 
 Provider secrets use `MAPTOY_*` environment variables and are referenced from Map
 Sets as `${MAPTOY_EXAMPLE_API_KEY}`. Private and link-local provider hosts are

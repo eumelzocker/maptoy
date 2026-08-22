@@ -45,6 +45,12 @@ describe("Map Set validation", () => {
     ).toThrow("Minimum zoom");
     expect(() =>
       validateMapSetSemantics(
+        { ...createDefaultMapSetInput(), minZoom: 1, defaultZoom: 0 },
+        baseOptions,
+      ),
+    ).toThrow("Default zoom");
+    expect(() =>
+      validateMapSetSemantics(
         {
           ...createDefaultMapSetInput(),
           urlTemplate: "https://127.0.0.1/{z}/{x}/{y}.png",

@@ -13,6 +13,7 @@ import {
 import DocumentationView from "./views/DocumentationView.vue";
 import MapSetsView from "./views/MapSetsView.vue";
 import MapView from "./views/MapView.vue";
+import TileCacheView from "./views/TileCacheView.vue";
 import "@mdi/font/css/materialdesignicons.css";
 import "@maptoy/leaflet-xyz/style.css";
 import "./style.css";
@@ -32,6 +33,10 @@ const router = createRouter({
     {
       path: "/map-sets",
       component: MapSetsView,
+    },
+    {
+      path: "/cache",
+      component: TileCacheView,
     },
     {
       path: "/docs",

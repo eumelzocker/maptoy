@@ -27,8 +27,8 @@ without another provider request, subject to the selected refresh mode and revis
 
 ## Cache snapshot
 
-A named, immutable selection of exact tile revisions for one Map Set and source
-revision. A snapshot makes later display, comparison, and export reproducible.
+A named, immutable selection of exact tile revisions for one Map Set. A snapshot
+makes later display, comparison, and export reproducible.
 
 ## Capability
 
@@ -63,8 +63,8 @@ registered layer plugin and may contain tracks, positioned images, or other data
 
 ## Logical tile
 
-The identity of a tile within a Map Set and source revision, defined by its zoom and
-`x`/`y` coordinates. One logical tile may have several immutable tile revisions.
+The identity of a tile within a Map Set, defined by its zoom and `x`/`y` coordinates.
+One logical tile may have several immutable tile revisions.
 
 ## Map Set
 
@@ -87,11 +87,6 @@ renderer. Version 1.0 supplies the Leaflet/XYZ adapter.
 
 The conversion of geographic data or a raster image from one coordinate reference
 system to another. Reprojection can change shape, scale, and visible extent.
-
-## Source revision
-
-An immutable version of the Map Set fields that affect tile retrieval, such as the
-URL template, style, headers, format, tile size, and source projection.
 
 ## Tile
 

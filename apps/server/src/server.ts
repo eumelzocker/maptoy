@@ -14,6 +14,9 @@ import { MapSetRepository } from "./mapSets/repository.js";
 import { registerMapSetRoutes } from "./mapSets/routes.js";
 import { MapSetService } from "./mapSets/service.js";
 import { SafeProviderClient, type ProviderClient } from "./providerClient.js";
+import { TileArchiveRepository } from "./tiles/repository.js";
+import { TileArchiveService } from "./tiles/service.js";
+import { TileStorage } from "./tiles/storage.js";
 
 export interface BuildServerOptions {
   config?: MaptoyConfig;
@@ -59,6 +62,12 @@ export async function buildServer(
   await mkdir(config.dataDirectory, { recursive: true });
   const database = await openDatabase(config.databasePath);
   const mapSetRepository = new MapSetRepository(database.sqlite);
+  const tileArchiveRepository = new TileArchiveRepository(database.sqlite);
+  const tileArchive = new TileArchiveService(
+    tileArchiveRepository,
+    new TileStorage(config.dataDirectory),
+  );
+  await tileArchive.initialize();
   const providerClient =
     options.providerClient ??
     new SafeProviderClient({
@@ -70,6 +79,7 @@ export async function buildServer(
     mapSetRepository,
     mapRendererRegistry,
     providerClient,
+    tileArchive,
     {
       allowPrivateTileHosts: config.allowPrivateTileHosts,
       environment: options.environment ?? process.env,
@@ -138,7 +148,7 @@ export async function buildServer(
     items: layerPluginRegistry.list().map(({ manifest }) => manifest),
   }));
 
-  registerMapSetRoutes(server, mapSetService);
+  registerMapSetRoutes(server, mapSetService, tileArchive);
 
   if (options.serveWeb ?? true) {
     const root = options.staticDirectory ?? defaultStaticDirectory();

@@ -19,7 +19,10 @@ Open **Map Sets**, choose **New Map Set**, and complete these essential fields:
 - **Name** is the local display name.
 - **XYZ URL template** must be an HTTP or HTTPS URL containing `{z}`, `{x}`, and
   `{y}`. `{s}` is optional and requires at least one configured subdomain.
-- **Attribution** is shown by the interactive renderer. Enter it as plain text.
+- **Attribution** is shown by the interactive renderer. Plain text and trusted
+  Leaflet-compatible link markup such as `<a href="https://…">…</a>` are accepted.
+  The markup is stored and rendered unchanged, so only administrators should edit
+  Map Set configuration.
 - **Provider terms URL**, **Terms last reviewed**, and **Notes** record what you
   checked; they do not constitute legal approval by maptoy.
 - **Minimum**, **maximum**, and **default zoom** must describe the source's actual
@@ -29,6 +32,22 @@ Open **Map Sets**, choose **New Map Set**, and complete these essential fields:
 
 The initial implementation supports the `xyz-raster` source type in Web Mercator
 (`EPSG:3857`) and the `leaflet-xyz` renderer only.
+
+## Source settings after caching
+
+Once a Map Set contains its first cached Tile Revision, maptoy locks the fields that
+define the source: source type, URL template, request headers, subdomains, tile size,
+format, and source projection. Metadata, viewport, zoom limits, capabilities, and
+cache or download policies remain editable.
+
+To change a locked source field, duplicate the Map Set and edit the copy. This keeps
+every cached coordinate tied to one understandable source without maintaining a
+separate source-version history. Changing the value of an environment variable, such
+as rotating an API key referenced by a header, does not change the stored Map Set and
+does not invalidate its cached Tiles.
+
+The editor shows locked source controls as disabled and offers **Duplicate to change
+source**. The server enforces the same rule for API clients.
 
 ## Secrets and request headers
 
@@ -82,6 +101,6 @@ capability prevents the Map Set from opening in the Map view.
 
 During Phase 2, the Map view loads every tile through the relative maptoy endpoint
 `api/map-sets/:id/tiles/:z/:x/:y`; the browser never receives the external provider
-URL or resolved secrets. Persistent tile revisions, cache refresh modes, snapshots,
-and batch downloads are implemented in later phases. Cache and download settings
-can already be recorded so the same Map Set configuration remains usable then.
+URL or resolved secrets. Persistent Tile Revisions, refresh modes, snapshots, and
+cache-state comparisons are described in the [Tile Cache](docs/en/tile-cache)
+documentation. Batch downloads are implemented in a later phase.

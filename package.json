@@ -1,6 +1,6 @@
 {
   "name": "maptoy",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.21.0",
@@ -19,7 +19,8 @@
     "d:down": "docker compose down",
     "d:up": "docker compose up --detach",
     "d:logs": "docker compose logs",
-    "d:rebuild": "docker compose down && docker compose up --build --detach && docker compose ps && echo -n \"🚀 \" && date"
+    "d:rebuild": "docker compose down && docker compose up --build --detach && docker compose ps && echo -n \"🚀 \" && date",
+    "d:rebuild:all": "docker compose down && docker compose build --no-cache && docker compose up --detach --force-recreate --wait && docker compose ps && echo -n \"🚀🚀 \" && date"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",

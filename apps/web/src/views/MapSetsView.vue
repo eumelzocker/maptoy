@@ -4,10 +4,12 @@ import {
   type MapSet,
   type MapSetInput,
   type MapSetTestResponse,
+  type TileCacheStats,
 } from "@maptoy/contracts";
 import { onMounted, ref } from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetForm from "../components/MapSetForm.vue";
+import { apiRequest } from "../api.js";
 import { mapSetInput } from "../mapSetModels.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
@@ -21,6 +23,7 @@ const message = ref<string | null>(null);
 const error = ref<string | null>(null);
 const testResult = ref<MapSetTestResponse | null>(null);
 const testedMapSetId = ref<string | null>(null);
+const sourceLocked = ref(false);
 
 onMounted(async () => {
   try {
@@ -34,6 +37,7 @@ onMounted(async () => {
 function newMapSet(): void {
   draft.value = createDefaultMapSetInput();
   editingId.value = null;
+  sourceLocked.value = false;
   editorMode.value = "create";
   editorKey.value = `create-${Date.now()}`;
   message.value = null;
@@ -41,9 +45,10 @@ function newMapSet(): void {
   testResult.value = null;
 }
 
-function edit(mapSet: MapSet): void {
+function openEditor(mapSet: MapSet, locked: boolean): void {
   draft.value = mapSetInput(mapSet);
   editingId.value = mapSet.id;
+  sourceLocked.value = locked;
   editorMode.value = "edit";
   editorKey.value = mapSet.id;
   message.value = null;
@@ -51,9 +56,29 @@ function edit(mapSet: MapSet): void {
   testResult.value = null;
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function edit(mapSet: MapSet): Promise<void> {
+  busy.value = true;
+  error.value = null;
+  try {
+    const stats = await apiRequest<TileCacheStats>(
+      `api/map-sets/${mapSet.id}/cache/stats`,
+    );
+    openEditor(mapSet, stats.totalRevisionCount > 0);
+  } catch (cause) {
+    error.value =
+      cause instanceof Error
+        ? cause.message
+        : "The Map Set cache status could not be loaded.";
+  } finally {
+    busy.value = false;
+  }
+}
+
 function closeEditor(): void {
   editorMode.value = "closed";
   editingId.value = null;
+  sourceLocked.value = false;
   editorKey.value = "closed";
 }
 
@@ -67,7 +92,7 @@ async function save(input: MapSetInput): Promise<void> {
       editingId.value === null
         ? await store.create(input)
         : await store.update(editingId.value, input);
-    edit(mapSet);
+    openEditor(mapSet, sourceLocked.value);
     message.value = `${mapSet.name} was saved.`;
   } catch (cause) {
     error.value =
@@ -79,7 +104,6 @@ async function save(input: MapSetInput): Promise<void> {
   }
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function duplicate(mapSet: MapSet): Promise<void> {
   busy.value = true;
   error.value = null;
@@ -88,7 +112,7 @@ async function duplicate(mapSet: MapSet): Promise<void> {
       ...mapSetInput(mapSet),
       name: `${mapSet.name} copy`,
     });
-    edit(copy);
+    openEditor(copy, false);
     message.value = `${copy.name} was created.`;
   } catch (cause) {
     error.value =
@@ -97,6 +121,14 @@ async function duplicate(mapSet: MapSet): Promise<void> {
         : "The Map Set could not be duplicated.";
   } finally {
     busy.value = false;
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function duplicateEditing(): Promise<void> {
+  const mapSet = store.items.find(({ id }) => id === editingId.value);
+  if (mapSet !== undefined) {
+    await duplicate(mapSet);
   }
 }
 
@@ -216,8 +248,10 @@ async function test(mapSet: MapSet): Promise<void> {
         :model-value="draft"
         :submit-label="editorMode === 'create' ? 'Create Map Set' : 'Save changes'"
         :busy="busy"
+        :source-locked="sourceLocked"
         @submit="save"
         @cancel="closeEditor"
+        @duplicate="duplicateEditing"
       />
     </section>
   </main>

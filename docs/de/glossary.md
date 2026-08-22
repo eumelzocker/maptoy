@@ -29,9 +29,8 @@ Provider-Anfrage verwendet werden.
 
 ## Cache snapshot
 
-Eine benannte, unveränderliche Auswahl exakter Tile-Revisionen für ein Map Set und
-einen Quellstand. Ein Snapshot macht spätere Anzeige, Vergleiche und Exporte
-reproduzierbar.
+Eine benannte, unveränderliche Auswahl exakter Tile-Revisionen für ein Map Set. Ein
+Snapshot macht spätere Anzeige, Vergleiche und Exporte reproduzierbar.
 
 ## Capability
 
@@ -68,9 +67,9 @@ Bilder oder andere Daten enthalten.
 
 ## Logical tile
 
-Die Identität eines Tiles innerhalb eines Map Sets und Quellstands, bestimmt durch
-Zoomstufe und `x`-/`y`-Koordinaten. Zu einem logischen Tile kann es mehrere
-unveränderliche Tile-Revisionen geben.
+Die Identität eines Tiles innerhalb eines Map Sets, bestimmt durch Zoomstufe und
+`x`-/`y`-Koordinaten. Zu einem logischen Tile kann es mehrere unveränderliche
+Tile-Revisionen geben.
 
 ## Map Set
 
@@ -94,11 +93,6 @@ Browser-Renderer verbindet. Version 1.0 liefert den Leaflet-/XYZ-Adapter aus.
 Umrechnung geografischer Daten oder eines Rasterbilds von einem
 Koordinatenreferenzsystem in ein anderes. Eine Reprojektion kann Form, Maßstab und
 sichtbaren Ausschnitt verändern.
-
-## Source revision
-
-Unveränderliche Fassung der Map-Set-Felder, die Tile-Abrufe beeinflussen, etwa
-URL-Template, Stil, Header, Format, Tile-Größe und Quellprojektion.
 
 ## Tile
 
