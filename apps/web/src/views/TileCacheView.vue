@@ -9,8 +9,10 @@ import type {
   TileRevisionListResponse,
   TileRevisionSummary,
 } from "@maptoy/contracts";
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { apiRequest } from "../api.js";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import HtmlTooltip from "../components/HtmlTooltip.vue";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
 const mapSets = useMapSetsStore();
@@ -29,6 +31,14 @@ const snapshotName = ref("");
 const busy = ref(false);
 const error = ref<string | null>(null);
 const message = ref<string | null>(null);
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const sortedRevisions = computed(() =>
+  [...revisions.value].sort(
+    (left, right) =>
+      left.zoom - right.zoom || left.x - right.x || left.y - right.y,
+  ),
+);
 
 async function loadDetails(): Promise<void> {
   if (selectedId.value === "") {
@@ -296,6 +306,12 @@ function formatDate(value: string): string {
     timeStyle: "medium",
   }).format(new Date(value));
 }
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function revisionPreviewUrl(revision: TileRevisionSummary): string {
+  const query = new URLSearchParams({ revision: revision.id });
+  return `api/map-sets/${encodeURIComponent(selectedId.value)}/tiles/${revision.zoom}/${revision.x}/${revision.y}?${query}`;
+}
 </script>
 
 <template>
@@ -419,9 +435,34 @@ function formatDate(value: string): string {
         <table>
           <thead><tr><th>Tile</th><th>State</th><th>Hash</th><th>Size</th><th>Validated</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="revision in revisions" :key="revision.id">
+            <tr v-for="revision in sortedRevisions" :key="revision.id">
               <td>{{ revision.zoom }}/{{ revision.x }}/{{ revision.y }}</td>
-              <td><span class="state" :class="{ current: revision.current }">{{ revision.current ? "current" : "historical" }}</span></td>
+              <td>
+                <HtmlTooltip
+                  :label="`Preview tile ${revision.zoom}/${revision.x}/${revision.y}`"
+                  align="start"
+                  fixed
+                  unstyled-trigger
+                >
+                  <template #trigger>
+                    <span class="state" :class="{ current: revision.current }">
+                      {{ revision.current ? "current" : "historical" }}
+                    </span>
+                  </template>
+                  <figure class="tile-preview">
+                    <img
+                      :src="revisionPreviewUrl(revision)"
+                      :alt="`Tile ${revision.zoom}/${revision.x}/${revision.y}`"
+                      width="256"
+                      height="256"
+                    />
+                    <figcaption>
+                      {{ revision.zoom }}/{{ revision.x }}/{{ revision.y }} ·
+                      {{ revision.contentHash.slice(0, 12) }}
+                    </figcaption>
+                  </figure>
+                </HtmlTooltip>
+              </td>
               <td><code :title="revision.contentHash">{{ revision.contentHash.slice(0, 12) }}</code></td>
               <td>{{ formatBytes(revision.byteLength) }}</td>
               <td>{{ formatDate(revision.lastValidatedAt) }}</td>
@@ -479,6 +520,9 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .revision-filters { align-items: end; gap: 0.75rem; flex-wrap: wrap; }
 .revision-filters label { min-width: 12rem; }
 .revision-table { margin-top: 1rem; }
+.tile-preview { width: 256px; margin: 0; }
+.tile-preview img { display: block; width: 256px; height: 256px; border-radius: 0.35rem; background: #dce7df; object-fit: contain; }
+.tile-preview figcaption { margin-top: 0.55rem; overflow: hidden; color: #536b64; font-family: ui-monospace, monospace; font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
 .revision-footer { justify-content: space-between; gap: 1rem; margin-top: 1rem; }
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }

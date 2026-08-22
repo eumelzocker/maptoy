@@ -33,6 +33,12 @@ Open **Map Sets**, choose **New Map Set**, and complete these essential fields:
 The initial implementation supports the `xyz-raster` source type in Web Mercator
 (`EPSG:3857`) and the `leaflet-xyz` renderer only.
 
+The Map view remembers one shared centre and zoom in the browser's local storage.
+Reloading the page restores that viewport, and switching Map Sets keeps the same
+area visible so sources can be compared directly. If the new Map Set has a narrower
+zoom range, maptoy clamps the shared zoom to its nearest limit. The configured
+default viewport is used when no valid stored value exists.
+
 ## Source settings after caching
 
 Once a Map Set contains its first cached Tile Revision, maptoy locks the fields that

@@ -73,7 +73,8 @@ Die Verwaltungsansicht lädt DB-Summen und Zusammenfassungen je Zoomstufe, ohne 
 Tile-Verzeichnis zu durchlaufen. Der Revision Explorer bleibt zunächst leer und
 lädt erst auf Anforderung höchstens 50 Zeilen pro Seite, optional nach Zoomstufe und
 aktuellem beziehungsweise historischem Zustand gefiltert. Dadurch bleibt die
-initiale Seite auch bei großen Archiven begrenzt.
+initiale Seite auch bei großen Archiven begrenzt. Der State-Chip zeigt bei Bedarf
+genau die ausgewählte Revision an, ohne den Provider zu kontaktieren.
 
 **Check consistency** scannt das verwaltete Verzeichnis ausdrücklich und meldet
 tatsächlich belegte Bytes, fehlende referenzierte und unreferenzierte Dateien. Der

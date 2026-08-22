@@ -68,7 +68,8 @@ than loading every Tile hash into server memory.
 The management view loads database totals and per-zoom summaries without walking
 the Tile directory. The Revision Explorer remains empty until requested, then loads
 at most 50 rows per page with optional zoom and current/historical filters. This
-keeps the initial page bounded even for large archives.
+keeps the initial page bounded even for large archives. The state chip previews the
+exact selected revision on demand without contacting the provider.
 
 **Check consistency** explicitly scans the managed directory and reports physical
 bytes, missing referenced files, and unreferenced files. The scan is not part of a

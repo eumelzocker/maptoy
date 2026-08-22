@@ -2,6 +2,9 @@
 import type { MapRendererInstance } from "@maptoy/map-adapter-sdk";
 import { storeToRefs } from "pinia";
 import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import HtmlTooltip from "../components/HtmlTooltip.vue";
+import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
 import { MAP_RENDERER_FACTORY_REGISTRY_KEY } from "../registries.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
@@ -22,6 +25,7 @@ let renderGeneration = 0;
 
 async function destroyRenderer(): Promise<void> {
   if (renderer !== null) {
+    saveMapViewport(localStorage, renderer.getViewport());
     await renderer.destroy();
     renderer = null;
   }
@@ -51,12 +55,18 @@ async function renderSelectedMap(): Promise<void> {
     return;
   }
   try {
-    const nextRenderer = await factory.create({
-      host: mapHost.value,
-      initialViewport: {
+    const initialViewport = loadMapViewport(
+      localStorage,
+      {
         center: mapSet.defaultCenter,
         zoom: mapSet.defaultZoom,
       },
+      mapSet.minZoom,
+      mapSet.maxZoom,
+    );
+    const nextRenderer = await factory.create({
+      host: mapHost.value,
+      initialViewport,
       configuration: {
         tileUrl: `api/map-sets/${mapSet.id}/tiles/{z}/{x}/{y}`,
         attribution: mapSet.attribution,
@@ -83,18 +93,10 @@ async function renderSelectedMap(): Promise<void> {
         };
       }
     });
-    nextRenderer.subscribe("viewport", (payload) => {
-      if (
-        typeof payload === "object" &&
-        payload !== null &&
-        "viewport" in payload &&
-        typeof payload.viewport === "object" &&
-        payload.viewport !== null &&
-        "zoom" in payload.viewport &&
-        typeof payload.viewport.zoom === "number"
-      ) {
-        zoom.value = payload.viewport.zoom;
-      }
+    nextRenderer.subscribe("viewport", () => {
+      const viewport = nextRenderer.getViewport();
+      zoom.value = viewport.zoom;
+      saveMapViewport(localStorage, viewport);
     });
   } catch (error) {
     mapError.value =
@@ -120,46 +122,50 @@ onBeforeUnmount(destroyRenderer);
 
 <template>
   <main class="map-page">
-    <aside class="map-toolbar">
-      <div>
-        <p class="eyebrow">Interactive map</p>
-        <h1>Map</h1>
+    <section class="map-stage" aria-label="Interactive map">
+      <div ref="mapHost" class="map-host"></div>
+
+      <div v-if="store.items.length > 0" class="map-controls">
+        <label>
+          <span class="visually-hidden">Map Set</span>
+          <select v-model="selectedId" aria-label="Map Set">
+            <option v-for="mapSet in store.items" :key="mapSet.id" :value="mapSet.id">
+              {{ mapSet.name }}
+            </option>
+          </select>
+        </label>
+        <HtmlTooltip v-if="selected" label="Map Set information" align="end">
+          <template #trigger>
+            <i class="mdi mdi-information-outline" aria-hidden="true"></i>
+          </template>
+          <article class="map-set-card">
+            <strong>{{ selected.name }}</strong>
+            <dl>
+              <div><dt>Renderer</dt><dd>{{ selected.rendererId }}</dd></div>
+              <div><dt>Projection</dt><dd>{{ selected.sourceProjection }}</dd></div>
+              <div><dt>Zoom range</dt><dd>{{ selected.minZoom }}–{{ selected.maxZoom }}</dd></div>
+              <div><dt>Tiles</dt><dd>{{ selected.tileSize }} px · {{ selected.tileFormat.toUpperCase() }}</dd></div>
+            </dl>
+            <!-- Attribution is trusted, administrator-authored Map Set HTML. -->
+            <div class="map-set-attribution" v-html="selected.attribution"></div>
+            <a v-if="selected.termsUrl" :href="selected.termsUrl" target="_blank" rel="noopener noreferrer">
+              Provider terms
+              <i class="mdi mdi-open-in-new" aria-hidden="true"></i>
+            </a>
+          </article>
+        </HtmlTooltip>
+        <RouterLink class="manage-link" to="/map-sets" aria-label="Manage Map Sets" title="Manage Map Sets">
+          <i class="mdi mdi-cog-outline" aria-hidden="true"></i>
+        </RouterLink>
       </div>
-      <label v-if="store.items.length > 0">
-        <span>Map Set</span>
-        <select v-model="selectedId">
-          <option v-for="mapSet in store.items" :key="mapSet.id" :value="mapSet.id">
-            {{ mapSet.name }}
-          </option>
-        </select>
-      </label>
-      <RouterLink class="manage-link" to="/map-sets">
-        <i class="mdi mdi-map-cog" aria-hidden="true"></i>
-        Manage Map Sets
-      </RouterLink>
-      <dl v-if="selected" class="map-details">
-        <div>
-          <dt>Renderer</dt>
-          <dd>{{ selected.rendererId }}</dd>
-        </div>
-        <div>
-          <dt>Projection</dt>
-          <dd>{{ selected.sourceProjection }}</dd>
-        </div>
-        <div>
-          <dt>Zoom range</dt>
-          <dd>{{ selected.minZoom }}–{{ selected.maxZoom }}</dd>
-        </div>
-      </dl>
-      <p v-if="zoom !== null || pointer" class="viewport-status">
+
+      <p v-if="zoom !== null || pointer" class="viewport-status" aria-label="Map viewport status">
         <span v-if="zoom !== null">Zoom {{ Math.round(zoom) }}</span>
         <span v-if="pointer" class="coordinates">
           {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
         </span>
       </p>
-    </aside>
 
-    <section class="map-stage" aria-label="Interactive map">
       <div v-if="store.loading" class="map-overlay">Loading Map Sets…</div>
       <div v-else-if="store.loaded && store.items.length === 0" class="map-overlay empty">
         <i class="mdi mdi-map-plus" aria-hidden="true"></i>
@@ -168,86 +174,122 @@ onBeforeUnmount(destroyRenderer);
         <RouterLink to="/map-sets">Create Map Set</RouterLink>
       </div>
       <div v-if="mapError" class="map-overlay error" role="alert">{{ mapError }}</div>
-      <div ref="mapHost" class="map-host"></div>
     </section>
   </main>
 </template>
 
 <style scoped>
 .map-page {
-  display: grid;
-  grid-template-columns: minmax(13rem, 18rem) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
 }
 
-.map-toolbar {
-  z-index: 2;
-  padding: 1.5rem;
-  overflow-y: auto;
-  border-right: 1px solid #b6c6bc;
-  background: #edf2ee;
+.map-controls {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1000;
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.35rem;
+  border: 1px solid rgb(103 125 116 / 45%);
+  border-radius: 0.55rem;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 0.35rem 1rem rgb(24 54 45 / 18%);
+  backdrop-filter: blur(0.3rem);
 }
 
-h1 {
-  margin: 0 0 1.5rem;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 2.5rem;
-  font-weight: 500;
-}
-
-label {
-  display: grid;
-  gap: 0.4rem;
-  color: #314f47;
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-select {
-  width: 100%;
-  min-height: 2.6rem;
-  padding: 0.5rem;
-  border: 1px solid #9eb1a7;
-  border-radius: 0.45rem;
-  background: #fff;
+.map-controls select {
+  min-width: min(15rem, 55vw);
+  min-height: 2.35rem;
+  padding: 0.4rem 0.6rem;
+  border: 0;
+  border-radius: 0.35rem;
+  color: #142c28;
+  background: transparent;
   font: inherit;
+  font-weight: 700;
 }
 
 .manage-link {
-  display: inline-flex;
-  gap: 0.4rem;
-  margin-top: 1rem;
-}
-
-.map-details {
   display: grid;
-  gap: 0.7rem;
-  margin-top: 2rem;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border-radius: 0.35rem;
+  color: #163832;
+  font-size: 1.25rem;
+  text-decoration: none;
 }
 
-.map-details div {
+.manage-link:hover,
+.manage-link:focus-visible {
+  background: #dfe9e3;
+}
+
+.map-set-card > strong {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.map-set-card dl {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.map-set-card dl div {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  padding-bottom: 0.45rem;
-  border-bottom: 1px solid #c5d2ca;
 }
 
-.map-details dt {
-  color: #597068;
+.map-set-card dt {
+  color: #617870;
 }
 
-.map-details dd {
+.map-set-card dd {
   margin: 0;
   font-weight: 700;
 }
 
+.map-set-attribution {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #d7e0db;
+  color: #536b64;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.map-set-card > a {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.7rem;
+  color: #17453c;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .viewport-status {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 1000;
   display: flex;
   gap: 0.75rem;
   align-items: baseline;
+  margin: 0;
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.4rem;
+  color: #f7faf8;
+  background: rgb(20 44 40 / 86%);
+  box-shadow: 0 0.25rem 0.8rem rgb(24 54 45 / 18%);
   font-size: 0.8rem;
+  pointer-events: none;
 }
 
 .coordinates,
@@ -257,6 +299,7 @@ select {
 
 .map-stage {
   position: relative;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   background: #a6c4b5;
@@ -297,19 +340,18 @@ select {
 }
 
 @media (max-width: 700px) {
-  .map-page {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(25rem, 1fr);
+  .map-controls {
+    top: 0.5rem;
+    right: 0.5rem;
   }
 
-  .map-toolbar {
-    padding: 1rem;
-    border-right: 0;
-    border-bottom: 1px solid #b6c6bc;
+  .map-controls select {
+    min-width: min(12rem, 55vw);
   }
 
-  .map-details {
-    display: none;
+  .viewport-status {
+    bottom: 0.5rem;
+    left: 0.5rem;
   }
 }
 </style>

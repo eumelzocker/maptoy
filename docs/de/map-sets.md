@@ -36,6 +36,13 @@ als technische Orientierung.
 Die erste Implementierung unterstützt ausschließlich den Quelltyp `xyz-raster` in
 Web Mercator (`EPSG:3857`) und den Renderer `leaflet-xyz`.
 
+Die Kartenansicht merkt sich einen gemeinsamen Mittelpunkt und Zoom im lokalen
+Browserspeicher. Beim Neuladen wird dieser Ausschnitt wiederhergestellt; beim Wechsel
+des Map Sets bleibt dasselbe Gebiet sichtbar, damit sich Quellen direkt vergleichen
+lassen. Hat das neue Map Set engere Zoomgrenzen, begrenzt maptoy den gemeinsamen Zoom
+auf die nächstgelegene erlaubte Stufe. Der konfigurierte Startausschnitt gilt, wenn
+kein gültiger gespeicherter Wert vorhanden ist.
+
 ## Quelle nach dem ersten Cache-Eintrag
 
 Sobald ein Map Set seine erste Tile-Revision im Cache enthält, sperrt maptoy die

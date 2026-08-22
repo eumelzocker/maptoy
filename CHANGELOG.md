@@ -4,6 +4,21 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Browser-local persistence for one shared map centre and zoom across reloads and
+  Map Set switches, with safe fallback and zoom-range clamping.
+- Reusable HTML-capable Vue tooltip with hover, focus, click, and keyboard support,
+  first used for a compact Map Set information card with attribution and terms.
+- On-demand exact-revision Tile previews in the Revision Explorer without provider
+  requests.
+
+### Changed
+
+- Interactive Map view now uses the full canvas, with the Map Set selector and
+  management actions in a compact overlay and zoom plus pointer coordinates in a
+  bottom status bar instead of the former sidebar.
+
 ## [0.0.3] - 2026-08-22
 
 ### Added
