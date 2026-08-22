@@ -33,6 +33,11 @@ als technische Orientierung.
 - **Default longitude** und **Default latitude** bestimmen den ersten Ausschnitt.
 - **Tile size** und **Format** müssen der Providerantwort entsprechen.
 
+Zoomwerte beschreiben die `{z}`-Koordinate des Providers. Ein 512-Pixel-Tile mit
+Provider-Zoom `z` wird bei Leaflet-Zoom `z + 1` dargestellt, da es die Details eines
+256-Pixel-Tiles dieser Stufe enthält. maptoy wendet diesen Versatz automatisch an;
+API und Cache verwenden weiterhin den Provider-Zoom.
+
 Die erste Implementierung unterstützt ausschließlich den Quelltyp `xyz-raster` in
 Web Mercator (`EPSG:3857`) und den Renderer `leaflet-xyz`.
 

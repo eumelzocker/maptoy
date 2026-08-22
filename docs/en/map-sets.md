@@ -30,6 +30,11 @@ Open **Map Sets**, choose **New Map Set**, and complete these essential fields:
 - **Default longitude and latitude** determine the first viewport.
 - **Tile size** and **format** must match the provider response.
 
+Zoom values describe the provider's `{z}` coordinate. A 512-pixel Tile at provider
+zoom `z` is displayed at Leaflet zoom `z + 1`, as it contains the detail of a
+256-pixel Tile from that level. maptoy applies this offset automatically; API and
+cache coordinates continue to use the provider zoom.
+
 The initial implementation supports the `xyz-raster` source type in Web Mercator
 (`EPSG:3857`) and the `leaflet-xyz` renderer only.
 

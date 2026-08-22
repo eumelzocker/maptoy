@@ -19,6 +19,12 @@ All notable changes to maptoy are documented in this file.
   management actions in a compact overlay and zoom plus pointer coordinates in a
   bottom status bar instead of the former sidebar.
 
+### Fixed
+
+- 512-pixel XYZ sources now use Leaflet's required one-level zoom offset, so their
+  complete world extent is rendered while API and cache coordinates retain the
+  provider's zoom levels.
+
 ## [0.0.3] - 2026-08-22
 
 ### Added

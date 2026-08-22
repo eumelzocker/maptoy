@@ -8,12 +8,22 @@ import {
   createLeafletXyzFactory,
   LEAFLET_XYZ_ADAPTER_ID,
   leafletXyzManifest,
+  leafletXyzZoomOptions,
 } from "./index.js";
 
 describe("Leaflet XYZ manifest", () => {
   it("passes registry validation", () => {
     const registry = createMapRendererManifestRegistry([leafletXyzManifest]);
     expect(registry.get(LEAFLET_XYZ_ADAPTER_ID)).toBe(leafletXyzManifest);
+  });
+
+  it("maps provider zoom levels to Leaflet display zooms", () => {
+    expect(
+      leafletXyzZoomOptions({ minZoom: 0, maxZoom: 18, tileSize: 256 }),
+    ).toEqual({ minZoom: 0, maxZoom: 18, zoomOffset: 0 });
+    expect(
+      leafletXyzZoomOptions({ minZoom: 0, maxZoom: 18, tileSize: 512 }),
+    ).toEqual({ minZoom: 1, maxZoom: 19, zoomOffset: -1 });
   });
 
   it("passes the renderer contract through its Leaflet bridge", async () => {

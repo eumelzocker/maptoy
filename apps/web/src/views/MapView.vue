@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
 import type { MapRendererInstance } from "@maptoy/map-adapter-sdk";
 import { storeToRefs } from "pinia";
 import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -55,14 +56,15 @@ async function renderSelectedMap(): Promise<void> {
     return;
   }
   try {
+    const zoomOptions = leafletXyzZoomOptions(mapSet);
     const initialViewport = loadMapViewport(
       localStorage,
       {
         center: mapSet.defaultCenter,
-        zoom: mapSet.defaultZoom,
+        zoom: mapSet.defaultZoom - zoomOptions.zoomOffset,
       },
-      mapSet.minZoom,
-      mapSet.maxZoom,
+      zoomOptions.minZoom,
+      zoomOptions.maxZoom,
     );
     const nextRenderer = await factory.create({
       host: mapHost.value,
@@ -143,7 +145,7 @@ onBeforeUnmount(destroyRenderer);
             <dl>
               <div><dt>Renderer</dt><dd>{{ selected.rendererId }}</dd></div>
               <div><dt>Projection</dt><dd>{{ selected.sourceProjection }}</dd></div>
-              <div><dt>Zoom range</dt><dd>{{ selected.minZoom }}–{{ selected.maxZoom }}</dd></div>
+              <div><dt>Source zoom</dt><dd>{{ selected.minZoom }}–{{ selected.maxZoom }}</dd></div>
               <div><dt>Tiles</dt><dd>{{ selected.tileSize }} px · {{ selected.tileFormat.toUpperCase() }}</dd></div>
             </dl>
             <!-- Attribution is trusted, administrator-authored Map Set HTML. -->

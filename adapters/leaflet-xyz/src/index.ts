@@ -1,6 +1,6 @@
 import {
-  MAP_ADAPTER_SDK_VERSION,
   type CreateMapRendererOptions,
+  MAP_ADAPTER_SDK_VERSION,
   type MapLayerDescriptor,
   type MapRendererEvent,
   type MapRendererFactory,
@@ -35,6 +35,20 @@ export interface LeafletXyzConfiguration {
   minZoom: number;
   maxZoom: number;
   tileSize: 256 | 512;
+}
+
+export function leafletXyzZoomOptions(
+  value: Pick<LeafletXyzConfiguration, "minZoom" | "maxZoom" | "tileSize">,
+): { minZoom: number; maxZoom: number; zoomOffset: number } {
+  // A 512 px provider Tile at z covers the same area as a 256 px Tile at z,
+  // but contains the detail of display zoom z + 1. Leaflet therefore needs a
+  // one-level URL offset while its viewport remains on the visual zoom scale.
+  const displayZoomOffset = value.tileSize === 512 ? 1 : 0;
+  return {
+    minZoom: value.minZoom + displayZoomOffset,
+    maxZoom: value.maxZoom + displayZoomOffset,
+    zoomOffset: displayZoomOffset === 0 ? 0 : -displayZoomOffset,
+  };
 }
 
 type LeafletInstanceCreator = (
@@ -73,9 +87,10 @@ async function createLeafletInstance(
   leafletConfiguration: LeafletXyzConfiguration,
 ): Promise<MapRendererInstance> {
   const L = await import("leaflet");
+  const zoomOptions = leafletXyzZoomOptions(leafletConfiguration);
   const map = L.map(options.host, {
-    minZoom: leafletConfiguration.minZoom,
-    maxZoom: leafletConfiguration.maxZoom,
+    minZoom: zoomOptions.minZoom,
+    maxZoom: zoomOptions.maxZoom,
     zoomSnap: 0.25,
   }).setView(
     [
@@ -89,9 +104,10 @@ async function createLeafletInstance(
     // administrator-authored configuration in this single-user application, so
     // links are passed through unchanged instead of applying XSS sanitization.
     attribution: leafletConfiguration.attribution,
-    minZoom: leafletConfiguration.minZoom,
-    maxZoom: leafletConfiguration.maxZoom,
+    minZoom: zoomOptions.minZoom,
+    maxZoom: zoomOptions.maxZoom,
     tileSize: leafletConfiguration.tileSize,
+    zoomOffset: zoomOptions.zoomOffset,
   }).addTo(map);
 
   const layers = new Map<string, MapLayerDescriptor>();
