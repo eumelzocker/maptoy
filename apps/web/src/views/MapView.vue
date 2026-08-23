@@ -120,6 +120,19 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(destroyRenderer);
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function resetToInitialViewport(): void {
+  const mapSet = selected.value;
+  if (mapSet === null || renderer === null) {
+    return;
+  }
+  const zoomOptions = leafletXyzZoomOptions(mapSet);
+  void renderer.setViewport({
+    center: mapSet.defaultCenter,
+    zoom: mapSet.defaultZoom - zoomOptions.zoomOffset,
+  });
+}
 </script>
 
 <template>
@@ -148,6 +161,10 @@ onBeforeUnmount(destroyRenderer);
               <div><dt>Source zoom</dt><dd>{{ selected.minZoom }}–{{ selected.maxZoom }}</dd></div>
               <div><dt>Tiles</dt><dd>{{ selected.tileSize }} px · {{ selected.tileFormat.toUpperCase() }}</dd></div>
             </dl>
+            <button type="button" class="map-set-reset" @click="resetToInitialViewport">
+              <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>
+              Reset to initial view
+            </button>
             <!-- Attribution is trusted, administrator-authored Map Set HTML. -->
             <div class="map-set-attribution" v-html="selected.attribution"></div>
             <a v-if="selected.termsUrl" :href="selected.termsUrl" target="_blank" rel="noopener noreferrer">
@@ -274,6 +291,21 @@ onBeforeUnmount(destroyRenderer);
   color: #17453c;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.map-set-reset {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.7rem;
+  padding: 0;
+  border: 0;
+  color: #17453c;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .viewport-status {

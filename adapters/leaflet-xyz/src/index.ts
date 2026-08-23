@@ -92,6 +92,7 @@ async function createLeafletInstance(
     minZoom: zoomOptions.minZoom,
     maxZoom: zoomOptions.maxZoom,
     zoomSnap: 0.25,
+    worldCopyJump: true,
   }).setView(
     [
       options.initialViewport.center.latitude,
@@ -124,7 +125,7 @@ async function createLeafletInstance(
 
   return {
     getViewport: () => {
-      const center = map.getCenter();
+      const center = map.wrapLatLng(map.getCenter());
       return {
         center: { longitude: center.lng, latitude: center.lat },
         zoom: map.getZoom(),
@@ -152,7 +153,7 @@ async function createLeafletInstance(
           });
           return;
         }
-        const center = map.getCenter();
+        const center = map.wrapLatLng(map.getCenter());
         listener({
           viewport: {
             center: { longitude: center.lng, latitude: center.lat },

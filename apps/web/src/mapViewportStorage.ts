@@ -1,4 +1,5 @@
 import type { MapViewport } from "@maptoy/map-adapter-sdk";
+import { getItem, setItem } from "./localStorage.js";
 
 const storageKey = "maptoy:viewport";
 const maximumMercatorLatitude = 85.05112878;
@@ -19,14 +20,24 @@ function isStoredViewport(value: unknown): value is MapViewport {
     center !== null &&
     "longitude" in center &&
     isFiniteNumber(center.longitude) &&
-    center.longitude >= -180 &&
-    center.longitude <= 180 &&
     "latitude" in center &&
     isFiniteNumber(center.latitude) &&
-    center.latitude >= -maximumMercatorLatitude &&
-    center.latitude <= maximumMercatorLatitude &&
     "zoom" in value &&
     isFiniteNumber(value.zoom)
+  );
+}
+
+function wrapLongitude(longitude: number): number {
+  if (longitude >= -180 && longitude <= 180) {
+    return longitude;
+  }
+  return ((((longitude + 180) % 360) + 360) % 360) - 180;
+}
+
+function clampLatitude(latitude: number): number {
+  return Math.min(
+    maximumMercatorLatitude,
+    Math.max(-maximumMercatorLatitude, latitude),
   );
 }
 
@@ -36,17 +47,20 @@ export function loadMapViewport(
   minimumZoom: number,
   maximumZoom: number,
 ): MapViewport {
+  const stored = getItem(storageKey, storage);
+  if (stored === null) {
+    return fallback;
+  }
   try {
-    const stored = storage.getItem(storageKey);
-    if (stored === null) {
-      return fallback;
-    }
     const candidate: unknown = JSON.parse(stored);
     if (!isStoredViewport(candidate)) {
       return fallback;
     }
     return {
-      center: candidate.center,
+      center: {
+        longitude: wrapLongitude(candidate.center.longitude),
+        latitude: clampLatitude(candidate.center.latitude),
+      },
       zoom: Math.min(maximumZoom, Math.max(minimumZoom, candidate.zoom)),
     };
   } catch {
@@ -58,9 +72,5 @@ export function saveMapViewport(
   storage: ViewportStorage,
   viewport: MapViewport,
 ): void {
-  try {
-    storage.setItem(storageKey, JSON.stringify(viewport));
-  } catch {
-    // Browsing modes or storage quotas may reject writes; the map remains usable.
-  }
+  setItem(storageKey, JSON.stringify(viewport), storage);
 }

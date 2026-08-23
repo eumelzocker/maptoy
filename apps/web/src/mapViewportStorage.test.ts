@@ -53,6 +53,38 @@ describe("Map viewport storage", () => {
     });
   });
 
+  it("clamps a stored latitude outside the Mercator range instead of falling back", () => {
+    const storage = {
+      getItem: () =>
+        JSON.stringify({
+          center: { longitude: 9.4, latitude: 90 },
+          zoom: 10,
+        }),
+      setItem: () => undefined,
+    };
+
+    expect(loadMapViewport(storage, fallback, 0, 15)).toEqual({
+      center: { longitude: 9.4, latitude: 85.05112878 },
+      zoom: 10,
+    });
+  });
+
+  it("wraps a stored longitude outside -180..180 instead of falling back", () => {
+    const storage = {
+      getItem: () =>
+        JSON.stringify({
+          center: { longitude: 190, latitude: 53.8 },
+          zoom: 10,
+        }),
+      setItem: () => undefined,
+    };
+
+    expect(loadMapViewport(storage, fallback, 0, 15)).toEqual({
+      center: { longitude: -170, latitude: 53.8 },
+      zoom: 10,
+    });
+  });
+
   it("does not break the map when browser storage rejects writes", () => {
     const storage = {
       getItem: () => null,

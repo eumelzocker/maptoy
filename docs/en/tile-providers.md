@@ -25,12 +25,12 @@ value before saving a Map Set. maptoy itself resolves only tile placeholders suc
 `{z}`, `{x}`, `{y}`, and optional `{s}`. Keep credentials in environment variables;
 the examples below use `${MAPTOY_*}` references rather than real secrets.
 
-| Provider | Raster XYZ fit for v1 | Archive and batch policy under standard/public terms |
+| Provider | Raster XYZ fit for v1 | Archive and batch policy |
 | --- | --- | --- |
-| OpenStreetMap Standard | Direct | Bulk download and prefetch are prohibited; only policy-compliant interactive use and caching. |
-| OpenTopoMap | Direct | Avoid mass downloads; contact the project before larger use. |
-| MapTiler Cloud | Direct | Server-side proxy/cache, export, and bulk download require a custom agreement. |
-| Mapbox | Direct through Static Tiles API | Do not infer archival rights from HTTP cache headers; verify the current agreement for proxying, storage, export, and offline use. |
+| [OpenStreetMap Standard](https://openstreetmap.org/) | Direct | Bulk download and prefetch are prohibited; only policy-compliant interactive use and caching. [Wiki](https://wiki.openstreetmap.org/) |
+| [OpenTopoMap](https://opentopomap.org/) | Direct | Avoid mass downloads; contact the project before larger use. |
+| [MapTiler Cloud](https://www.maptiler.com/) | Direct | Server-side proxy/cache, export, and bulk download require a custom agreement. |
+| [Mapbox](https://www.mapbox.com/) | Direct through Static Tiles API | Do not infer archival rights from HTTP cache headers; verify the current agreement for proxying, storage, export, and offline use. |
 | Stadia Maps | Direct | Standard terms prohibit server-side proxying/caching and general bulk download. |
 | Thunderforest | Direct | Standard terms allow limited client/device caching but prohibit caching proxies and redistribution. |
 | ArcGIS Location Platform | Direct with `{z}/{y}/{x}` path order | Account-, service-, and agreement-dependent; no general archival permission is implied. |

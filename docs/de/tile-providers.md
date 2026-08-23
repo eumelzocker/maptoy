@@ -27,12 +27,12 @@ wie `{z}`, `{x}`, `{y}` und optional `{s}` auf. Zugangsdaten gehören in
 Environment-Variablen; die Beispiele verwenden `${MAPTOY_*}`-Referenzen statt echter
 Secrets.
 
-| Provider | Technische Raster-XYZ-Eignung für v1 | Archiv- und Batch-Regeln der Standard-/öffentlichen Bedingungen |
+| Provider | Technische Raster-XYZ-Eignung für v1 | Archiv- und Batch-Regeln |
 | --- | --- | --- |
-| OpenStreetMap Standard | Direkt | Bulk-Download und Prefetch sind verboten; nur policykonforme interaktive Nutzung und Zwischenspeicherung. |
-| OpenTopoMap | Direkt | Massendownloads vermeiden; vor größerer Nutzung das Projekt kontaktieren. |
-| MapTiler Cloud | Direkt | Serverseitiger Proxy/Cache, Export und Bulk-Download benötigen eine individuelle Vereinbarung. |
-| Mapbox | Direkt über die Static Tiles API | Aus HTTP-Cache-Headern keine Archivrechte ableiten; aktuelle Vereinbarung zu Proxy, Speicherung, Export und Offline-Nutzung prüfen. |
+| [OpenStreetMap Standard](https://openstreetmap.org/) | Direkt | Bulk-Download und Prefetch sind verboten; nur policykonforme interaktive Nutzung und Zwischenspeicherung. [Wiki](https://wiki.openstreetmap.org/wiki/DE:Hauptseite) |
+| [OpenTopoMap](https://opentopomap.org/) | Direkt | Massendownloads vermeiden; vor größerer Nutzung das Projekt kontaktieren. |
+| [MapTiler Cloud](https://www.maptiler.com/) | Direkt | Serverseitiger Proxy/Cache, Export und Bulk-Download benötigen eine individuelle Vereinbarung. |
+| [Mapbox](https://www.mapbox.com/) | Direkt über die Static Tiles API | Aus HTTP-Cache-Headern keine Archivrechte ableiten; aktuelle Vereinbarung zu Proxy, Speicherung, Export und Offline-Nutzung prüfen. |
 | Stadia Maps | Direkt | Standardbedingungen verbieten serverseitigen Proxy/Cache und allgemeinen Bulk-Download. |
 | Thunderforest | Direkt | Standardbedingungen erlauben begrenztes Client-/Geräte-Caching, verbieten jedoch Caching-Proxys und Weitergabe. |
 | ArcGIS Location Platform | Direkt mit Pfadreihenfolge `{z}/{y}/{x}` | Konto-, Dienst- und vertragsabhängig; keine allgemeine Archiverlaubnis. |

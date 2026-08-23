@@ -6,7 +6,7 @@ import {
   type MapSetTestResponse,
   type TileCacheStats,
 } from "@maptoy/contracts";
-import { onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetForm from "../components/MapSetForm.vue";
 import { apiRequest } from "../api.js";
@@ -24,31 +24,72 @@ const error = ref<string | null>(null);
 const testResult = ref<MapSetTestResponse | null>(null);
 const testedMapSetId = ref<string | null>(null);
 const sourceLocked = ref(false);
+const editorDirty = ref(false);
+const cacheStats = ref<Record<string, TileCacheStats | null>>({});
+const editorPanel = ref<HTMLElement | null>(null);
+
+async function scrollEditorIntoView(): Promise<void> {
+  await nextTick();
+  editorPanel.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function loadCacheStats(mapSet: MapSet): Promise<void> {
+  try {
+    cacheStats.value[mapSet.id] = await apiRequest<TileCacheStats>(
+      `api/map-sets/${mapSet.id}/cache/stats`,
+    );
+  } catch {
+    cacheStats.value[mapSet.id] = null;
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function cachedTileCount(id: string): number | null {
+  return cacheStats.value[id]?.logicalTileCount ?? null;
+}
 
 onMounted(async () => {
   try {
     await store.load();
+    void Promise.all(store.items.map(loadCacheStats));
   } catch {
     error.value = store.error;
   }
 });
 
+function hasUnsavedChanges(): boolean {
+  return editorMode.value !== "closed" && editorDirty.value;
+}
+
+function confirmDiscardChanges(): boolean {
+  return (
+    !hasUnsavedChanges() ||
+    window.confirm("Discard unsaved changes to this Map Set?")
+  );
+}
+
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function newMapSet(): void {
+  if (!confirmDiscardChanges()) {
+    return;
+  }
   draft.value = createDefaultMapSetInput();
   editingId.value = null;
   sourceLocked.value = false;
+  editorDirty.value = false;
   editorMode.value = "create";
   editorKey.value = `create-${Date.now()}`;
   message.value = null;
   error.value = null;
   testResult.value = null;
+  void scrollEditorIntoView();
 }
 
 function openEditor(mapSet: MapSet, locked: boolean): void {
   draft.value = mapSetInput(mapSet);
   editingId.value = mapSet.id;
   sourceLocked.value = locked;
+  editorDirty.value = false;
   editorMode.value = "edit";
   editorKey.value = mapSet.id;
   message.value = null;
@@ -58,13 +99,18 @@ function openEditor(mapSet: MapSet, locked: boolean): void {
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function edit(mapSet: MapSet): Promise<void> {
+  if (!confirmDiscardChanges()) {
+    return;
+  }
   busy.value = true;
   error.value = null;
   try {
     const stats = await apiRequest<TileCacheStats>(
       `api/map-sets/${mapSet.id}/cache/stats`,
     );
+    cacheStats.value[mapSet.id] = stats;
     openEditor(mapSet, stats.totalRevisionCount > 0);
+    void scrollEditorIntoView();
   } catch (cause) {
     error.value =
       cause instanceof Error
@@ -79,7 +125,15 @@ function closeEditor(): void {
   editorMode.value = "closed";
   editingId.value = null;
   sourceLocked.value = false;
+  editorDirty.value = false;
   editorKey.value = "closed";
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function requestCloseEditor(): void {
+  if (confirmDiscardChanges()) {
+    closeEditor();
+  }
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
@@ -92,6 +146,9 @@ async function save(input: MapSetInput): Promise<void> {
       editingId.value === null
         ? await store.create(input)
         : await store.update(editingId.value, input);
+    if (cacheStats.value[mapSet.id] === undefined) {
+      void loadCacheStats(mapSet);
+    }
     openEditor(mapSet, sourceLocked.value);
     message.value = `${mapSet.name} was saved.`;
   } catch (cause) {
@@ -105,6 +162,9 @@ async function save(input: MapSetInput): Promise<void> {
 }
 
 async function duplicate(mapSet: MapSet): Promise<void> {
+  if (!confirmDiscardChanges()) {
+    return;
+  }
   busy.value = true;
   error.value = null;
   try {
@@ -112,7 +172,9 @@ async function duplicate(mapSet: MapSet): Promise<void> {
       ...mapSetInput(mapSet),
       name: `${mapSet.name} copy`,
     });
+    void loadCacheStats(copy);
     openEditor(copy, false);
+    void scrollEditorIntoView();
     message.value = `${copy.name} was created.`;
   } catch (cause) {
     error.value =
@@ -178,7 +240,7 @@ async function test(mapSet: MapSet): Promise<void> {
       <div>
         <p class="eyebrow">Configuration</p>
         <h1>Map Sets</h1>
-        <p>Configure XYZ raster sources without storing provider secrets.</p>
+        <p>Configure XYZ raster sources.</p>
       </div>
       <button class="primary-button" type="button" @click="newMapSet">
         <i class="mdi mdi-plus" aria-hidden="true"></i>
@@ -198,6 +260,9 @@ async function test(mapSet: MapSet): Promise<void> {
           <p class="metadata">
             Zoom {{ mapSet.minZoom }}–{{ mapSet.maxZoom }} · {{ mapSet.tileSize }} px ·
             {{ mapSet.rendererId }}
+            <template v-if="cachedTileCount(mapSet.id) !== null">
+              · {{ cachedTileCount(mapSet.id) }} cached tiles
+            </template>
           </p>
           <ul class="capabilities" aria-label="Enabled capabilities">
             <li v-if="mapSet.capabilities.interactive">Interactive</li>
@@ -207,7 +272,13 @@ async function test(mapSet: MapSet): Promise<void> {
           </ul>
         </div>
         <div class="card-actions">
-          <button type="button" :disabled="busy" @click="edit(mapSet)">Edit</button>
+          <button
+            type="button"
+            :disabled="busy || editingId === mapSet.id"
+            @click="edit(mapSet)"
+          >
+            Edit
+          </button>
           <button type="button" :disabled="busy" @click="test(mapSet)">Test tile</button>
           <button type="button" :disabled="busy" @click="duplicate(mapSet)">Duplicate</button>
           <button class="danger-button" type="button" :disabled="busy" @click="remove(mapSet)">
@@ -236,10 +307,15 @@ async function test(mapSet: MapSet): Promise<void> {
       <button class="primary-button" type="button" @click="newMapSet">Create the first Map Set</button>
     </section>
 
-    <section v-if="editorMode !== 'closed'" class="editor-panel" aria-label="Map Set editor">
+    <section
+      v-if="editorMode !== 'closed'"
+      ref="editorPanel"
+      class="editor-panel"
+      aria-label="Map Set editor"
+    >
       <header>
         <h2>{{ editorMode === "create" ? "Create Map Set" : "Edit Map Set" }}</h2>
-        <button type="button" aria-label="Close editor" @click="closeEditor">
+        <button type="button" aria-label="Close editor" @click="requestCloseEditor">
           <i class="mdi mdi-close" aria-hidden="true"></i>
         </button>
       </header>
@@ -250,8 +326,9 @@ async function test(mapSet: MapSet): Promise<void> {
         :busy="busy"
         :source-locked="sourceLocked"
         @submit="save"
-        @cancel="closeEditor"
+        @cancel="requestCloseEditor"
         @duplicate="duplicateEditing"
+        @dirty="(value) => (editorDirty = value)"
       />
     </section>
   </main>
@@ -354,6 +431,11 @@ button {
   background: #fff;
   cursor: pointer;
   font: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .primary-button {

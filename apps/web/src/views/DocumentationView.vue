@@ -2,6 +2,7 @@
 import { documentation } from "virtual:maptoy-docs";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { saveDocumentationLanguage } from "../documentationLanguage.js";
 import { decorateExternalDocumentationLinks } from "../documentationLinks.js";
 import {
   englishOnlyDocumentationLabel,
@@ -57,6 +58,8 @@ async function refreshExternalLinks(): Promise<void> {
 
 watch(page, refreshExternalLinks);
 onMounted(refreshExternalLinks);
+
+watch(requestedLanguage, saveDocumentationLanguage, { immediate: true });
 </script>
 
 <template>

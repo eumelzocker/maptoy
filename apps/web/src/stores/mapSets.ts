@@ -8,6 +8,7 @@ import type {
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { apiRequest } from "../api.js";
+import { getItem, removeItem, setItem } from "../localStorage.js";
 
 const selectedMapSetStorageKey = "maptoy:selected-map-set";
 
@@ -16,9 +17,7 @@ export const useMapSetsStore = defineStore("map-sets", () => {
   const loading = ref(false);
   const loaded = ref(false);
   const error = ref<string | null>(null);
-  const selectedId = ref<string | null>(
-    localStorage.getItem(selectedMapSetStorageKey),
-  );
+  const selectedId = ref<string | null>(getItem(selectedMapSetStorageKey));
   const selected = computed(
     () => items.value.find(({ id }) => id === selectedId.value) ?? null,
   );
@@ -26,9 +25,9 @@ export const useMapSetsStore = defineStore("map-sets", () => {
   function select(id: string | null): void {
     selectedId.value = id;
     if (id === null) {
-      localStorage.removeItem(selectedMapSetStorageKey);
+      removeItem(selectedMapSetStorageKey);
     } else {
-      localStorage.setItem(selectedMapSetStorageKey, id);
+      setItem(selectedMapSetStorageKey, id);
     }
   }
 

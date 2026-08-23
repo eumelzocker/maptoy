@@ -1,14 +1,16 @@
+import { documentation } from "virtual:maptoy-docs";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
+import { loadDocumentationLanguage } from "./documentationLanguage.js";
 import {
-  layerPluginRegistry,
   LAYER_PLUGIN_REGISTRY_KEY,
-  mapRendererFactoryRegistry,
+  layerPluginRegistry,
   MAP_RENDERER_FACTORY_REGISTRY_KEY,
-  mapRendererRegistry,
   MAP_RENDERER_REGISTRY_KEY,
+  mapRendererFactoryRegistry,
+  mapRendererRegistry,
 } from "./registries.js";
 import DocumentationView from "./views/DocumentationView.vue";
 import MapSetsView from "./views/MapSetsView.vue";
@@ -40,7 +42,11 @@ const router = createRouter({
     },
     {
       path: "/docs",
-      redirect: "/docs/en",
+      redirect: () =>
+        `/docs/${loadDocumentationLanguage(
+          documentation.languages.map(({ code }) => code),
+          documentation.defaultLanguage,
+        )}`,
     },
     {
       path: "/docs/:language/:pageId?",

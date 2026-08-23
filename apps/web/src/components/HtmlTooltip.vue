@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
-import { nextTick, ref, useId } from "vue";
+import { computed, nextTick, ref, useId } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -16,7 +16,10 @@ const props = withDefaults(
 const contentId = useId();
 const root = ref<HTMLElement | null>(null);
 const fixedContent = ref<HTMLElement | null>(null);
-const open = ref(false);
+const hoverOpen = ref(false);
+const pinned = ref(false);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const open = computed(() => hoverOpen.value || pinned.value);
 const fixedStyle = ref<CSSProperties>({
   top: "0",
   left: "0",
@@ -50,23 +53,23 @@ function positionFixedContent(): void {
   };
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function openTooltip(): void {
-  open.value = true;
+  hoverOpen.value = true;
   if (props.fixed) {
     void nextTick(positionFixedContent);
   }
 }
 
 function closeTooltip(): void {
-  open.value = false;
+  hoverOpen.value = false;
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-function toggleTooltip(): void {
-  if (open.value) {
-    closeTooltip();
-  } else {
-    openTooltip();
+function togglePin(): void {
+  pinned.value = !pinned.value;
+  if (pinned.value && props.fixed) {
+    void nextTick(positionFixedContent);
   }
 }
 
@@ -81,18 +84,24 @@ function closeAfterFocusLeaves(event: FocusEvent): void {
     closeTooltip();
   }
 }
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function closeAll(): void {
+  hoverOpen.value = false;
+  pinned.value = false;
+}
 </script>
 
 <template>
   <span
     ref="root"
     class="html-tooltip"
-    :class="[`align-${align}`, { open }]"
+    :class="[`align-${align}`, { open, pinned }]"
     @mouseenter="openTooltip"
     @mouseleave="closeTooltip"
     @focusin="openTooltip"
     @focusout="closeAfterFocusLeaves"
-    @keydown.esc="closeTooltip"
+    @keydown.esc="closeAll"
   >
     <button
       class="tooltip-trigger"
@@ -101,8 +110,9 @@ function closeAfterFocusLeaves(event: FocusEvent): void {
       :aria-label="label"
       aria-haspopup="dialog"
       :aria-expanded="open"
+      :aria-pressed="pinned"
       :aria-controls="contentId"
-      @click.stop="toggleTooltip"
+      @click.stop="togglePin"
     >
       <slot name="trigger">
         <i class="mdi mdi-information-outline" aria-hidden="true"></i>

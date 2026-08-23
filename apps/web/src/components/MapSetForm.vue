@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { MapSetInput } from "@maptoy/contracts";
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 
 const props = defineProps<{
   modelValue: MapSetInput;
@@ -13,6 +13,7 @@ const emit = defineEmits<{
   submit: [value: MapSetInput];
   cancel: [];
   duplicate: [];
+  dirty: [value: boolean];
 }>();
 
 const draft = reactive<MapSetInput>(props.modelValue);
@@ -30,6 +31,28 @@ const dailyRequestLimit = ref<string | number>(
 );
 const localError = ref<string | null>(null);
 
+function currentFormState(): unknown {
+  return {
+    ...draft,
+    subdomains: subdomains.value,
+    headers: headers.value,
+    cachePolicy: {
+      ...draft.cachePolicy,
+      maximumStorageBytes: maximumStorageBytes.value,
+    },
+    downloadPolicy: {
+      ...draft.downloadPolicy,
+      dailyRequestLimit: dailyRequestLimit.value,
+    },
+  };
+}
+
+let savedState = JSON.stringify(currentFormState());
+const isDirty = computed(
+  () => JSON.stringify(currentFormState()) !== savedState,
+);
+watch(isDirty, (value) => emit("dirty", value), { immediate: true });
+
 watch(
   () => props.modelValue,
   (value) => {
@@ -43,6 +66,7 @@ watch(
     dailyRequestLimit.value =
       value.downloadPolicy.dailyRequestLimit?.toString() ?? "";
     localError.value = null;
+    savedState = JSON.stringify(currentFormState());
   },
 );
 
@@ -120,7 +144,7 @@ function submit(): void {
           spellcheck="false"
           :disabled="sourceLocked"
         />
-        <small>Required placeholders: {z}, {x}, {y}; optional: {s}.</small>
+        <small>Required placeholders: {z}, {x}, {y}; optional: {s}. Use ${MAPTOY_PROVIDER_KEY} for secrets.</small>
       </label>
       <label class="wide-field">
         <span>Attribution</span>

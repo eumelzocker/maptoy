@@ -6,7 +6,7 @@
         <RouterLink to="/">Map</RouterLink>
         <RouterLink to="/map-sets">Map Sets</RouterLink>
         <RouterLink to="/cache">Tile Cache</RouterLink>
-        <RouterLink to="/docs/en">Documentation</RouterLink>
+        <RouterLink to="/docs">Documentation</RouterLink>
       </nav>
     </header>
     <div class="app-viewport">
