@@ -6,11 +6,11 @@ import {
 } from "../mapDisplayPreferences.js";
 
 export const useUiPreferencesStore = defineStore("ui-preferences", () => {
-  const showTitleBar = ref(loadShowTitleBar(globalThis.localStorage));
+  const showTitleBar = ref(loadShowTitleBar());
 
   function setShowTitleBar(value: boolean): void {
     showTitleBar.value = value;
-    saveShowTitleBar(value, globalThis.localStorage);
+    saveShowTitleBar(value);
   }
 
   return { showTitleBar, setShowTitleBar };

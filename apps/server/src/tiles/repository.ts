@@ -104,6 +104,25 @@ const tileColumns = `
 export class TileArchiveRepository {
   constructor(private readonly database: DatabaseSync) {}
 
+  logicalTileCounts(): ReadonlyMap<string, number> {
+    const rows = this.database
+      .prepare(
+        `SELECT map_set_id, COUNT(*) AS logical_tile_count
+           FROM logical_tiles
+          GROUP BY map_set_id`,
+      )
+      .all() as unknown as Array<{
+      map_set_id: string;
+      logical_tile_count: number;
+    }>;
+    return new Map(
+      rows.map(({ map_set_id, logical_tile_count }) => [
+        map_set_id,
+        logical_tile_count,
+      ]),
+    );
+  }
+
   selectedRevision(
     mapSetId: string,
     tile: { zoom: number; x: number; y: number },

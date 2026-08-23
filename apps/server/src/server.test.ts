@@ -113,6 +113,14 @@ describe("maptoy server", () => {
     expect(created.body).not.toContain("secret-value");
     const mapSet = created.json();
 
+    const emptyMapSetList = await server.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    expect(emptyMapSetList.json()).toMatchObject({
+      items: [{ id: mapSet.id, logicalTileCount: 0 }],
+    });
+
     const updated = await server.inject({
       method: "PATCH",
       url: `/api/map-sets/${mapSet.id}`,
@@ -162,6 +170,14 @@ describe("maptoy server", () => {
     });
     expect(cachedTile.statusCode).toBe(200);
     expect(cachedTile.headers["x-maptoy-cache"]).toBe("hit");
+
+    const populatedMapSetList = await server.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    expect(populatedMapSetList.json()).toMatchObject({
+      items: [{ id: mapSet.id, logicalTileCount: 1 }],
+    });
 
     const metadataUpdate = await server.inject({
       method: "PATCH",

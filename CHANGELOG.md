@@ -4,6 +4,8 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-08-23
+
 ### Added
 
 - Browser-local persistence for one shared map centre and zoom across reloads and

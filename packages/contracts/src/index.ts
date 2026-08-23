@@ -128,9 +128,22 @@ export const MapSetSchema = Type.Composite(
 
 export type MapSet = Static<typeof MapSetSchema>;
 
+export const MapSetListItemSchema = Type.Composite(
+  [
+    MapSetSchema,
+    Type.Object(
+      { logicalTileCount: Type.Integer({ minimum: 0 }) },
+      { additionalProperties: false },
+    ),
+  ],
+  { additionalProperties: false, $id: "MapSetListItem" },
+);
+
+export type MapSetListItem = Static<typeof MapSetListItemSchema>;
+
 export const MapSetListResponseSchema = Type.Object(
   {
-    items: Type.Array(MapSetSchema),
+    items: Type.Array(MapSetListItemSchema),
   },
   { additionalProperties: false, $id: "MapSetListResponse" },
 );

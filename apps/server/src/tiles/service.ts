@@ -250,6 +250,10 @@ export class TileArchiveService {
     return this.repository.metadataStats(mapSetId);
   }
 
+  logicalTileCounts(): ReadonlyMap<string, number> {
+    return this.repository.logicalTileCounts();
+  }
+
   hasCachedTiles(mapSetId: string): boolean {
     return this.repository.hasTileRevisions(mapSetId);
   }

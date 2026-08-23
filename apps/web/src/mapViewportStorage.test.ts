@@ -95,4 +95,9 @@ describe("Map viewport storage", () => {
 
     expect(() => saveMapViewport(storage, fallback)).not.toThrow();
   });
+
+  it("uses the fallback when no browser storage is available", () => {
+    expect(loadMapViewport(null, fallback, 0, 15)).toBe(fallback);
+    expect(() => saveMapViewport(null, fallback)).not.toThrow();
+  });
 });

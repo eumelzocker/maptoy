@@ -1,6 +1,7 @@
 import type {
   MapSet,
   MapSetInput,
+  MapSetListItem,
   MapSetListResponse,
   MapSetPatch,
   MapSetTestResponse,
@@ -13,7 +14,7 @@ import { getItem, removeItem, setItem } from "../localStorage.js";
 const selectedMapSetStorageKey = "maptoy:selected-map-set";
 
 export const useMapSetsStore = defineStore("map-sets", () => {
-  const items = ref<MapSet[]>([]);
+  const items = ref<MapSetListItem[]>([]);
   const loading = ref(false);
   const loaded = ref(false);
   const error = ref<string | null>(null);
@@ -33,10 +34,15 @@ export const useMapSetsStore = defineStore("map-sets", () => {
 
   function replace(mapSet: MapSet): void {
     const index = items.value.findIndex(({ id }) => id === mapSet.id);
+    const listItem: MapSetListItem = {
+      ...mapSet,
+      logicalTileCount:
+        index === -1 ? 0 : (items.value[index]?.logicalTileCount ?? 0),
+    };
     if (index === -1) {
-      items.value.push(mapSet);
+      items.value.push(listItem);
     } else {
-      items.value[index] = mapSet;
+      items.value[index] = listItem;
     }
     items.value.sort((left, right) => left.name.localeCompare(right.name));
   }

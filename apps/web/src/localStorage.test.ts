@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { getItem, removeItem, setItem } from "./localStorage.js";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  availableLocalStorage,
+  getItem,
+  removeItem,
+  setItem,
+} from "./localStorage.js";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -50,8 +55,26 @@ describe("storage access with an explicit storage", () => {
 });
 
 describe("storage access against the global localStorage", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, "localStorage");
+  });
+
   it("returns null when no localStorage global exists", () => {
     expect(typeof globalThis.localStorage).toBe("undefined");
     expect(getItem("maptoy:missing")).toBeNull();
+  });
+
+  it("does not throw when browser policy blocks access to the Storage property", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get: () => {
+        throw new DOMException("Storage access denied", "SecurityError");
+      },
+    });
+
+    expect(availableLocalStorage()).toBeNull();
+    expect(getItem("key")).toBeNull();
+    expect(() => setItem("key", "value")).not.toThrow();
+    expect(() => removeItem("key")).not.toThrow();
   });
 });

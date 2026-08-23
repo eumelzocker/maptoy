@@ -1,10 +1,17 @@
-function globalStorage(): Storage | null {
-  return typeof localStorage === "undefined" ? null : localStorage;
+export function availableLocalStorage(): Storage | null {
+  try {
+    return typeof globalThis.localStorage === "undefined"
+      ? null
+      : globalThis.localStorage;
+  } catch {
+    // Access to the Storage property itself may be blocked by browser policy.
+    return null;
+  }
 }
 
 export function getItem(
   key: string,
-  storage: Pick<Storage, "getItem"> | null = globalStorage(),
+  storage: Pick<Storage, "getItem"> | null = availableLocalStorage(),
 ): string | null {
   if (storage === null) {
     return null;
@@ -19,7 +26,7 @@ export function getItem(
 export function setItem(
   key: string,
   value: string,
-  storage: Pick<Storage, "setItem"> | null = globalStorage(),
+  storage: Pick<Storage, "setItem"> | null = availableLocalStorage(),
 ): void {
   if (storage === null) {
     return;
@@ -33,7 +40,7 @@ export function setItem(
 
 export function removeItem(
   key: string,
-  storage: Pick<Storage, "removeItem"> | null = globalStorage(),
+  storage: Pick<Storage, "removeItem"> | null = availableLocalStorage(),
 ): void {
   if (storage === null) {
     return;

@@ -46,4 +46,17 @@ describe("UI preferences store", () => {
     expect(() => store.setShowTitleBar(false)).not.toThrow();
     expect(store.showTitleBar).toBe(false);
   });
+
+  it("stays usable when browser policy blocks the localStorage property", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get: () => {
+        throw new DOMException("Storage access denied", "SecurityError");
+      },
+    });
+
+    const store = useUiPreferencesStore();
+    expect(store.showTitleBar).toBe(true);
+    expect(() => store.setShowTitleBar(false)).not.toThrow();
+  });
 });

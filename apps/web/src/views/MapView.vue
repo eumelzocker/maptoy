@@ -21,6 +21,7 @@ import {
   saveShowAttribution,
   saveShowCoordinates,
 } from "../mapDisplayPreferences.js";
+import { availableLocalStorage } from "../localStorage.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
 import { MAP_RENDERER_FACTORY_REGISTRY_KEY } from "../registries.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
@@ -38,8 +39,9 @@ const mapHost = ref<HTMLElement | null>(null);
 const mapError = ref<string | null>(null);
 const pointer = ref<{ longitude: number; latitude: number } | null>(null);
 const zoom = ref<number | null>(null);
-const showCoordinates = ref(loadShowCoordinates(localStorage));
-const showAttribution = ref(loadShowAttribution(localStorage));
+const browserStorage = availableLocalStorage();
+const showCoordinates = ref(loadShowCoordinates(browserStorage));
+const showAttribution = ref(loadShowAttribution(browserStorage));
 const uiPreferences = useUiPreferencesStore();
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const showTitleBar = computed({
@@ -49,15 +51,15 @@ const showTitleBar = computed({
 let renderer: MapRendererInstance | null = null;
 let renderGeneration = 0;
 
-watch(showCoordinates, (value) => saveShowCoordinates(value, localStorage));
+watch(showCoordinates, (value) => saveShowCoordinates(value, browserStorage));
 watch(showAttribution, (value) => {
-  saveShowAttribution(value, localStorage);
+  saveShowAttribution(value, browserStorage);
   void renderer?.setAttributionVisible(value);
 });
 
 async function destroyRenderer(): Promise<void> {
   if (renderer !== null) {
-    saveMapViewport(localStorage, renderer.getViewport());
+    saveMapViewport(browserStorage, renderer.getViewport());
     await renderer.destroy();
     renderer = null;
   }
@@ -89,7 +91,7 @@ async function renderSelectedMap(): Promise<void> {
   try {
     const zoomOptions = leafletXyzZoomOptions(mapSet);
     const initialViewport = loadMapViewport(
-      localStorage,
+      browserStorage,
       {
         center: mapSet.defaultCenter,
         zoom: mapSet.defaultZoom - zoomOptions.zoomOffset,
@@ -130,7 +132,7 @@ async function renderSelectedMap(): Promise<void> {
     nextRenderer.subscribe("viewport", () => {
       const viewport = nextRenderer.getViewport();
       zoom.value = viewport.zoom;
-      saveMapViewport(localStorage, viewport);
+      saveMapViewport(browserStorage, viewport);
     });
   } catch (error) {
     mapError.value =

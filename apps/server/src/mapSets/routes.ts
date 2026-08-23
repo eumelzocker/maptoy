@@ -97,7 +97,15 @@ export function registerMapSetRoutes(
   server.get(
     "/api/map-sets",
     { schema: { response: { 200: MapSetListResponseSchema } } },
-    async () => ({ items: service.list() }),
+    async () => {
+      const logicalTileCounts = tileArchive.logicalTileCounts();
+      return {
+        items: service.list().map((mapSet) => ({
+          ...mapSet,
+          logicalTileCount: logicalTileCounts.get(mapSet.id) ?? 0,
+        })),
+      };
+    },
   );
 
   server.post<{ Body: MapSetInput; Reply: MapSet }>(

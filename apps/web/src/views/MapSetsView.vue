@@ -25,7 +25,6 @@ const testResult = ref<MapSetTestResponse | null>(null);
 const testedMapSetId = ref<string | null>(null);
 const sourceLocked = ref(false);
 const editorDirty = ref(false);
-const cacheStats = ref<Record<string, TileCacheStats | null>>({});
 const editorPanel = ref<HTMLElement | null>(null);
 
 async function scrollEditorIntoView(): Promise<void> {
@@ -33,25 +32,9 @@ async function scrollEditorIntoView(): Promise<void> {
   editorPanel.value?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-async function loadCacheStats(mapSet: MapSet): Promise<void> {
-  try {
-    cacheStats.value[mapSet.id] = await apiRequest<TileCacheStats>(
-      `api/map-sets/${mapSet.id}/cache/stats`,
-    );
-  } catch {
-    cacheStats.value[mapSet.id] = null;
-  }
-}
-
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-function cachedTileCount(id: string): number | null {
-  return cacheStats.value[id]?.logicalTileCount ?? null;
-}
-
 onMounted(async () => {
   try {
     await store.load();
-    void Promise.all(store.items.map(loadCacheStats));
   } catch {
     error.value = store.error;
   }
@@ -108,7 +91,6 @@ async function edit(mapSet: MapSet): Promise<void> {
     const stats = await apiRequest<TileCacheStats>(
       `api/map-sets/${mapSet.id}/cache/stats`,
     );
-    cacheStats.value[mapSet.id] = stats;
     openEditor(mapSet, stats.totalRevisionCount > 0);
     void scrollEditorIntoView();
   } catch (cause) {
@@ -146,9 +128,6 @@ async function save(input: MapSetInput): Promise<void> {
       editingId.value === null
         ? await store.create(input)
         : await store.update(editingId.value, input);
-    if (cacheStats.value[mapSet.id] === undefined) {
-      void loadCacheStats(mapSet);
-    }
     openEditor(mapSet, sourceLocked.value);
     message.value = `${mapSet.name} was saved.`;
   } catch (cause) {
@@ -172,7 +151,6 @@ async function duplicate(mapSet: MapSet): Promise<void> {
       ...mapSetInput(mapSet),
       name: `${mapSet.name} copy`,
     });
-    void loadCacheStats(copy);
     openEditor(copy, false);
     void scrollEditorIntoView();
     message.value = `${copy.name} was created.`;
@@ -260,9 +238,7 @@ async function test(mapSet: MapSet): Promise<void> {
           <p class="metadata">
             Zoom {{ mapSet.minZoom }}–{{ mapSet.maxZoom }} · {{ mapSet.tileSize }} px ·
             {{ mapSet.rendererId }}
-            <template v-if="cachedTileCount(mapSet.id) !== null">
-              · {{ cachedTileCount(mapSet.id) }} cached tiles
-            </template>
+            · {{ mapSet.logicalTileCount }} cached tiles
           </p>
           <ul class="capabilities" aria-label="Enabled capabilities">
             <li v-if="mapSet.capabilities.interactive">Interactive</li>

@@ -42,7 +42,7 @@ function clampLatitude(latitude: number): number {
 }
 
 export function loadMapViewport(
-  storage: ViewportStorage,
+  storage: ViewportStorage | null,
   fallback: MapViewport,
   minimumZoom: number,
   maximumZoom: number,
@@ -69,7 +69,7 @@ export function loadMapViewport(
 }
 
 export function saveMapViewport(
-  storage: ViewportStorage,
+  storage: ViewportStorage | null,
   viewport: MapViewport,
 ): void {
   setItem(storageKey, JSON.stringify(viewport), storage);

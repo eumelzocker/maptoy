@@ -9,7 +9,7 @@ const showTitleBarKey = "maptoy:show-title-bar";
 function loadBooleanPreference(
   key: string,
   fallback: boolean,
-  storage: PreferenceStorage,
+  storage?: PreferenceStorage | null,
 ): boolean {
   const stored = getItem(key, storage);
   return stored === "true" ? true : stored === "false" ? false : fallback;
@@ -18,40 +18,44 @@ function loadBooleanPreference(
 function saveBooleanPreference(
   key: string,
   value: boolean,
-  storage: PreferenceStorage,
+  storage?: PreferenceStorage | null,
 ): void {
   setItem(key, value ? "true" : "false", storage);
 }
 
-export function loadShowCoordinates(storage: PreferenceStorage): boolean {
+export function loadShowCoordinates(
+  storage?: PreferenceStorage | null,
+): boolean {
   return loadBooleanPreference(showCoordinatesKey, true, storage);
 }
 
 export function saveShowCoordinates(
   value: boolean,
-  storage: PreferenceStorage,
+  storage?: PreferenceStorage | null,
 ): void {
   saveBooleanPreference(showCoordinatesKey, value, storage);
 }
 
-export function loadShowAttribution(storage: PreferenceStorage): boolean {
+export function loadShowAttribution(
+  storage?: PreferenceStorage | null,
+): boolean {
   return loadBooleanPreference(showAttributionKey, true, storage);
 }
 
 export function saveShowAttribution(
   value: boolean,
-  storage: PreferenceStorage,
+  storage?: PreferenceStorage | null,
 ): void {
   saveBooleanPreference(showAttributionKey, value, storage);
 }
 
-export function loadShowTitleBar(storage: PreferenceStorage): boolean {
+export function loadShowTitleBar(storage?: PreferenceStorage | null): boolean {
   return loadBooleanPreference(showTitleBarKey, true, storage);
 }
 
 export function saveShowTitleBar(
   value: boolean,
-  storage: PreferenceStorage,
+  storage?: PreferenceStorage | null,
 ): void {
   saveBooleanPreference(showTitleBarKey, value, storage);
 }
