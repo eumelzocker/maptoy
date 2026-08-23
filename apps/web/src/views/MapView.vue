@@ -2,12 +2,29 @@
 import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
 import type { MapRendererInstance } from "@maptoy/map-adapter-sdk";
 import { storeToRefs } from "pinia";
-import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import TogglePanel from "../components/TogglePanel.vue";
+import {
+  loadShowAttribution,
+  loadShowCoordinates,
+  saveShowAttribution,
+  saveShowCoordinates,
+} from "../mapDisplayPreferences.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
 import { MAP_RENDERER_FACTORY_REGISTRY_KEY } from "../registries.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
+import { useUiPreferencesStore } from "../stores/uiPreferences.js";
 
 const injectedFactories = inject(MAP_RENDERER_FACTORY_REGISTRY_KEY);
 if (injectedFactories === undefined) {
@@ -21,8 +38,22 @@ const mapHost = ref<HTMLElement | null>(null);
 const mapError = ref<string | null>(null);
 const pointer = ref<{ longitude: number; latitude: number } | null>(null);
 const zoom = ref<number | null>(null);
+const showCoordinates = ref(loadShowCoordinates(localStorage));
+const showAttribution = ref(loadShowAttribution(localStorage));
+const uiPreferences = useUiPreferencesStore();
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const showTitleBar = computed({
+  get: () => uiPreferences.showTitleBar,
+  set: (value) => uiPreferences.setShowTitleBar(value),
+});
 let renderer: MapRendererInstance | null = null;
 let renderGeneration = 0;
+
+watch(showCoordinates, (value) => saveShowCoordinates(value, localStorage));
+watch(showAttribution, (value) => {
+  saveShowAttribution(value, localStorage);
+  void renderer?.setAttributionVisible(value);
+});
 
 async function destroyRenderer(): Promise<void> {
   if (renderer !== null) {
@@ -83,6 +114,7 @@ async function renderSelectedMap(): Promise<void> {
     }
     renderer = nextRenderer;
     zoom.value = nextRenderer.getViewport().zoom;
+    await nextRenderer.setAttributionVisible(showAttribution.value);
     nextRenderer.subscribe("pointer", (payload) => {
       if (
         typeof payload === "object" &&
@@ -178,12 +210,38 @@ function resetToInitialViewport(): void {
         </RouterLink>
       </div>
 
-      <p v-if="zoom !== null || pointer" class="viewport-status" aria-label="Map viewport status">
-        <span v-if="zoom !== null">Zoom {{ Math.round(zoom) }}</span>
-        <span v-if="pointer" class="coordinates">
-          {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
-        </span>
-      </p>
+      <div class="map-bottom-left">
+        <TogglePanel label="Display Options" align="start">
+          <template #trigger>
+            <i class="mdi mdi-tune" aria-hidden="true"></i>
+          </template>
+          <strong class="options-heading">Display Options</strong>
+          <hr class="options-divider" />
+          <label class="check-field">
+            <input v-model="showTitleBar" type="checkbox" />
+            <span>Show title bar</span>
+          </label>
+          <label class="check-field">
+            <input v-model="showCoordinates" type="checkbox" />
+            <span>Show coordinates</span>
+          </label>
+          <label class="check-field">
+            <input v-model="showAttribution" type="checkbox" />
+            <span>Show attribution</span>
+          </label>
+        </TogglePanel>
+        <p
+          v-if="zoom !== null || pointer"
+          class="viewport-status"
+          :style="{ visibility: showCoordinates ? 'visible' : 'hidden' }"
+          aria-label="Map viewport status"
+        >
+          <span v-if="zoom !== null">Zoom {{ Math.round(zoom) }}</span>
+          <span v-if="pointer" class="coordinates">
+            {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
+          </span>
+        </p>
+      </div>
 
       <div v-if="store.loading" class="map-overlay">Loading Map Sets…</div>
       <div v-else-if="store.loaded && store.items.length === 0" class="map-overlay empty">
@@ -308,11 +366,18 @@ function resetToInitialViewport(): void {
   cursor: pointer;
 }
 
-.viewport-status {
+.map-bottom-left {
   position: absolute;
   bottom: 0.75rem;
   left: 0.75rem;
   z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.viewport-status {
   display: flex;
   gap: 0.75rem;
   align-items: baseline;
@@ -324,6 +389,25 @@ function resetToInitialViewport(): void {
   box-shadow: 0 0.25rem 0.8rem rgb(24 54 45 / 18%);
   font-size: 0.8rem;
   pointer-events: none;
+  white-space: nowrap;
+}
+
+.check-field {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.options-heading {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.options-divider {
+  margin: 0.5rem 0;
+  border: 0;
+  border-top: 1px solid #d7e0db;
 }
 
 .coordinates,
@@ -383,7 +467,7 @@ function resetToInitialViewport(): void {
     min-width: min(12rem, 55vw);
   }
 
-  .viewport-status {
+  .map-bottom-left {
     bottom: 0.5rem;
     left: 0.5rem;
   }

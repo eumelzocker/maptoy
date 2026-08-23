@@ -22,6 +22,12 @@ All notable changes to maptoy are documented in this file.
   currently open in the editor.
 - Cached Tile count in the Map Set list, and automatic scrolling to the editor
   panel when it opens.
+- Map display options panel, toggled from a bottom-left overlay button, to
+  show or hide the coordinates status bar and the on-map attribution control;
+  both preferences persist across reloads and Map Set switches.
+- "Show title bar" option in the Map display options panel, hiding the app
+  header for more vertical space on the Map view; other views always show it
+  regardless of the stored preference.
 
 ### Changed
 

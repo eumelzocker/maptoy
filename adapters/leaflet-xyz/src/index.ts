@@ -137,6 +137,13 @@ async function createLeafletInstance(
         viewport.zoom,
       );
     },
+    setAttributionVisible: (visible) => {
+      if (visible) {
+        map.attributionControl.addTo(map);
+      } else {
+        map.attributionControl.remove();
+      }
+    },
     subscribe: (event, listener) => {
       const leafletEvent = eventName(event);
       const handler: Leaflet.LeafletEventHandlerFn = (payload) => {

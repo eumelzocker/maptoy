@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { CSSProperties } from "vue";
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, nextTick, ref } from "vue";
+import { useAnchoredOverlayPosition } from "../composables/useAnchoredOverlayPosition.js";
+import { useDisclosure } from "../composables/useDisclosure.js";
 
 const props = withDefaults(
   defineProps<{
@@ -12,52 +13,29 @@ const props = withDefaults(
   { align: "start", fixed: false, unstyledTrigger: false },
 );
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const contentId = useId();
-const root = ref<HTMLElement | null>(null);
-const fixedContent = ref<HTMLElement | null>(null);
+const {
+  // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+  contentId,
+  open: pinned,
+  toggle: togglePinState,
+  close: closePinned,
+} = useDisclosure();
+const {
+  root,
+  content: fixedContent,
+  // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+  style: fixedStyle,
+  reposition,
+} = useAnchoredOverlayPosition();
 const hoverOpen = ref(false);
-const pinned = ref(false);
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const open = computed(() => hoverOpen.value || pinned.value);
-const fixedStyle = ref<CSSProperties>({
-  top: "0",
-  left: "0",
-  visibility: "hidden",
-});
-
-function positionFixedContent(): void {
-  if (root.value === null || fixedContent.value === null) {
-    return;
-  }
-  const trigger = root.value.getBoundingClientRect();
-  const content = fixedContent.value.getBoundingClientRect();
-  const gap = 8;
-  const edge = 8;
-  const alignedLeft =
-    props.align === "end" ? trigger.right - content.width : trigger.left;
-  const left = Math.max(
-    edge,
-    Math.min(alignedLeft, window.innerWidth - content.width - edge),
-  );
-  const below = trigger.bottom + gap;
-  const above = trigger.top - content.height - gap;
-  const top =
-    below + content.height <= window.innerHeight - edge || above < edge
-      ? below
-      : above;
-  fixedStyle.value = {
-    top: `${top}px`,
-    left: `${left}px`,
-    visibility: "visible",
-  };
-}
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function openTooltip(): void {
   hoverOpen.value = true;
   if (props.fixed) {
-    void nextTick(positionFixedContent);
+    void nextTick(() => reposition(props.align));
   }
 }
 
@@ -67,9 +45,9 @@ function closeTooltip(): void {
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function togglePin(): void {
-  pinned.value = !pinned.value;
+  togglePinState();
   if (pinned.value && props.fixed) {
-    void nextTick(positionFixedContent);
+    void nextTick(() => reposition(props.align));
   }
 }
 
@@ -88,7 +66,7 @@ function closeAfterFocusLeaves(event: FocusEvent): void {
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function closeAll(): void {
   hoverOpen.value = false;
-  pinned.value = false;
+  closePinned();
 }
 </script>
 

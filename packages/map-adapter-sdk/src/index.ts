@@ -57,6 +57,7 @@ export interface MapRendererInstance {
   updateLayer: (layer: MapLayerDescriptor) => MaybePromise<void>;
   reorderLayers: (layerIds: readonly string[]) => MaybePromise<void>;
   removeLayer: (layerId: string) => MaybePromise<void>;
+  setAttributionVisible: (visible: boolean) => MaybePromise<void>;
   geographicToScreen: (coordinate: GeographicCoordinate) => ScreenPoint;
   screenToGeographic: (point: ScreenPoint) => GeographicCoordinate;
   destroy: () => MaybePromise<void>;
@@ -141,6 +142,7 @@ export function createFakeMapRendererFactory(): MapRendererFactory {
         removeLayer: (layerId) => {
           layers.delete(layerId);
         },
+        setAttributionVisible: () => undefined,
         geographicToScreen: ({ longitude, latitude }) => ({
           x: longitude,
           y: latitude,
@@ -244,6 +246,9 @@ export async function exerciseMapRendererContract(
   await instance.updateLayer({ ...layer, opacity: 0.5 });
   await instance.reorderLayers([layer.id]);
   await instance.removeLayer(layer.id);
+
+  await instance.setAttributionVisible(false);
+  await instance.setAttributionVisible(true);
 
   const coordinate = { longitude: 13.4, latitude: 52.5 };
   const roundTrip = instance.screenToGeographic(
