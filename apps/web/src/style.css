@@ -186,7 +186,98 @@ nav a {
 .docs-page code {
   padding: 0.12rem 0.3rem;
   border-radius: 0.25rem;
-  background: #dce7df;
+  background: #e3eee6;
+}
+
+.docs-clipcopy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.docs-clipcopy code {
+  transition: background-color 0.15s ease;
+}
+
+.docs-clipcopy:has(.docs-clipcopy-button:hover) code,
+.docs-clipcopy:has(.docs-clipcopy-button:focus-visible) code {
+  background: #c8d9cd;
+}
+
+.docs-clipcopy--copied code {
+  background: #cdeadb;
+}
+
+.docs-clipcopy-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.docs-clipcopy-icon {
+  font-size: 0.85rem;
+  font-style: normal;
+  line-height: 1;
+  color: #7c9088;
+  transition: color 0.15s ease;
+}
+
+.docs-clipcopy-button:hover .docs-clipcopy-icon,
+.docs-clipcopy-button:focus-visible .docs-clipcopy-icon {
+  color: #405b54;
+}
+
+.docs-clipcopy--copied .docs-clipcopy-icon {
+  color: #31835f;
+}
+
+.docs-clipcopy-block {
+  position: relative;
+  border-radius: 0.5rem;
+  background: #e3eee6;
+  transition: background-color 0.15s ease;
+}
+
+.docs-clipcopy-block pre {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+}
+
+.docs-clipcopy-block code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.docs-clipcopy-block:has(.docs-clipcopy-block-button:hover),
+.docs-clipcopy-block:has(.docs-clipcopy-block-button:focus-visible) {
+  background: #c8d9cd;
+}
+
+.docs-clipcopy-block.docs-clipcopy--copied {
+  background: #cdeadb;
+}
+
+.docs-clipcopy-block-button {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  padding: 0.35rem;
+  border-radius: 0.3rem;
+  background: rgb(255 255 255 / 70%);
+}
+
+.docs-clipcopy-block-button:hover,
+.docs-clipcopy-block-button:focus-visible {
+  background: rgb(255 255 255 / 90%);
+}
+
+.docs-clipcopy-block.docs-clipcopy--copied .docs-clipcopy-block-button {
+  background: #cdeadb;
 }
 
 .docs-page table {
@@ -206,7 +297,7 @@ nav a {
 
 .docs-page th {
   color: #163832;
-  background: #dce7df;
+  background: #e7f5eb;
 }
 
 .docs-page td {

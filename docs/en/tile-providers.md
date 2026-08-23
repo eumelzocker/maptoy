@@ -1,12 +1,12 @@
 ---
 id: tile-providers
-title: Tile providers
+title: Tile Providers
 language: en
 ---
 
-# Tile providers
+# Tile Providers
 
-Last content review: **2026-08-21**.
+Last content review: **2026-08-23**.
 
 This page is a technical orientation, not a recommendation, legal review, or
 guarantee that a provider permits a particular use. Provider terms, plans, URLs,
@@ -31,10 +31,10 @@ the examples below use `${MAPTOY_*}` references rather than real secrets.
 | [OpenTopoMap](https://opentopomap.org/) | Direct | Avoid mass downloads; contact the project before larger use. |
 | [MapTiler Cloud](https://www.maptiler.com/) | Direct | Server-side proxy/cache, export, and bulk download require a custom agreement. |
 | [Mapbox](https://www.mapbox.com/) | Direct through Static Tiles API | Do not infer archival rights from HTTP cache headers; verify the current agreement for proxying, storage, export, and offline use. |
-| Stadia Maps | Direct | Standard terms prohibit server-side proxying/caching and general bulk download. |
-| Thunderforest | Direct | Standard terms allow limited client/device caching but prohibit caching proxies and redistribution. |
-| ArcGIS Location Platform | Direct with `{z}/{y}/{x}` path order | Account-, service-, and agreement-dependent; no general archival permission is implied. |
-| Google Maps Platform | Not directly | Session creation, dynamic attribution, and caching restrictions conflict with maptoy's current static Map Set and archive model. |
+| [Stadia Maps](https://stadiamaps.com/) | Direct | Standard terms prohibit server-side proxying/caching and general bulk download. |
+| [Thunderforest](https://www.thunderforest.com/maps/) | Direct | Standard terms allow limited client/device caching but prohibit caching proxies and redistribution. |
+| [ArcGIS Location](https://location.arcgis.com/) | Direct with `{z}/{y}/{x}` path order | Account-, service-, and agreement-dependent; no general archival permission is implied. |
+| [Google Maps](https://maps.google.com/) | Not directly | Session creation, dynamic attribution, and caching restrictions conflict with maptoy's current static Map Set and archive model. |
 
 ## OpenStreetMap Standard
 
@@ -114,18 +114,25 @@ attribution is required; free accounts can have additional logo requirements.
 
 **Name:** Mapbox Static Tiles API.
 
-**Variants:** Classic rasterizable styles include Streets v12, Outdoors v12, Light
-v11, Dark v11, Satellite v9, and Satellite Streets v12, plus compatible custom
-Studio styles. The current Mapbox Standard and Standard Satellite styles are not
-supported by the Static Tiles API.
+**Variants:** Classic rasterizable styles are
+- Streets v12 `streets-v12`
+- Outdoors v12 `outdoors-v12`
+- Light v11 `light-v11`
+- Dark v11 `dark-v11`
+- Satellite v9 `satellite-v9`
+- Satellite Streets v12 `satellite-streets-v12`
+- Navigation Day `navigation-day-v1`
+- Navigation Night `navigation-night-v1`
+
+plus compatible custom Studio styles. The current Mapbox Standard and
+Standard Satellite styles are not supported by the Static Tiles API.
 
 **URL template:**
-`https://api.mapbox.com/styles/v1/{username}/{styleId}/tiles/512/{z}/{x}/{y}?access_token=${MAPTOY_MAPBOX_ACCESS_TOKEN}`
+`https://api.mapbox.com/styles/v1/{styleId}/tiles/512/{z}/{x}/{y}?access_token=${MAPTOY_MAPBOX_ACCESS_TOKEN}`
 
-Replace `{username}` and `{styleId}` with fixed values. Use `/256/` only when the Map
-Set and billing expectations are configured for 256-pixel tiles; 512-pixel tiles use
-a different zoom interpretation from 256-pixel tiles. A literal `@2x` suffix is
-optional.
+Replace `{styleId}` with fixed values. Use `/256/` only when the Map Set and billing
+expectations are configured for 256-pixel tiles; 512-pixel tiles use a different
+zoom interpretation from 256-pixel tiles. A literal `@2x` suffix is optional.
 
 **Parameters and headers:** Account username, style ID, `256` or `512` tile size,
 optional `@2x`, and an access token with the required scope. Requests are billed and

@@ -4,6 +4,29 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Documentation images: `docs/assets/` files are now served under
+  `/docs-assets/` in both development and production, with relative
+  `<img src>` references in documentation pages rewritten automatically at
+  build time.
+- Every inline code snippet and fenced code block in the documentation now has
+  a click/keyboard-activated copy-to-clipboard icon (inline: right after the
+  text; blocks: top-right corner of the block). A custom
+  `<callout type="clipcopy">text</callout>` Markdown tag is also available and
+  renders like inline code.
+
+### Changed
+
+- Documentation improvements
+
+### Fixed
+
+- `apps/web/build/` (the documentation loader and its tests) was unintentionally
+  excluded from version control by an overly broad `build/` entry in
+  `.gitignore`, which also silently hid it from Biome's format checks; the
+  entry is now scoped to `dist/` only.
+
 ## [0.0.4] - 2026-08-23
 
 ### Added

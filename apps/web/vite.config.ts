@@ -1,12 +1,22 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import { defineConfig, type Plugin } from "vite";
+import {
+  copyDocsAssets,
+  createDocsAssetsMiddleware,
+} from "./build/docsAssets.js";
 import { loadDocumentation } from "./build/docs.js";
 
 const virtualDocumentationId = "virtual:maptoy-docs";
 const resolvedVirtualDocumentationId = `\0${virtualDocumentationId}`;
 
 function documentationPlugin(): Plugin {
+  const docsAssetsRoot = fileURLToPath(
+    new URL("../../docs/assets", import.meta.url),
+  );
+  let outDir = "dist";
+
   return {
     name: "maptoy-documentation",
     resolveId(id) {
@@ -28,6 +38,18 @@ function documentationPlugin(): Plugin {
         changelogPath,
       });
       return `export const documentation = ${JSON.stringify(documentation)};`;
+    },
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    configureServer(server) {
+      server.middlewares.use(
+        "/docs-assets",
+        createDocsAssetsMiddleware(docsAssetsRoot),
+      );
+    },
+    async writeBundle() {
+      await copyDocsAssets(docsAssetsRoot, outDir);
     },
   };
 }

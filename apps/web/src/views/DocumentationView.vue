@@ -2,6 +2,7 @@
 import { documentation } from "virtual:maptoy-docs";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { decorateClipCopyCallouts } from "../documentationClipCopy.js";
 import { saveDocumentationLanguage } from "../documentationLanguage.js";
 import { decorateExternalDocumentationLinks } from "../documentationLinks.js";
 import {
@@ -49,15 +50,16 @@ const englishOnlyLabel = computed(() =>
 
 const pageContent = ref<HTMLElement | null>(null);
 
-async function refreshExternalLinks(): Promise<void> {
+async function decorateDocumentationContent(): Promise<void> {
   await nextTick();
   if (pageContent.value !== null) {
     decorateExternalDocumentationLinks(pageContent.value);
+    decorateClipCopyCallouts(pageContent.value);
   }
 }
 
-watch(page, refreshExternalLinks);
-onMounted(refreshExternalLinks);
+watch(page, decorateDocumentationContent);
+onMounted(decorateDocumentationContent);
 
 watch(requestedLanguage, saveDocumentationLanguage, { immediate: true });
 </script>

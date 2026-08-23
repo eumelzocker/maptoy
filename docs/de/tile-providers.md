@@ -6,7 +6,7 @@ language: de
 
 # Tile-Provider
 
-Letzte inhaltliche Prüfung: **2026-08-21**.
+Letzte inhaltliche Prüfung: **2026-08-23**.
 
 Diese Seite dient der technischen Orientierung. Sie ist weder Empfehlung noch
 Rechtsprüfung oder Garantie dafür, dass ein Provider eine bestimmte Nutzung erlaubt.
@@ -33,10 +33,10 @@ Secrets.
 | [OpenTopoMap](https://opentopomap.org/) | Direkt | Massendownloads vermeiden; vor größerer Nutzung das Projekt kontaktieren. |
 | [MapTiler Cloud](https://www.maptiler.com/) | Direkt | Serverseitiger Proxy/Cache, Export und Bulk-Download benötigen eine individuelle Vereinbarung. |
 | [Mapbox](https://www.mapbox.com/) | Direkt über die Static Tiles API | Aus HTTP-Cache-Headern keine Archivrechte ableiten; aktuelle Vereinbarung zu Proxy, Speicherung, Export und Offline-Nutzung prüfen. |
-| Stadia Maps | Direkt | Standardbedingungen verbieten serverseitigen Proxy/Cache und allgemeinen Bulk-Download. |
-| Thunderforest | Direkt | Standardbedingungen erlauben begrenztes Client-/Geräte-Caching, verbieten jedoch Caching-Proxys und Weitergabe. |
-| ArcGIS Location Platform | Direkt mit Pfadreihenfolge `{z}/{y}/{x}` | Konto-, Dienst- und vertragsabhängig; keine allgemeine Archiverlaubnis. |
-| Google Maps Platform | Nicht direkt | Session-Erzeugung, dynamische Attribution und Cache-Beschränkungen widersprechen dem aktuellen statischen Map-Set- und Archivmodell. |
+| [Stadia Maps](https://stadiamaps.com/) | Direkt | Standardbedingungen verbieten serverseitigen Proxy/Cache und allgemeinen Bulk-Download. |
+| [Thunderforest](https://www.thunderforest.com/maps/) | Direkt | Standardbedingungen erlauben begrenztes Client-/Geräte-Caching, verbieten jedoch Caching-Proxys und Weitergabe. |
+| [ArcGIS Location](https://location.arcgis.com/) | Direkt mit Pfadreihenfolge `{z}/{y}/{x}` | Konto-, Dienst- und vertragsabhängig; keine allgemeine Archiverlaubnis. |
+| [Google Maps](https://maps.google.com/) | Nicht direkt | Session-Erzeugung, dynamische Attribution und Cache-Beschränkungen widersprechen dem aktuellen statischen Map-Set- und Archivmodell. |
 
 ## OpenStreetMap Standard
 
@@ -120,18 +120,26 @@ kostenlose Konten können zusätzliche Logo-Vorgaben gelten.
 
 **Name:** Mapbox Static Tiles API.
 
-**Varianten:** Klassische rasterisierbare Stile sind Streets v12, Outdoors v12,
-Light v11, Dark v11, Satellite v9 und Satellite Streets v12 sowie kompatible eigene
-Studio-Stile. Die aktuellen Stile Mapbox Standard und Standard Satellite werden von
-der Static Tiles API nicht unterstützt.
+**Varianten:** Klassische rasterisierbare Stile sind
+- Streets v12 `streets-v12`
+- Outdoors v12 `outdoors-v12`
+- Light v11 `light-v11`
+- Dark v11 `dark-v11`
+- Satellite v9 `satellite-v9`
+- Satellite Streets v12 `satellite-streets-v12`
+- Navigation Day `navigation-day-v1`
+- Navigation Night `navigation-night-v1`
+
+sowie kompatible eigene Studio-Stile. Die aktuellen Stile Mapbox Standard und
+Standard Satellite werden von der Static Tiles API nicht unterstützt.
 
 **URL-Template:**
-`https://api.mapbox.com/styles/v1/{username}/{styleId}/tiles/512/{z}/{x}/{y}?access_token=${MAPTOY_MAPBOX_ACCESS_TOKEN}`
+`https://api.mapbox.com/styles/v1/{styleId}/tiles/512/{z}/{x}/{y}?access_token=${MAPTOY_MAPBOX_ACCESS_TOKEN}`
 
-`{username}` und `{styleId}` durch feste Werte ersetzen. `/256/` nur verwenden,
-wenn Map Set und Abrechnung für 256-Pixel-Tiles konfiguriert sind; 512-Pixel-Tiles
-haben gegenüber 256-Pixel-Tiles eine verschobene Zoominterpretation. Ein literales
-`@2x`-Suffix ist optional.
+`{styleId}` durch feste Werte ersetzen. `/256/` nur verwenden, wenn Map Set und
+Abrechnung für 256-Pixel-Tiles konfiguriert sind; 512-Pixel-Tiles haben gegenüber
+256-Pixel-Tiles eine verschobene Zoominterpretation. Ein literales`@2x`-Suffix ist
+optional.
 
 **Parameter und Header:** Kontoname, Stil-ID, Tile-Größe `256` oder `512`, optional
 `@2x` und ein Zugriffstoken mit passendem Scope. Anfragen werden nach aktivem Tarif

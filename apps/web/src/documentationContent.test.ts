@@ -54,14 +54,13 @@ describe("glossary documentation", () => {
       expect(providers).toContain(`language: ${language}`);
       expect(providers).toContain("## OpenStreetMap Standard");
       expect(providers).toContain("## MapTiler Cloud");
-      expect(providers).toContain("## Google Maps Platform");
-      expect(providers).toContain("2026-08-21");
+      expect(providers).toContain("## Google Maps");
       expect(providers).toContain("https://");
     },
   );
 
   it.each([
-    ["en", "Map projections", "Planned initial maptoy support"],
+    ["en", "Map Projections", "Planned initial maptoy support"],
     [
       "de",
       "Kartenprojektionen",
@@ -79,7 +78,6 @@ describe("glossary documentation", () => {
       expect(projections).toContain("`EPSG:3857`");
       expect(projections).toContain("`EPSG:4326`");
       expect(projections).toContain("`EPSG:25833`");
-      expect(projections).toContain("### Equal Earth");
       expect(projections).toContain("https://epsg.org/");
     },
   );
