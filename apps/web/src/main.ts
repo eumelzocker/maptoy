@@ -37,7 +37,7 @@ const router = createRouter({
       component: MapSetsView,
     },
     {
-      path: "/cache",
+      path: "/cache/:mapSetId?",
       component: TileCacheView,
     },
     {

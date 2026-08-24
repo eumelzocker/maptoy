@@ -227,6 +227,50 @@ describe("maptoy server", () => {
       name: "smoke",
       tileCount: 1,
     });
+    const overviewStats = await server.inject({
+      method: "GET",
+      url: "/api/cache/stats",
+    });
+    expect(overviewStats.statusCode).toBe(200);
+    expect(overviewStats.json()).toMatchObject({
+      mapSetCount: 1,
+      populatedMapSetCount: 1,
+      stats: {
+        logicalTileCount: 1,
+        currentRevisionCount: 1,
+        snapshotCount: 1,
+        totalStorageBytes: validPng.byteLength,
+        zoomLevels: [{ zoom: 10, logicalTileCount: 1 }],
+      },
+      mapSets: [
+        {
+          mapSetId: mapSet.id,
+          logicalTileCount: 1,
+          currentRevisionCount: 1,
+          snapshotCount: 1,
+        },
+      ],
+    });
+    const overviewAudit = await server.inject({
+      method: "POST",
+      url: "/api/cache/audit",
+    });
+    expect(overviewAudit.statusCode).toBe(200);
+    expect(overviewAudit.json()).toMatchObject({
+      totals: {
+        scannedFileCount: 1,
+        missingFileCount: 0,
+        orphanFileCount: 0,
+      },
+      mapSets: [
+        {
+          mapSetId: mapSet.id,
+          scannedFileCount: 1,
+          missingFileCount: 0,
+          orphanFileCount: 0,
+        },
+      ],
+    });
     const snapshotId = createdSnapshot.json().id;
     const snapshotTile = await server.inject({
       method: "GET",

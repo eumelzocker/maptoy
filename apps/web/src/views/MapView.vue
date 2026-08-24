@@ -14,6 +14,8 @@ import {
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import MapSetSelect from "../components/MapSetSelect.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import TogglePanel from "../components/TogglePanel.vue";
 import {
   loadShowAttribution,
@@ -175,14 +177,13 @@ function resetToInitialViewport(): void {
       <div ref="mapHost" class="map-host"></div>
 
       <div v-if="store.items.length > 0" class="map-controls">
-        <label>
-          <span class="visually-hidden">Map Set</span>
-          <select v-model="selectedId" aria-label="Map Set">
-            <option v-for="mapSet in store.items" :key="mapSet.id" :value="mapSet.id">
-              {{ mapSet.name }}
-            </option>
-          </select>
-        </label>
+        <MapSetSelect
+          v-model="selectedId"
+          class="map-set-picker"
+          :items="store.items"
+          variant="plain"
+          aria-label="Map Set"
+        />
         <HtmlTooltip v-if="selected" label="Map Set information" align="end">
           <template #trigger>
             <i class="mdi mdi-information-outline" aria-hidden="true"></i>
@@ -279,16 +280,8 @@ function resetToInitialViewport(): void {
   backdrop-filter: blur(0.3rem);
 }
 
-.map-controls select {
-  min-width: min(15rem, 55vw);
-  min-height: 2.35rem;
-  padding: 0.4rem 0.6rem;
-  border: 0;
-  border-radius: 0.35rem;
-  color: #142c28;
-  background: transparent;
-  font: inherit;
-  font-weight: 700;
+.map-set-picker {
+  width: min(18rem, 58vw);
 }
 
 .manage-link {
@@ -465,8 +458,8 @@ function resetToInitialViewport(): void {
     right: 0.5rem;
   }
 
-  .map-controls select {
-    min-width: min(12rem, 55vw);
+  .map-set-picker {
+    width: min(15rem, 58vw);
   }
 
   .map-bottom-left {

@@ -4,21 +4,31 @@ import type {
   CacheSnapshotListResponse,
   TileCacheAuditResult,
   TileCacheComparison,
+  TileCacheMapSetAuditResult,
+  TileCacheOverviewAuditResult,
+  TileCacheOverviewStats,
   TileCacheRepairResult,
   TileCacheStats,
   TileRevisionListResponse,
   TileRevisionSummary,
 } from "@maptoy/contracts";
 import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { apiRequest } from "../api.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import MapSetSelect from "../components/MapSetSelect.vue";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
 const mapSets = useMapSetsStore();
+const route = useRoute();
+const router = useRouter();
 const selectedId = ref("");
 const stats = ref<TileCacheStats | null>(null);
+const overview = ref<TileCacheOverviewStats | null>(null);
 const audit = ref<TileCacheAuditResult | null>(null);
+const overviewAudit = ref<TileCacheOverviewAuditResult | null>(null);
 const snapshots = ref<CacheSnapshot[]>([]);
 const revisions = ref<TileRevisionSummary[]>([]);
 const revisionTotal = ref(0);
@@ -31,6 +41,31 @@ const snapshotName = ref("");
 const busy = ref(false);
 const error = ref<string | null>(null);
 const message = ref<string | null>(null);
+let routeReady = false;
+let loadGeneration = 0;
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const isOverview = computed(() => selectedId.value === "");
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const selectedMapSet = computed(
+  () => mapSets.items.find(({ id }) => id === selectedId.value) ?? null,
+);
+const auditByMapSet = computed(
+  () =>
+    new Map(
+      overviewAudit.value?.mapSets.map((result) => [result.mapSetId, result]) ??
+        [],
+    ),
+);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const overviewRows = computed(() =>
+  (overview.value?.mapSets ?? []).flatMap((summary) => {
+    const mapSet = mapSets.items.find(({ id }) => id === summary.mapSetId);
+    return mapSet === undefined
+      ? []
+      : [{ mapSet, summary, audit: auditByMapSet.value.get(summary.mapSetId) }];
+  }),
+);
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const sortedRevisions = computed(() =>
@@ -40,64 +75,108 @@ const sortedRevisions = computed(() =>
   ),
 );
 
+function resetScopeState(): void {
+  stats.value = null;
+  snapshots.value = [];
+  comparison.value = null;
+  message.value = null;
+  audit.value = null;
+  revisions.value = [];
+  revisionTotal.value = 0;
+  revisionCursor.value = null;
+  revisionsLoaded.value = false;
+  revisionZoom.value = "";
+  revisionState.value = "all";
+}
+
 async function loadDetails(): Promise<void> {
-  if (selectedId.value === "") {
-    stats.value = null;
-    audit.value = null;
-    snapshots.value = [];
-    revisions.value = [];
-    return;
-  }
+  const generation = ++loadGeneration;
+  const mapSetId = selectedId.value;
   busy.value = true;
   error.value = null;
   try {
-    const base = `api/map-sets/${selectedId.value}`;
-    const [loadedStats, loadedSnapshots] = await Promise.all([
-      apiRequest<TileCacheStats>(`${base}/cache/stats`),
-      apiRequest<CacheSnapshotListResponse>(`${base}/snapshots`),
-    ]);
-    stats.value = loadedStats;
-    snapshots.value = loadedSnapshots.items;
+    if (mapSetId === "") {
+      const loadedOverview =
+        await apiRequest<TileCacheOverviewStats>("api/cache/stats");
+      if (generation !== loadGeneration) return;
+      overview.value = loadedOverview;
+      stats.value = loadedOverview.stats;
+      snapshots.value = [];
+    } else {
+      const base = `api/map-sets/${mapSetId}`;
+      const [loadedStats, loadedSnapshots] = await Promise.all([
+        apiRequest<TileCacheStats>(`${base}/cache/stats`),
+        apiRequest<CacheSnapshotListResponse>(`${base}/snapshots`),
+      ]);
+      if (generation !== loadGeneration) return;
+      stats.value = loadedStats;
+      snapshots.value = loadedSnapshots.items;
+    }
   } catch (cause) {
+    if (generation !== loadGeneration) return;
     error.value =
       cause instanceof Error
         ? cause.message
         : "The Tile Cache could not be loaded.";
   } finally {
-    busy.value = false;
+    if (generation === loadGeneration) busy.value = false;
+  }
+}
+
+async function applyRoute(): Promise<void> {
+  const parameter = route.params.mapSetId;
+  const mapSetId = typeof parameter === "string" ? parameter : "";
+  if (mapSetId !== "" && !mapSets.items.some(({ id }) => id === mapSetId)) {
+    await router.replace("/cache");
+    error.value = "The requested Map Set does not exist.";
+    return;
+  }
+  if (selectedId.value !== mapSetId) {
+    selectedId.value = mapSetId;
+    resetScopeState();
+  }
+  if (mapSetId !== "") {
+    mapSets.select(mapSetId);
+  }
+  await loadDetails();
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function selectScope(mapSetId: string): void {
+  const target =
+    mapSetId === "" ? "/cache" : `/cache/${encodeURIComponent(mapSetId)}`;
+  if (target !== route.path) {
+    void router.push(target);
   }
 }
 
 onMounted(async () => {
   try {
-    if (!mapSets.loaded) {
-      await mapSets.load();
-    }
-    selectedId.value = mapSets.selectedId ?? mapSets.items[0]?.id ?? "";
-    if (selectedId.value === "") {
-      await loadDetails();
-    }
+    if (!mapSets.loaded) await mapSets.load();
+    routeReady = true;
+    await applyRoute();
   } catch (cause) {
     error.value =
       cause instanceof Error ? cause.message : "Map Sets could not be loaded.";
   }
 });
 
-watch(selectedId, async (id, previous) => {
-  if (id !== previous) {
-    mapSets.select(id || null);
-    comparison.value = null;
-    message.value = null;
-    audit.value = null;
-    revisions.value = [];
-    revisionTotal.value = 0;
-    revisionCursor.value = null;
-    revisionsLoaded.value = false;
-    revisionZoom.value = "";
-    revisionState.value = "all";
-    await loadDetails();
-  }
-});
+watch(
+  () => route.params.mapSetId,
+  () => {
+    if (routeReady) void applyRoute();
+  },
+);
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function mapSetAuditNeedsAttention(
+  result: TileCacheMapSetAuditResult | undefined,
+): boolean {
+  return (
+    result !== undefined &&
+    (result.missingFileCount > 0 || result.orphanFileCount > 0)
+  );
+}
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function createSnapshot(): Promise<void> {
@@ -210,17 +289,22 @@ async function deleteRevision(revision: TileRevisionSummary): Promise<void> {
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function auditCache(): Promise<void> {
-  if (selectedId.value === "") {
-    return;
-  }
   busy.value = true;
   error.value = null;
   try {
-    audit.value = await apiRequest<TileCacheAuditResult>(
-      `api/map-sets/${selectedId.value}/cache/audit`,
-      { method: "POST" },
-    );
-    message.value = `Consistency check scanned ${audit.value.scannedFileCount} files.`;
+    if (selectedId.value === "") {
+      overviewAudit.value = await apiRequest<TileCacheOverviewAuditResult>(
+        "api/cache/audit",
+        { method: "POST" },
+      );
+      message.value = `Consistency check scanned ${overviewAudit.value.totals.scannedFileCount} files across ${overviewAudit.value.mapSets.length} Map Sets.`;
+    } else {
+      audit.value = await apiRequest<TileCacheAuditResult>(
+        `api/map-sets/${selectedId.value}/cache/audit`,
+        { method: "POST" },
+      );
+      message.value = `Consistency check scanned ${audit.value.scannedFileCount} files.`;
+    }
   } catch (cause) {
     error.value =
       cause instanceof Error ? cause.message : "The consistency check failed.";
@@ -249,6 +333,8 @@ async function repairCache(): Promise<void> {
     );
     message.value = `Repair scanned ${result.scannedFileCount} files, removed ${result.removedOrphanFileCount} unreferenced files, and forgot ${result.removedMissingRevisionCount} revisions for ${result.removedMissingFileCount} missing files.`;
     audit.value = result.audit;
+    overview.value = null;
+    overviewAudit.value = null;
     await loadDetails();
   } catch (cause) {
     error.value =
@@ -320,16 +406,25 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
       <div>
         <p class="eyebrow">Persistent archive</p>
         <h1>Tile Cache</h1>
-        <p>Inspect immutable revisions, create snapshots, and compare cache states.</p>
+        <p v-if="isOverview">
+          Storage, revisions, and consistency across all Map Sets.
+        </p>
+        <p v-else>
+          <RouterLink class="overview-link" to="/cache">All Map Sets</RouterLink>
+          <span aria-hidden="true"> / </span>{{ selectedMapSet?.name }}
+        </p>
       </div>
-      <label class="map-set-picker">
-        <span>Map Set</span>
-        <select v-model="selectedId" :disabled="busy || mapSets.items.length === 0">
-          <option v-for="mapSet in mapSets.items" :key="mapSet.id" :value="mapSet.id">
-            {{ mapSet.name }}
-          </option>
-        </select>
-      </label>
+      <div class="map-set-picker">
+        <span>Scope</span>
+        <MapSetSelect
+          :model-value="selectedId"
+          :items="mapSets.items"
+          :disabled="busy"
+          all-label="All Map Sets"
+          aria-label="Cache scope"
+          @update:model-value="selectScope"
+        />
+      </div>
     </header>
 
     <p v-if="message" class="notice success" role="status">{{ message }}</p>
@@ -337,6 +432,12 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
     <p v-if="busy && !stats" class="notice">Loading Tile Cache…</p>
 
     <section v-if="stats" class="stats" aria-label="Cache statistics">
+      <article v-if="isOverview && overview">
+        <span>Map Sets</span><strong>{{ overview.mapSetCount }}</strong>
+      </article>
+      <article v-if="isOverview && overview">
+        <span>With cached tiles</span><strong>{{ overview.populatedMapSetCount }}</strong>
+      </article>
       <article><span>Logical tiles</span><strong>{{ stats.logicalTileCount }}</strong></article>
       <article><span>Current revisions</span><strong>{{ stats.currentRevisionCount }}</strong></article>
       <article><span>Historical revisions</span><strong>{{ stats.historicalRevisionCount }}</strong></article>
@@ -345,8 +446,104 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
       <article><span>Indexed storage</span><strong>{{ formatBytes(stats.totalStorageBytes) }}</strong></article>
     </section>
 
+    <section
+      v-if="isOverview && overview && overviewRows.length"
+      class="panel compact-panel map-set-overview"
+    >
+      <header>
+        <div>
+          <h2>Map Sets</h2>
+          <p>Indexed cache metadata by Map Set. Open a row for snapshots and revisions.</p>
+        </div>
+      </header>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Map Set</th><th>Logical</th><th>Current</th><th>Historical</th>
+              <th>Snapshots</th><th>Files</th><th>Storage</th><th>Consistency</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in overviewRows" :key="row.mapSet.id">
+              <td><strong>{{ row.mapSet.name }}</strong></td>
+              <td>{{ row.summary.logicalTileCount }}</td>
+              <td>{{ row.summary.currentRevisionCount }}</td>
+              <td>{{ row.summary.historicalRevisionCount }}</td>
+              <td>{{ row.summary.snapshotCount }}</td>
+              <td>{{ row.summary.uniqueContentCount }}</td>
+              <td>{{ formatBytes(row.summary.totalStorageBytes) }}</td>
+              <td>
+                <span
+                  v-if="row.audit"
+                  class="health-state"
+                  :class="{ warning: mapSetAuditNeedsAttention(row.audit) }"
+                >
+                  {{ mapSetAuditNeedsAttention(row.audit) ? "Needs attention" : "OK" }}
+                </span>
+                <span v-else class="muted">Not checked</span>
+              </td>
+              <td>
+                <RouterLink class="detail-link" :to="`/cache/${row.mapSet.id}`">
+                  Details
+                  <i class="mdi mdi-chevron-right" aria-hidden="true"></i>
+                </RouterLink>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section v-if="isOverview && overview" class="panel consistency-panel">
+      <header>
+        <div>
+          <h2>Overall consistency</h2>
+          <p>The file system is scanned only when explicitly requested.</p>
+        </div>
+        <div class="actions">
+          <button
+            type="button"
+            :disabled="busy || overview.mapSetCount === 0"
+            @click="auditCache"
+          >
+            Check all Map Sets
+          </button>
+        </div>
+      </header>
+      <div v-if="overviewAudit" class="audit-results">
+        <article>
+          <span>Physical files</span>
+          <strong>{{ overviewAudit.totals.scannedFileCount }}</strong>
+        </article>
+        <article>
+          <span>Physical storage</span>
+          <strong>{{ formatBytes(overviewAudit.totals.physicalStorageBytes) }}</strong>
+        </article>
+        <article :class="{ warning: overviewAudit.totals.missingFileCount > 0 }">
+          <span>Missing files</span>
+          <strong>{{ overviewAudit.totals.missingFileCount }}</strong>
+        </article>
+        <article :class="{ warning: overviewAudit.totals.orphanFileCount > 0 }">
+          <span>Unreferenced files</span>
+          <strong>{{ overviewAudit.totals.orphanFileCount }}</strong>
+        </article>
+      </div>
+      <p v-else class="muted">
+        Not checked in this browser session. Large archives may take a while to scan.
+      </p>
+    </section>
+
     <section v-if="stats && stats.zoomLevels.length" class="panel compact-panel">
-      <header><div><h2>Zoom overview</h2><p>Database totals without a file-system scan.</p></div></header>
+      <header>
+        <div>
+          <h2>Zoom overview</h2>
+          <p>
+            {{ isOverview ? "Totals across all Map Sets" : "Map Set totals" }} without a
+            file-system scan.
+          </p>
+        </div>
+      </header>
       <div class="table-scroll">
         <table>
           <thead><tr><th>Zoom</th><th>Logical tiles</th><th>Current</th><th>Historical</th><th>Storage</th></tr></thead>
@@ -363,7 +560,7 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
       </div>
     </section>
 
-    <section v-if="selectedId" class="panel consistency-panel">
+    <section v-if="!isOverview && selectedId" class="panel consistency-panel">
       <header>
         <div><h2>Consistency</h2><p>The file-system scan runs only when explicitly requested.</p></div>
         <div class="actions">
@@ -492,8 +689,10 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
 .page-heading, .panel > header, .snapshot-list article { justify-content: space-between; gap: 1rem; }
 h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.3rem, 5vw, 4rem); font-weight: 500; }
 h2, p { margin-top: 0; }
+.overview-link, .detail-link { color: #17453c; font-weight: 700; }
+.detail-link { display: inline-flex; align-items: center; text-decoration: none; }
 .map-set-picker, .snapshot-form label, .revision-filters label { display: grid; gap: 0.35rem; font-weight: 700; }
-.map-set-picker select { min-width: 15rem; }
+.map-set-picker .map-set-select { min-width: 18rem; }
 input, select, button { min-height: 2.4rem; padding: 0.5rem 0.7rem; border: 1px solid #9eb1a7; border-radius: 0.45rem; color: #142c28; background: #fff; font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -506,6 +705,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .stats span, .audit-results span, .muted, .snapshot-list span, .revision-footer { color: #617870; }
 .stats strong, .audit-results strong { font-size: 1.5rem; }
 .warning { border-color: #b54725 !important; }
+.health-state { display: inline-flex; padding: 0.2rem 0.45rem; border-radius: 999px; color: #245744; background: #dcebe1; font-size: 0.75rem; font-weight: 700; }
+.health-state.warning { color: #8a281c; background: #ffe9e5; }
 .panel { margin-top: 1.25rem; padding: 1.25rem; }
 .compact-panel { padding-bottom: 0.5rem; }
 .consistency-panel .audit-results { margin-top: 1rem; }
@@ -530,5 +731,5 @@ th, td { padding: 0.65rem; border-bottom: 1px solid #d7e0db; text-align: left; w
 th { color: #536b64; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .state { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 999px; background: #e8ded6; }
 .state.current { color: #fff; background: #17453c; }
-@media (max-width: 700px) { .page-heading, .panel > header, .snapshot-form, .snapshot-list article, .revision-footer { align-items: stretch; flex-direction: column; } .map-set-picker select { min-width: 0; width: 100%; } }
+@media (max-width: 700px) { .page-heading, .panel > header, .snapshot-form, .snapshot-list article, .revision-footer { align-items: stretch; flex-direction: column; } .map-set-picker .map-set-select { min-width: 0; width: 100%; } }
 </style>

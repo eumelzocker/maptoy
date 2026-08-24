@@ -4,6 +4,9 @@ import type {
   MapSet,
   TileCacheAuditResult,
   TileCacheComparison,
+  TileCacheMapSetAuditResult,
+  TileCacheOverviewAuditResult,
+  TileCacheOverviewStats,
   TileCacheRepairResult,
   TileCacheStats,
   TileRefreshMode,
@@ -250,6 +253,10 @@ export class TileArchiveService {
     return this.repository.metadataStats(mapSetId);
   }
 
+  overview(): TileCacheOverviewStats {
+    return this.repository.metadataOverview();
+  }
+
   logicalTileCounts(): ReadonlyMap<string, number> {
     return this.repository.logicalTileCounts();
   }
@@ -269,6 +276,33 @@ export class TileArchiveService {
       ),
       missingFileCount: missingPaths.length,
       orphanFileCount: orphans.length,
+    };
+  }
+
+  async auditAll(
+    mapSetIds: readonly string[],
+  ): Promise<TileCacheOverviewAuditResult> {
+    const mapSets: TileCacheMapSetAuditResult[] = [];
+    for (const mapSetId of mapSetIds) {
+      mapSets.push({ mapSetId, ...(await this.audit(mapSetId)) });
+    }
+    return {
+      totals: mapSets.reduce(
+        (totals, mapSet) => ({
+          scannedFileCount: totals.scannedFileCount + mapSet.scannedFileCount,
+          physicalStorageBytes:
+            totals.physicalStorageBytes + mapSet.physicalStorageBytes,
+          missingFileCount: totals.missingFileCount + mapSet.missingFileCount,
+          orphanFileCount: totals.orphanFileCount + mapSet.orphanFileCount,
+        }),
+        {
+          scannedFileCount: 0,
+          physicalStorageBytes: 0,
+          missingFileCount: 0,
+          orphanFileCount: 0,
+        },
+      ),
+      mapSets,
     };
   }
 

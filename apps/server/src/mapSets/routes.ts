@@ -14,6 +14,8 @@ import {
   MapSetTestResponseSchema,
   TileCacheAuditResultSchema,
   TileCacheComparisonSchema,
+  TileCacheOverviewAuditResultSchema,
+  TileCacheOverviewStatsSchema,
   TileCacheRepairResultSchema,
   TileCacheStatsSchema,
   TileRevisionListResponseSchema,
@@ -106,6 +108,18 @@ export function registerMapSetRoutes(
         })),
       };
     },
+  );
+
+  server.get(
+    "/api/cache/stats",
+    { schema: { response: { 200: TileCacheOverviewStatsSchema } } },
+    async () => tileArchive.overview(),
+  );
+
+  server.post(
+    "/api/cache/audit",
+    { schema: { response: { 200: TileCacheOverviewAuditResultSchema } } },
+    async () => tileArchive.auditAll(service.list().map(({ id }) => id)),
   );
 
   server.post<{ Body: MapSetInput; Reply: MapSet }>(

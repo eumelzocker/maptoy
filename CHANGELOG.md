@@ -4,6 +4,8 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-08-24
+
 ### Added
 
 - Documentation images: `docs/assets/` files are now served under
@@ -15,10 +17,22 @@ All notable changes to maptoy are documented in this file.
   text; blocks: top-right corner of the block). A custom
   `<callout type="clipcopy">text</callout>` Markdown tag is also available and
   renders like inline code.
+- Reusable accessible Vue menu with optional nested submenus, pointer and
+  keyboard navigation, viewport-aware popup positioning, and a responsive
+  inline submenu layout on narrow screens. It now powers the Map Set selectors
+  in the Map and Tile Cache views and provides a base for future context menus.
+- Tile Cache overview at `/cache` with efficiently aggregated statistics and
+  zoom totals across all Map Sets, per-Map-Set storage summaries, and an
+  explicitly triggered overall file-system consistency check. Map Set details
+  remain directly addressable at `/cache/:mapSetId`.
 
 ### Changed
 
 - Documentation improvements
+- Map Set names now use their first `/`-separated segment as a presentation
+  hierarchy in the Map Sets overview and selectors. Later separators remain in
+  the displayed item name, while names without a separator are collected under
+  `Other Map Sets`; persisted Map Set names remain unchanged.
 
 ### Fixed
 

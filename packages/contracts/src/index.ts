@@ -273,6 +273,38 @@ export const TileCacheStatsSchema = Type.Object(
 
 export type TileCacheStats = Static<typeof TileCacheStatsSchema>;
 
+export const TileCacheMapSetSummarySchema = Type.Object(
+  {
+    mapSetId: Type.String(),
+    logicalTileCount: Type.Integer({ minimum: 0 }),
+    currentRevisionCount: Type.Integer({ minimum: 0 }),
+    historicalRevisionCount: Type.Integer({ minimum: 0 }),
+    totalRevisionCount: Type.Integer({ minimum: 0 }),
+    snapshotCount: Type.Integer({ minimum: 0 }),
+    uniqueContentCount: Type.Integer({ minimum: 0 }),
+    totalStorageBytes: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false, $id: "TileCacheMapSetSummary" },
+);
+
+export type TileCacheMapSetSummary = Static<
+  typeof TileCacheMapSetSummarySchema
+>;
+
+export const TileCacheOverviewStatsSchema = Type.Object(
+  {
+    mapSetCount: Type.Integer({ minimum: 0 }),
+    populatedMapSetCount: Type.Integer({ minimum: 0 }),
+    stats: TileCacheStatsSchema,
+    mapSets: Type.Array(TileCacheMapSetSummarySchema),
+  },
+  { additionalProperties: false, $id: "TileCacheOverviewStats" },
+);
+
+export type TileCacheOverviewStats = Static<
+  typeof TileCacheOverviewStatsSchema
+>;
+
 export const TileCacheAuditResultSchema = Type.Object(
   {
     scannedFileCount: Type.Integer({ minimum: 0 }),
@@ -284,6 +316,27 @@ export const TileCacheAuditResultSchema = Type.Object(
 );
 
 export type TileCacheAuditResult = Static<typeof TileCacheAuditResultSchema>;
+
+export const TileCacheMapSetAuditResultSchema = Type.Composite(
+  [Type.Object({ mapSetId: Type.String() }), TileCacheAuditResultSchema],
+  { additionalProperties: false, $id: "TileCacheMapSetAuditResult" },
+);
+
+export type TileCacheMapSetAuditResult = Static<
+  typeof TileCacheMapSetAuditResultSchema
+>;
+
+export const TileCacheOverviewAuditResultSchema = Type.Object(
+  {
+    totals: TileCacheAuditResultSchema,
+    mapSets: Type.Array(TileCacheMapSetAuditResultSchema),
+  },
+  { additionalProperties: false, $id: "TileCacheOverviewAuditResult" },
+);
+
+export type TileCacheOverviewAuditResult = Static<
+  typeof TileCacheOverviewAuditResultSchema
+>;
 
 export const TileCacheRepairResultSchema = Type.Object(
   {

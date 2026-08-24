@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type {
   CacheSnapshot,
+  TileCacheMapSetSummary,
+  TileCacheOverviewStats,
   TileCacheStats,
   TileRevisionSummary,
 } from "@maptoy/contracts";
@@ -564,6 +566,182 @@ export class TileArchiveRepository {
           indexedStorageBytes: storageByZoom.get(row.zoom) ?? 0,
         };
       }),
+    };
+  }
+
+  metadataOverview(): TileCacheOverviewStats {
+    const tileRows = this.database
+      .prepare(
+        `SELECT ms.id AS map_set_id,
+                COUNT(lt.id) AS logical_count,
+                COALESCE(SUM(CASE WHEN lt.current_revision_id IS NULL THEN 0 ELSE 1 END), 0)
+                  AS current_count
+           FROM map_sets ms
+           LEFT JOIN logical_tiles lt ON lt.map_set_id = ms.id
+          GROUP BY ms.id
+          ORDER BY ms.name COLLATE NOCASE, ms.id`,
+      )
+      .all() as unknown as Array<{
+      map_set_id: string;
+      logical_count: number;
+      current_count: number;
+    }>;
+    const revisionCounts = new Map(
+      (
+        this.database
+          .prepare(
+            `SELECT lt.map_set_id, COUNT(*) AS revision_count
+               FROM tile_revisions tr
+               JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+              GROUP BY lt.map_set_id`,
+          )
+          .all() as unknown as Array<{
+          map_set_id: string;
+          revision_count: number;
+        }>
+      ).map((row) => [row.map_set_id, row.revision_count]),
+    );
+    const snapshotCounts = new Map(
+      (
+        this.database
+          .prepare(
+            `SELECT map_set_id, COUNT(*) AS snapshot_count
+               FROM cache_snapshots
+              GROUP BY map_set_id`,
+          )
+          .all() as unknown as Array<{
+          map_set_id: string;
+          snapshot_count: number;
+        }>
+      ).map((row) => [row.map_set_id, row.snapshot_count]),
+    );
+    const storageByMapSet = new Map(
+      (
+        this.database
+          .prepare(
+            `SELECT map_set_id, COUNT(*) AS content_count,
+                    COALESCE(SUM(byte_length), 0) AS bytes
+               FROM (
+                 SELECT lt.map_set_id, tr.file_path,
+                        MAX(tr.byte_length) AS byte_length
+                   FROM tile_revisions tr
+                   JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+                  GROUP BY lt.map_set_id, tr.file_path
+               )
+              GROUP BY map_set_id`,
+          )
+          .all() as unknown as Array<{
+          map_set_id: string;
+          content_count: number;
+          bytes: number;
+        }>
+      ).map((row) => [row.map_set_id, row]),
+    );
+    const logicalByZoom = this.database
+      .prepare(
+        `SELECT zoom, COUNT(*) AS logical_count,
+                SUM(CASE WHEN current_revision_id IS NULL THEN 0 ELSE 1 END) AS current_count
+           FROM logical_tiles
+          GROUP BY zoom
+          ORDER BY zoom`,
+      )
+      .all() as unknown as Array<{
+      zoom: number;
+      logical_count: number;
+      current_count: number;
+    }>;
+    const revisionsByZoom = new Map(
+      (
+        this.database
+          .prepare(
+            `SELECT lt.zoom, COUNT(*) AS revision_count
+               FROM tile_revisions tr
+               JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+              GROUP BY lt.zoom`,
+          )
+          .all() as unknown as Array<{
+          zoom: number;
+          revision_count: number;
+        }>
+      ).map((row) => [row.zoom, row.revision_count]),
+    );
+    const storageByZoom = new Map(
+      (
+        this.database
+          .prepare(
+            `SELECT zoom, COALESCE(SUM(byte_length), 0) AS bytes
+               FROM (
+                 SELECT lt.zoom, tr.file_path,
+                        MAX(tr.byte_length) AS byte_length
+                   FROM tile_revisions tr
+                   JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+                  GROUP BY lt.zoom, tr.file_path
+               )
+              GROUP BY zoom`,
+          )
+          .all() as unknown as Array<{ zoom: number; bytes: number }>
+      ).map((row) => [row.zoom, row.bytes]),
+    );
+
+    const mapSets: TileCacheMapSetSummary[] = tileRows.map((row) => {
+      const totalRevisionCount = revisionCounts.get(row.map_set_id) ?? 0;
+      const storage = storageByMapSet.get(row.map_set_id);
+      return {
+        mapSetId: row.map_set_id,
+        logicalTileCount: row.logical_count,
+        currentRevisionCount: row.current_count,
+        historicalRevisionCount: totalRevisionCount - row.current_count,
+        totalRevisionCount,
+        snapshotCount: snapshotCounts.get(row.map_set_id) ?? 0,
+        uniqueContentCount: storage?.content_count ?? 0,
+        totalStorageBytes: storage?.bytes ?? 0,
+      };
+    });
+    const totals = mapSets.reduce(
+      (result, mapSet) => ({
+        logicalTileCount: result.logicalTileCount + mapSet.logicalTileCount,
+        currentRevisionCount:
+          result.currentRevisionCount + mapSet.currentRevisionCount,
+        historicalRevisionCount:
+          result.historicalRevisionCount + mapSet.historicalRevisionCount,
+        totalRevisionCount:
+          result.totalRevisionCount + mapSet.totalRevisionCount,
+        snapshotCount: result.snapshotCount + mapSet.snapshotCount,
+        uniqueContentCount:
+          result.uniqueContentCount + mapSet.uniqueContentCount,
+        totalStorageBytes: result.totalStorageBytes + mapSet.totalStorageBytes,
+      }),
+      {
+        logicalTileCount: 0,
+        currentRevisionCount: 0,
+        historicalRevisionCount: 0,
+        totalRevisionCount: 0,
+        snapshotCount: 0,
+        uniqueContentCount: 0,
+        totalStorageBytes: 0,
+      },
+    );
+
+    return {
+      mapSetCount: mapSets.length,
+      populatedMapSetCount: mapSets.filter(
+        ({ logicalTileCount }) => logicalTileCount > 0,
+      ).length,
+      stats: {
+        ...totals,
+        zoomLevels: logicalByZoom.map((row) => {
+          const totalRevisionCount = revisionsByZoom.get(row.zoom) ?? 0;
+          return {
+            zoom: row.zoom,
+            logicalTileCount: row.logical_count,
+            currentRevisionCount: row.current_count,
+            historicalRevisionCount: totalRevisionCount - row.current_count,
+            totalRevisionCount,
+            indexedStorageBytes: storageByZoom.get(row.zoom) ?? 0,
+          };
+        }),
+      },
+      mapSets,
     };
   }
 

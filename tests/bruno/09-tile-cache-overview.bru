@@ -1,0 +1,20 @@
+meta {
+  name: Tile Cache - Overall Statistics (read only)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{appUrl}}/api/cache/stats
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns aggregate and per-Map-Set statistics", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.mapSetCount).to.be.a("number");
+    expect(res.body.stats.totalRevisionCount).to.be.a("number");
+    expect(res.body.mapSets).to.be.an("array");
+  });
+}

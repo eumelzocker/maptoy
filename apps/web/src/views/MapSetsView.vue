@@ -6,10 +6,11 @@ import {
   type MapSetTestResponse,
   type TileCacheStats,
 } from "@maptoy/contracts";
-import { nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetForm from "../components/MapSetForm.vue";
 import { apiRequest } from "../api.js";
+import { groupMapSetsByFirstNameSegment } from "../mapSetNameGroups.js";
 import { mapSetInput } from "../mapSetModels.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
@@ -26,6 +27,10 @@ const testedMapSetId = ref<string | null>(null);
 const sourceLocked = ref(false);
 const editorDirty = ref(false);
 const editorPanel = ref<HTMLElement | null>(null);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const mapSetGroups = computed(() =>
+  groupMapSetsByFirstNameSegment(store.items),
+);
 
 async function scrollEditorIntoView(): Promise<void> {
   await nextTick();
@@ -230,50 +235,85 @@ async function test(mapSet: MapSet): Promise<void> {
     <p v-if="error" class="notice error" role="alert">{{ error }}</p>
     <p v-if="store.loading" class="notice">Loading Map Sets…</p>
 
-    <section v-if="store.items.length > 0" class="map-set-list" aria-label="Map Sets">
-      <article v-for="mapSet in store.items" :key="mapSet.id" class="map-set-card">
-        <div>
-          <h2>{{ mapSet.name }}</h2>
-          <p class="source-template">{{ mapSet.urlTemplate }}</p>
-          <p class="metadata">
-            Zoom {{ mapSet.minZoom }}–{{ mapSet.maxZoom }} · {{ mapSet.tileSize }} px ·
-            {{ mapSet.rendererId }}
-            · {{ mapSet.logicalTileCount }} cached tiles
-          </p>
-          <ul class="capabilities" aria-label="Enabled capabilities">
-            <li v-if="mapSet.capabilities.interactive">Interactive</li>
-            <li v-if="mapSet.capabilities.tileArchive">Archive</li>
-            <li v-if="mapSet.capabilities.batchDownload">Batch</li>
-            <li v-if="mapSet.capabilities.serverExport">Export</li>
-          </ul>
-        </div>
-        <div class="card-actions">
-          <button
-            type="button"
-            :disabled="busy || editingId === mapSet.id"
-            @click="edit(mapSet)"
-          >
-            Edit
-          </button>
-          <button type="button" :disabled="busy" @click="test(mapSet)">Test tile</button>
-          <button type="button" :disabled="busy" @click="duplicate(mapSet)">Duplicate</button>
-          <button class="danger-button" type="button" :disabled="busy" @click="remove(mapSet)">
-            Delete
-          </button>
-        </div>
-        <p
-          v-if="testResult && testedMapSetId === mapSet.id"
-          class="test-result"
-          :class="{ failed: !testResult.ok }"
-          role="status"
-        >
-          {{ testResult.message }}
-          <span v-if="testResult.statusCode">
-            HTTP {{ testResult.statusCode }}, {{ testResult.contentType ?? "unknown type" }},
-            {{ testResult.byteLength ?? 0 }} bytes, {{ testResult.durationMilliseconds }} ms
+    <section v-if="store.items.length > 0" class="map-set-groups" aria-label="Map Sets">
+      <section
+        v-for="(group, groupIndex) in mapSetGroups"
+        :key="group.key"
+        class="map-set-group"
+        :class="{ ungrouped: group.ungrouped }"
+        :aria-labelledby="`map-set-group-${groupIndex}`"
+      >
+        <header class="group-heading">
+          <div class="group-title">
+            <i
+              class="mdi"
+              :class="group.ungrouped ? 'mdi-format-list-bulleted' : 'mdi-folder-outline'"
+              aria-hidden="true"
+            ></i>
+            <h2 :id="`map-set-group-${groupIndex}`">{{ group.label }}</h2>
+          </div>
+          <span class="group-count">
+            {{ group.items.length }} {{ group.items.length === 1 ? "Map Set" : "Map Sets" }}
           </span>
-        </p>
-      </article>
+        </header>
+
+        <div class="map-set-list">
+          <article v-for="item in group.items" :key="item.mapSet.id" class="map-set-card">
+            <div>
+              <h3 :title="item.mapSet.name">{{ item.label }}</h3>
+              <p class="source-template">{{ item.mapSet.urlTemplate }}</p>
+              <p class="metadata">
+                Zoom {{ item.mapSet.minZoom }}–{{ item.mapSet.maxZoom }} ·
+                {{ item.mapSet.tileSize }} px · {{ item.mapSet.rendererId }} ·
+                {{ item.mapSet.logicalTileCount }} cached tiles
+              </p>
+              <ul class="capabilities" aria-label="Enabled capabilities">
+                <li v-if="item.mapSet.capabilities.interactive">Interactive</li>
+                <li v-if="item.mapSet.capabilities.tileArchive">Archive</li>
+                <li v-if="item.mapSet.capabilities.batchDownload">Batch</li>
+                <li v-if="item.mapSet.capabilities.serverExport">Export</li>
+              </ul>
+            </div>
+            <div class="card-actions">
+              <button
+                type="button"
+                :disabled="busy || editingId === item.mapSet.id"
+                @click="edit(item.mapSet)"
+              >
+                Edit
+              </button>
+              <button type="button" :disabled="busy" @click="test(item.mapSet)">
+                Test tile
+              </button>
+              <button type="button" :disabled="busy" @click="duplicate(item.mapSet)">
+                Duplicate
+              </button>
+              <button
+                class="danger-button"
+                type="button"
+                :disabled="busy"
+                @click="remove(item.mapSet)"
+              >
+                Delete
+              </button>
+            </div>
+            <p
+              v-if="testResult && testedMapSetId === item.mapSet.id"
+              class="test-result"
+              :class="{ failed: !testResult.ok }"
+              role="status"
+            >
+              {{ testResult.message }}
+              <span v-if="testResult.statusCode">
+                HTTP {{ testResult.statusCode }},
+                {{ testResult.contentType ?? "unknown type" }},
+                {{ testResult.byteLength ?? 0 }} bytes,
+                {{ testResult.durationMilliseconds }} ms
+              </span>
+            </p>
+          </article>
+        </div>
+      </section>
     </section>
 
     <section v-else-if="store.loaded && !store.loading" class="empty-state">
@@ -338,9 +378,65 @@ h1 {
   font-weight: 500;
 }
 
+.map-set-groups,
 .map-set-list {
   display: grid;
+}
+
+.map-set-groups {
+  gap: 1.75rem;
+}
+
+.map-set-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.group-heading,
+.group-title {
+  display: flex;
+  align-items: center;
+}
+
+.group-heading {
+  justify-content: space-between;
   gap: 1rem;
+  padding-inline: 0.35rem;
+}
+
+.group-title {
+  min-width: 0;
+  gap: 0.55rem;
+}
+
+.group-title i {
+  color: #a34521;
+  font-size: 1.35rem;
+}
+
+.group-heading h2 {
+  margin: 0;
+  color: #243f38;
+  font-size: 1.15rem;
+  font-weight: 750;
+}
+
+.group-count {
+  flex: none;
+  color: #657971;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.map-set-list {
+  gap: 1rem;
+  padding-left: 1rem;
+  border-left: 0.2rem solid #b9cfc3;
+}
+
+.map-set-group.ungrouped .map-set-list {
+  border-left-color: #d4c9b6;
 }
 
 .map-set-card,
@@ -359,9 +455,14 @@ h1 {
   gap: 1rem;
 }
 
-.map-set-card h2,
+.map-set-card h3,
 .map-set-card p {
   margin-block: 0 0.5rem;
+}
+
+.map-set-card h3 {
+  color: #19372f;
+  font-size: 1.1rem;
 }
 
 .source-template {
@@ -481,6 +582,10 @@ button:disabled {
 
   .card-actions {
     justify-content: flex-start;
+  }
+
+  .map-set-list {
+    padding-left: 0.65rem;
   }
 }
 </style>
