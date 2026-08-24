@@ -41,10 +41,14 @@ the same host-controlled directory. maptoy does not use a Docker-managed named o
 anonymous volume for persistent application data. The directory must be writable
 by UID `1000`, which is the non-root user running the container.
 
-SQLite schema version 4 is maptoy's production baseline. New installations create
-that baseline directly, and all future numbered migrations build on it while
-preserving existing data. Versions 1 through 3 were development-only schemas and
-are not supported upgrade sources; no production database predates version 4.
+SQLite schema version 4 is maptoy's production baseline. New installations first
+create that baseline and then apply every numbered migration, including version 5's
+Tile Revision origin. Versions 1 through 3 were development-only schemas and are
+not supported upgrade sources; no production database predates version 4.
+
+`MAPTOY_MAX_TILE_BYTES` limits both provider responses and the raw body of the Tile
+seeding route. The upload limit is route-specific and does not reduce the accepted
+size of Map Set JSON or unrelated API requests.
 
 ## Traffic logs
 

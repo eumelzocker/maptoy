@@ -6,7 +6,7 @@ language: en
 
 # Tile Providers
 
-Last content review: **2026-08-23**.
+Last content review: **2026-08-24**.
 
 This page is a technical orientation, not a recommendation, legal review, or
 guarantee that a provider permits a particular use. Provider terms, plans, URLs,
@@ -28,7 +28,7 @@ the examples below use `${MAPTOY_*}` references rather than real secrets.
 | Provider | Raster XYZ fit for v1 | Archive and batch policy |
 | --- | --- | --- |
 | [OpenStreetMap Standard](https://openstreetmap.org/) | Direct | Bulk download and prefetch are prohibited; only policy-compliant interactive use and caching. [Wiki](https://wiki.openstreetmap.org/) |
-| [OpenTopoMap](https://opentopomap.org/) | Direct | Avoid mass downloads; contact the project before larger use. |
+| [OpenTopoMap](https://opentopomap.org/) | Direct; maptoy's manual development example | Credential-free low-volume development with attribution; avoid mass downloads and contact the project before larger use. |
 | [MapTiler Cloud](https://www.maptiler.com/) | Direct | Server-side proxy/cache, export, and bulk download require a custom agreement. |
 | [Mapbox](https://www.mapbox.com/) | Direct through Static Tiles API | Do not infer archival rights from HTTP cache headers; verify the current agreement for proxying, storage, export, and offline use. |
 | [Stadia Maps](https://stadiamaps.com/) | Direct | Standard terms prohibit server-side proxying/caching and general bulk download. |
@@ -73,12 +73,18 @@ coverage and maximum useful zoom vary.
 **Parameters and headers:** No API key. Provide the required OpenTopoMap and data
 attribution.
 
-**Policy notes:** Embedding is allowed as long as the community-operated server is
-not heavily loaded, especially by mass downloads. Availability is not guaranteed;
-contact the project before larger use. Treat maptoy batch jobs as unsuitable unless
-the operator has agreed to the intended load and retention.
+**Development use:** This is maptoy's documented source for manual development,
+smoke checks, screenshots, and demonstrations that need real Tiles. Configure it
+explicitly; automated tests never access public Tile services. The published usage
+notes make the map available under CC-BY-SA with attribution, so controlled
+low-volume development fits this profile without credentials.
 
-**Official information:** [Service, licence, legend, and usage notes](https://services.opentopomap.org/about)
+**Policy notes:** Availability is not guaranteed. Avoid mass downloads, broad
+pre-seeding, and load tests; contact the project before larger use. Keep maptoy batch
+download disabled unless the operator has agreed to the intended load and retention.
+The development profile is not a general legal review or an unlimited-use guarantee.
+
+**Official information:** [Service, licence, legend, and usage notes](https://opentopomap.org/about#verwendung)
 and [project source](https://github.com/der-stefan/OpenTopoMap).
 
 ## MapTiler Cloud

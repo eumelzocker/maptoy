@@ -137,8 +137,9 @@ partial output behind.
 
 ## Provider requirements
 
-A real provider is not required to execute the spike. Any later example provider
-must be reviewed and documented with at least:
+The spike and all automated tests remain independent of public providers. OpenTopoMap
+is the documented source for manual development and demonstrations that need real
+Tiles. Its provider record is reviewed and documented with at least:
 
 - an official tile/API documentation URL and current terms URL;
 - required attribution text and display rules;
@@ -149,8 +150,9 @@ must be reviewed and documented with at least:
 - the date on which the user last reviewed those rules.
 
 maptoy records these facts as technical guidance, not as a legal determination. No
-automated test may access a public tile service. A provider is not adopted as a
-bundled example until its current official documentation has been reviewed.
+automated test may access a public Tile service. The current manual development
+profile and its review date are maintained in
+[Example provider decision](./provider-example.md).
 
 ## Expected Phase 0 records
 

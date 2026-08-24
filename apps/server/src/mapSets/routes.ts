@@ -19,11 +19,14 @@ import {
   TileCacheRepairResultSchema,
   TileCacheStatsSchema,
   TileRevisionListResponseSchema,
+  TileUploadBodySchema,
+  type TileUploadResponse,
+  TileUploadResponseSchema,
 } from "@maptoy/contracts";
 import type { FastifyInstance } from "fastify";
 import { ProviderRequestError } from "../providerClient.js";
 import type { TileSelection } from "../tiles/repository.js";
-import type { TileArchiveService } from "../tiles/service.js";
+import { TileArchiveError, type TileArchiveService } from "../tiles/service.js";
 import type { MapSetService } from "./service.js";
 import { MapSetValidationError } from "./validation.js";
 
@@ -95,6 +98,7 @@ export function registerMapSetRoutes(
   server: FastifyInstance,
   service: MapSetService,
   tileArchive: TileArchiveService,
+  options: { maximumTileBytes: number },
 ): void {
   server.get(
     "/api/map-sets",
@@ -253,6 +257,71 @@ export function registerMapSetRoutes(
         }
         throw error;
       }
+    },
+  );
+
+  server.post<{
+    Params: { id: string; z: number; x: number; y: number };
+    Body: unknown;
+    Reply: TileUploadResponse;
+  }>(
+    "/api/map-sets/:id/tiles/:z/:x/:y",
+    {
+      bodyLimit: options.maximumTileBytes,
+      schema: {
+        params: tileParametersSchema,
+        body: TileUploadBodySchema,
+        response: {
+          200: TileUploadResponseSchema,
+          201: TileUploadResponseSchema,
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+          409: ErrorResponseSchema,
+          413: ErrorResponseSchema,
+          415: ErrorResponseSchema,
+          507: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const contentType = request.headers["content-type"];
+      const normalizedContentType = contentType
+        ?.split(";", 1)[0]
+        ?.trim()
+        .toLowerCase();
+      let body: Buffer | undefined;
+      if (Buffer.isBuffer(request.body)) {
+        body = request.body;
+      } else if (
+        request.body == null &&
+        normalizedContentType !== undefined &&
+        ["image/png", "image/jpeg", "image/webp"].includes(
+          normalizedContentType,
+        )
+      ) {
+        body = Buffer.alloc(0);
+      }
+      if (body === undefined) {
+        throw new TileArchiveError(
+          "TILE_MEDIA_TYPE_INVALID",
+          "The upload must use an unmodified image body with its image Content-Type.",
+          415,
+        );
+      }
+      const result = await service.uploadTile(
+        request.params.id,
+        {
+          zoom: request.params.z,
+          x: request.params.x,
+          y: request.params.y,
+        },
+        body,
+        contentType,
+      );
+      return reply
+        .code(result.created ? 201 : 200)
+        .header("x-maptoy-tile-revision", result.revisionId)
+        .send(result);
     },
   );
 

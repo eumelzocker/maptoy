@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 // 1 through 3 are intentionally not upgrade sources; append future migrations.
 const migrationFiles = [
   { version: 4, filename: "0004-initial-schema.sql" },
+  { version: 5, filename: "0005-tile-revision-origin.sql" },
 ] as const;
 
 async function loadMigrations(): Promise<

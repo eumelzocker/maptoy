@@ -4,6 +4,27 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-08-24
+
+### Added
+
+- Raw PNG, JPEG, and WebP Tile seeding through
+  `POST api/map-sets/:id/tiles/:z/:x/:y`, with shared archive validation,
+  deduplication, storage limits, and deterministic coordination with provider
+  requests.
+- Persisted `provider` or `upload` origin for every Tile Revision, including the
+  lossless schema version 5 migration of existing production-baseline data.
+- Integrated English API reference and a clearly marked Bruno write request for
+  manual Tile seeding.
+
+### Changed
+
+- Tile cache and provider documentation now covers external seeding, its
+  unauthenticated trusted-network boundary, and OpenTopoMap as the manual
+  development example without requiring a standalone local Tile server.
+- The project plan now records the actual `0.0.x` release sequence, completed and
+  remaining phase scope, and the reduced set of unresolved v1 decisions.
+
 ## [0.0.6] - 2026-08-24
 
 ### Added

@@ -5,6 +5,7 @@ import type {
   TileCacheMapSetSummary,
   TileCacheOverviewStats,
   TileCacheStats,
+  TileRevisionOrigin,
   TileRevisionSummary,
 } from "@maptoy/contracts";
 
@@ -34,6 +35,7 @@ interface TileRevisionRow {
   last_validated_at: string;
   selected_from: string;
   selected_until: string | null;
+  origin: TileRevisionOrigin;
   current: number;
 }
 
@@ -81,6 +83,7 @@ function tileFromRow(row: TileRevisionRow): StoredTileRevision {
     lastValidatedAt: row.last_validated_at,
     selectedFrom: row.selected_from,
     selectedUntil: row.selected_until,
+    origin: row.origin,
     current: row.current === 1,
   };
 }
@@ -99,7 +102,7 @@ const tileColumns = `
   tr.id, tr.logical_tile_id, lt.zoom, lt.tile_x, lt.tile_y,
   tr.content_hash, tr.file_path, tr.content_type, tr.byte_length, tr.etag,
   tr.last_modified, tr.first_seen_at, tr.last_seen_at, tr.last_validated_at,
-  tr.selected_from, tr.selected_until,
+  tr.selected_from, tr.selected_until, tr.origin,
   CASE WHEN lt.current_revision_id = tr.id THEN 1 ELSE 0 END AS current
 `;
 
@@ -215,6 +218,7 @@ export class TileArchiveRepository {
     etag: string | null;
     lastModified: string | null;
     timestamp: string;
+    origin: TileRevisionOrigin;
   }): { revision: StoredTileRevision; created: boolean } {
     this.database.exec("BEGIN IMMEDIATE;");
     try {
@@ -246,19 +250,31 @@ export class TileArchiveRepository {
           ? undefined
           : this.revisionById(logical.current_revision_id);
       if (current?.contentHash === input.contentHash) {
-        this.database
-          .prepare(
-            `UPDATE tile_revisions
-                SET last_seen_at = ?, last_validated_at = ?, etag = ?, last_modified = ?
-              WHERE id = ?`,
-          )
-          .run(
-            input.timestamp,
-            input.timestamp,
-            input.etag,
-            input.lastModified,
-            current.id,
-          );
+        if (input.origin === "provider") {
+          this.database
+            .prepare(
+              `UPDATE tile_revisions
+                  SET last_seen_at = ?, last_validated_at = ?, etag = ?, last_modified = ?
+                WHERE id = ?`,
+            )
+            .run(
+              input.timestamp,
+              input.timestamp,
+              input.etag,
+              input.lastModified,
+              current.id,
+            );
+        } else {
+          // An identical upload observes the existing revision; it must not
+          // rewrite that revision's creation origin or provider validators.
+          this.database
+            .prepare(
+              `UPDATE tile_revisions
+                  SET last_seen_at = ?, last_validated_at = ?
+                WHERE id = ?`,
+            )
+            .run(input.timestamp, input.timestamp, current.id);
+        }
         this.database.exec("COMMIT;");
         const updated = this.revisionById(current.id);
         if (updated === undefined) {
@@ -278,8 +294,8 @@ export class TileArchiveRepository {
           `INSERT INTO tile_revisions (
              id, logical_tile_id, content_hash, file_path, content_type, byte_length,
              etag, last_modified, first_seen_at, last_seen_at, last_validated_at,
-             selected_from, selected_until, validation_status
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'valid')`,
+             selected_from, selected_until, validation_status, origin
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'valid', ?)`,
         )
         .run(
           revisionId,
@@ -294,6 +310,7 @@ export class TileArchiveRepository {
           input.timestamp,
           input.timestamp,
           input.timestamp,
+          input.origin,
         );
       this.database
         .prepare(

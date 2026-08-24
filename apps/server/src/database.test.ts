@@ -1,6 +1,7 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "./database.js";
 
@@ -15,7 +16,7 @@ afterEach(async () => {
 });
 
 describe("database migrations", () => {
-  it("creates the current schema from the version 4 baseline", async () => {
+  it("creates the current schema from the production baseline", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "maptoy-db-test-"));
     temporaryDirectories.push(directory);
     const databasePath = path.join(directory, "nested", "maptoy.sqlite");
@@ -23,7 +24,7 @@ describe("database migrations", () => {
     const database = await openDatabase(databasePath);
     expect(
       database.sqlite.prepare("SELECT version FROM schema_migrations").all(),
-    ).toEqual([{ version: 4 }]);
+    ).toEqual([{ version: 4 }, { version: 5 }]);
     expect(
       database.sqlite
         .prepare(
@@ -45,16 +46,40 @@ describe("database migrations", () => {
         .all()
         .map((column) => (column as { name: string }).name),
     ).not.toContain("source_revision_id");
+    expect(
+      database.sqlite
+        .prepare("PRAGMA table_info(tile_revisions)")
+        .all()
+        .map((column) => (column as { name: string }).name),
+    ).toContain("origin");
     database.close();
   });
 
-  it("reopens an existing version 4 database without rerunning the baseline", async () => {
+  it("migrates existing version 4 data to provider revisions", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "maptoy-db-v4-test-"));
     temporaryDirectories.push(directory);
     const databasePath = path.join(directory, "maptoy.sqlite");
 
-    const first = await openDatabase(databasePath);
-    first.sqlite
+    const baseline = new DatabaseSync(databasePath);
+    baseline.exec("PRAGMA foreign_keys = ON;");
+    baseline.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      ) STRICT;
+    `);
+    baseline.exec(
+      await readFile(
+        new URL("../migrations/0004-initial-schema.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    baseline
+      .prepare(
+        "INSERT INTO schema_migrations(version, applied_at) VALUES (4, ?)",
+      )
+      .run("2026-08-22T00:00:00.000Z");
+    baseline
       .prepare(
         `INSERT INTO map_sets (
           id, name, source_type, url_template, attribution, terms_url, notes,
@@ -92,19 +117,52 @@ describe("database migrations", () => {
         "2026-08-24T00:00:00.000Z",
         "2026-08-24T00:00:00.000Z",
       );
-    first.close();
+    baseline
+      .prepare(
+        `INSERT INTO logical_tiles (
+          id, map_set_id, zoom, tile_x, tile_y, current_revision_id
+        ) VALUES (1, ?, 2, 2, 1, ?)`,
+      )
+      .run(
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+      );
+    baseline
+      .prepare(
+        `INSERT INTO tile_revisions (
+          id, logical_tile_id, content_hash, file_path, content_type,
+          byte_length, etag, last_modified, first_seen_at, last_seen_at,
+          last_validated_at, selected_from, selected_until, validation_status
+        ) VALUES (?, 1, ?, ?, 'image/png', 8, NULL, NULL, ?, ?, ?, ?, NULL, 'valid')`,
+      )
+      .run(
+        "00000000-0000-4000-8000-000000000002",
+        "baseline-hash",
+        "tiles/00000000-0000-4000-8000-000000000001/2/2/1.baseline-hash.png",
+        "2026-08-24T00:00:00.000Z",
+        "2026-08-24T00:00:00.000Z",
+        "2026-08-24T00:00:00.000Z",
+        "2026-08-24T00:00:00.000Z",
+      );
+    baseline.close();
 
     const reopened = await openDatabase(databasePath);
     expect(
       reopened.sqlite
         .prepare("SELECT version FROM schema_migrations ORDER BY version")
         .all(),
-    ).toEqual([{ version: 4 }]);
+    ).toEqual([{ version: 4 }, { version: 5 }]);
     expect(
       reopened.sqlite
         .prepare("SELECT name FROM map_sets WHERE id = ?")
         .get("00000000-0000-4000-8000-000000000001"),
     ).toEqual({ name: "Preserved Map Set" });
+    expect(
+      reopened.sqlite.prepare("SELECT id, origin FROM tile_revisions").get(),
+    ).toEqual({
+      id: "00000000-0000-4000-8000-000000000002",
+      origin: "provider",
+    });
     reopened.assertReady();
     reopened.close();
   });

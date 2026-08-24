@@ -11,8 +11,10 @@ async function documentationPage(
   page:
     | "abbreviations"
     | "glossary"
+    | "api-reference"
     | "map-projections"
     | "map-sets"
+    | "tile-cache"
     | "tile-providers",
 ): Promise<string> {
   return readFile(`${documentationRoot}/${language}/${page}.md`, "utf8");
@@ -44,6 +46,18 @@ describe("glossary documentation", () => {
       expect(glossary).toContain("## Web Mercator");
     },
   );
+
+  it("documents the binary Tile upload contract and security boundary", async () => {
+    const apiReference = await documentationPage("en", "api-reference");
+    const tileCache = await documentationPage("en", "tile-cache");
+
+    expect(apiReference).toContain("POST api/map-sets/:id/tiles/:z/:x/:y");
+    expect(apiReference).toContain("TILE_BODY_TOO_LARGE");
+    expect(apiReference).toContain("does not authenticate API requests");
+    expect(tileCache).toContain("MAPTOY_MAX_TILE_BYTES");
+    expect(tileCache).toContain("origin `upload`");
+    expect(tileCache).toContain("reverse proxy must authenticate");
+  });
 
   it.each(["en", "de"])(
     "provides a localized tile-provider reference for %s",

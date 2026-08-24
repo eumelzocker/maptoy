@@ -4,6 +4,7 @@ import type {
   MapSetInput,
   MapSetPatch,
   MapSetTestResponse,
+  TileUploadResponse,
 } from "@maptoy/contracts";
 import { mapSetInputValidationErrors } from "@maptoy/contracts";
 import { wgs84ToXyz } from "@maptoy/map-core";
@@ -86,6 +87,7 @@ export class MapSetService {
     private readonly options: {
       allowPrivateTileHosts: boolean;
       environment: NodeJS.ProcessEnv;
+      maximumTileBytes: number;
     },
   ) {}
 
@@ -196,6 +198,31 @@ export class MapSetService {
     },
   ): Promise<ArchivedTileResponse> {
     const mapSet = this.get(id);
+    this.validateTileCoordinate(mapSet, tile);
+    return this.tileArchive.tile(mapSet, tile, options, (additionalHeaders) =>
+      this.requestTile(mapSet, tile, additionalHeaders),
+    );
+  }
+
+  async uploadTile(
+    id: string,
+    tile: { zoom: number; x: number; y: number },
+    body: Buffer,
+    contentType: string | undefined,
+  ): Promise<TileUploadResponse> {
+    const mapSet = this.get(id);
+    this.validateTileCoordinate(mapSet, tile);
+    return this.tileArchive.upload(mapSet, tile, {
+      body,
+      contentType,
+      maximumTileBytes: this.options.maximumTileBytes,
+    });
+  }
+
+  private validateTileCoordinate(
+    mapSet: MapSet,
+    tile: { zoom: number; x: number; y: number },
+  ): void {
     if (tile.zoom < mapSet.minZoom || tile.zoom > mapSet.maxZoom) {
       throw new MapSetValidationError(
         "The requested tile zoom is outside the Map Set zoom range.",
@@ -207,9 +234,6 @@ export class MapSetService {
         "The requested XYZ tile is out of range.",
       );
     }
-    return this.tileArchive.tile(mapSet, tile, options, (additionalHeaders) =>
-      this.requestTile(mapSet, tile, additionalHeaders),
-    );
   }
 
   private requestTile(

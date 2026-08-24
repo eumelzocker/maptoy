@@ -74,6 +74,176 @@ afterEach(async () => {
 });
 
 describe("TileArchiveService", () => {
+  it("seeds immutable upload revisions and serves them without a provider request", async () => {
+    let now = new Date("2026-08-24T08:00:00.000Z");
+    const { mapSet, repository, service } = await fixture(() => now);
+    const tile = { zoom: 3, x: 4, y: 2 };
+    const bodyA = png("upload-a");
+    const bodyB = png("upload-b");
+
+    const first = await service.upload(mapSet, tile, {
+      body: bodyA,
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+    });
+    expect(first.created).toBe(true);
+    expect(repository.revisionById(first.revisionId)).toMatchObject({
+      origin: "upload",
+      etag: null,
+      lastModified: null,
+    });
+
+    const requestProvider = vi.fn(async () => response(png("provider")));
+    expect(
+      (
+        await service.tile(
+          mapSet,
+          tile,
+          { refresh: "auto", selection: { kind: "current" } },
+          requestProvider,
+        )
+      ).body,
+    ).toEqual(bodyA);
+    expect(
+      (
+        await service.tile(
+          mapSet,
+          tile,
+          { refresh: "cache-only", selection: { kind: "current" } },
+          requestProvider,
+        )
+      ).body,
+    ).toEqual(bodyA);
+    expect(requestProvider).not.toHaveBeenCalled();
+
+    now = new Date("2026-08-24T08:00:01.000Z");
+    const identical = await service.upload(mapSet, tile, {
+      body: bodyA,
+      contentType: "image/png; charset=binary",
+      maximumTileBytes: 1024,
+    });
+    expect(identical).toEqual({ revisionId: first.revisionId, created: false });
+    expect(repository.revisionById(first.revisionId)).toMatchObject({
+      firstSeenAt: "2026-08-24T08:00:00.000Z",
+      lastSeenAt: "2026-08-24T08:00:01.000Z",
+      origin: "upload",
+    });
+
+    now = new Date("2026-08-24T08:00:02.000Z");
+    const second = await service.upload(mapSet, tile, {
+      body: bodyB,
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+    });
+    now = new Date("2026-08-24T08:00:03.000Z");
+    const third = await service.upload(mapSet, tile, {
+      body: bodyA,
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+    });
+    expect(second.created).toBe(true);
+    expect(third.created).toBe(true);
+    const revisions = service.listRevisions(mapSet.id);
+    expect(revisions).toHaveLength(3);
+    expect(revisions.every(({ origin }) => origin === "upload")).toBe(true);
+    expect(repository.revisionById(first.revisionId)?.filePath).toBe(
+      repository.revisionById(third.revisionId)?.filePath,
+    );
+    expect(service.stats(mapSet.id)).toMatchObject({
+      totalRevisionCount: 3,
+      uniqueContentCount: 2,
+      totalStorageBytes: bodyA.byteLength + bodyB.byteLength,
+    });
+  });
+
+  it("serializes provider writes and uploads for the same logical tile", async () => {
+    const now = new Date("2026-08-24T09:00:00.000Z");
+    const { mapSet, service } = await fixture(() => now);
+    const tile = { zoom: 3, x: 4, y: 2 };
+    let resolveProvider: ((value: ProviderResponse) => void) | undefined;
+    const provider = service.tile(
+      mapSet,
+      tile,
+      { refresh: "force", selection: { kind: "current" } },
+      () =>
+        new Promise<ProviderResponse>((resolve) => {
+          resolveProvider = resolve;
+        }),
+    );
+    const upload = service.upload(mapSet, tile, {
+      body: png("upload-after-provider"),
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+    });
+
+    resolveProvider?.(response(png("provider-first")));
+    await provider;
+    const uploaded = await upload;
+
+    expect(uploaded.created).toBe(true);
+    expect(service.listRevisions(mapSet.id)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ origin: "upload", current: true }),
+        expect.objectContaining({ origin: "provider", current: false }),
+      ]),
+    );
+  });
+
+  it("rejects upload policy, media, content, body, and storage violations without metadata", async () => {
+    const now = new Date("2026-08-24T10:00:00.000Z");
+    const { mapSet, service, storage } = await fixture(() => now);
+    const tile = { zoom: 2, x: 2, y: 1 };
+
+    await expect(
+      service.upload(mapSet, tile, {
+        body: png("wrong-media"),
+        contentType: "image/jpeg",
+        maximumTileBytes: 1024,
+      }),
+    ).rejects.toMatchObject({
+      code: "TILE_MEDIA_TYPE_INVALID",
+      statusCode: 415,
+    });
+    await expect(
+      service.upload(mapSet, tile, {
+        body: Buffer.from("not-a-png"),
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      }),
+    ).rejects.toMatchObject({ code: "TILE_CONTENT_INVALID", statusCode: 400 });
+    await expect(
+      service.upload(mapSet, tile, {
+        body: png("too-large"),
+        contentType: "image/png",
+        maximumTileBytes: 1,
+      }),
+    ).rejects.toMatchObject({ code: "TILE_BODY_TOO_LARGE", statusCode: 413 });
+
+    mapSet.cachePolicy.maximumStorageBytes = 1;
+    await expect(
+      service.upload(mapSet, tile, {
+        body: png("no-space"),
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      }),
+    ).rejects.toMatchObject({ code: "TILE_STORAGE_LIMIT", statusCode: 507 });
+    mapSet.cachePolicy.enabled = false;
+    await expect(
+      service.upload(mapSet, tile, {
+        body: png("disabled"),
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      }),
+    ).rejects.toMatchObject({ code: "TILE_ARCHIVE_DISABLED", statusCode: 409 });
+
+    expect(service.stats(mapSet.id)).toMatchObject({
+      logicalTileCount: 0,
+      totalRevisionCount: 0,
+      totalStorageBytes: 0,
+    });
+    expect(await storage.listMapSetFiles(mapSet.id)).toEqual([]);
+  });
+
   it("preserves revisions, reuses content, validates conditionally, and serves selections", async () => {
     let now = new Date("2026-08-21T10:00:00.000Z");
     const { mapSet, repository, service, storage } = await fixture(() => now);

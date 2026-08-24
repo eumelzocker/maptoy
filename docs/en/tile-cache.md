@@ -26,11 +26,55 @@ The API accepts the mode as `?refresh=auto`, `?refresh=force`, or
 `?refresh=cache-only`. Concurrent requests for the same uncached logical tile share
 one provider request.
 
+## External Tile seeding
+
+Trusted API clients can seed one logical Tile without contacting its configured
+provider:
+
+```sh
+curl --request POST \
+  --header 'Content-Type: image/png' \
+  --data-binary '@tile.png' \
+  "$MAPTOY_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
+```
+
+The request body is the unmodified PNG, JPEG, or WebP file; this endpoint does not
+use multipart encoding. Its media type and file signature must match the Map Set's
+configured Tile format. Coordinates must be inside the Map Set's zoom and XYZ
+bounds, its Tile Archive capability and cache policy must be enabled, and both
+`MAPTOY_MAX_TILE_BYTES` and the Map Set storage limit apply.
+
+A new immutable revision returns `201` and
+`{ "revisionId": "...", "created": true }`. Uploading bytes equal to the current
+revision returns `200` with `created: false`, updates only its observation times,
+and consumes no additional storage. Uploaded revisions have origin `upload`; later
+normal and `cache-only` reads return those exact bytes without contacting the
+provider while the revision is fresh.
+
+Upload errors use these contracts:
+
+- `415 TILE_MEDIA_TYPE_INVALID` for a missing, unsupported, or Map-Set-mismatched
+  Content-Type.
+- `400 TILE_CONTENT_INVALID` when the bytes do not have the configured image
+  signature.
+- `409 TILE_ARCHIVE_DISABLED` when archival capability or cache policy is disabled.
+- `413 TILE_BODY_TOO_LARGE` when the route-specific `MAPTOY_MAX_TILE_BYTES` limit is
+  exceeded.
+- `507 TILE_STORAGE_LIMIT` when the Map Set's storage limit would be exceeded.
+
+maptoy v1 has no application authentication. This write endpoint is intended only
+for trusted private clients. If maptoy is reachable over an untrusted network, the
+reverse proxy must authenticate and authorize access; do not publish the upload
+route without such protection. The operator remains responsible for ensuring that
+seeded bytes belong to the configured source and may lawfully be stored.
+
 ## Immutable revisions
 
 New bytes create a revision addressed by their SHA-256 hash. Earlier revisions are
 not overwritten. If provider content changes from A to B and later back to A,
 maptoy records three temporal revisions while reusing the original A file.
+Each revision also records whether its creating bytes came from the `provider` or
+an API `upload`.
 
 Files use this layout:
 

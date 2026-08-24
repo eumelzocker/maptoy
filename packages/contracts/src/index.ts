@@ -180,6 +180,13 @@ export const TileRefreshModeSchema = Type.Union([
 
 export type TileRefreshMode = Static<typeof TileRefreshModeSchema>;
 
+export const TileRevisionOriginSchema = Type.Union([
+  Type.Literal("provider"),
+  Type.Literal("upload"),
+]);
+
+export type TileRevisionOrigin = Static<typeof TileRevisionOriginSchema>;
+
 export const TileRevisionSummarySchema = Type.Object(
   {
     id: Type.String(),
@@ -192,6 +199,7 @@ export const TileRevisionSummarySchema = Type.Object(
     firstSeenAt: Type.String(),
     lastSeenAt: Type.String(),
     lastValidatedAt: Type.String(),
+    origin: TileRevisionOriginSchema,
     current: Type.Boolean(),
   },
   { additionalProperties: false, $id: "TileRevisionSummary" },
@@ -211,6 +219,23 @@ export const TileRevisionListResponseSchema = Type.Object(
 export type TileRevisionListResponse = Static<
   typeof TileRevisionListResponseSchema
 >;
+
+export const TileUploadBodySchema = Type.Unsafe<unknown>({
+  anyOf: [{ type: "string", format: "binary" }, { type: "object" }],
+  description:
+    "Unmodified PNG, JPEG, or WebP tile bytes with the matching image Content-Type.",
+  $id: "TileUploadBody",
+});
+
+export const TileUploadResponseSchema = Type.Object(
+  {
+    revisionId: Type.String(),
+    created: Type.Boolean(),
+  },
+  { additionalProperties: false, $id: "TileUploadResponse" },
+);
+
+export type TileUploadResponse = Static<typeof TileUploadResponseSchema>;
 
 export const CacheSnapshotCreateInputSchema = Type.Object(
   { name: Type.String({ minLength: 1, maxLength: 120 }) },

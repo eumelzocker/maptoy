@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MaptoyConfig } from "@maptoy/config";
 import { createDefaultMapSetInput } from "@maptoy/contracts";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderClient } from "./providerClient.js";
 import { buildServer } from "./server.js";
 
@@ -386,6 +386,187 @@ describe("maptoy server", () => {
       }),
     ).toMatchObject({ statusCode: 404 });
     await restarted.close();
+  });
+
+  it("accepts bounded raw Tile uploads and exposes their revision origin", async () => {
+    const config = await testConfig();
+    config.maximumTileBytes = validPng.byteLength;
+    const requestProvider = vi.fn(async () => ({
+      statusCode: 200,
+      headers: { "content-type": "image/png" },
+      body: Buffer.concat([validPng, Buffer.from("provider")]),
+    }));
+    const server = await buildServer({
+      config,
+      providerClient: { request: requestProvider },
+      serveWeb: false,
+    });
+    const createdMapSet = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        urlTemplate: "http://tiles.example.test/{z}/{x}/{y}.png",
+      },
+    });
+    const mapSetId = createdMapSet.json().id as string;
+    const tileUrl = `/api/map-sets/${mapSetId}/tiles/2/2/1`;
+
+    const seeded = await server.inject({
+      method: "POST",
+      url: tileUrl,
+      headers: { "content-type": "image/png" },
+      payload: validPng,
+    });
+    expect(seeded.statusCode).toBe(201);
+    expect(seeded.json()).toMatchObject({ created: true });
+    expect(seeded.headers["x-maptoy-tile-revision"]).toBe(
+      seeded.json().revisionId,
+    );
+
+    const lockedSource = await server.inject({
+      method: "PATCH",
+      url: `/api/map-sets/${mapSetId}`,
+      payload: {
+        urlTemplate: "http://other.example.test/{z}/{x}/{y}.png",
+      },
+    });
+    expect(lockedSource).toMatchObject({ statusCode: 409 });
+    expect(lockedSource.json()).toMatchObject({
+      error: { code: "MAP_SET_SOURCE_LOCKED" },
+    });
+
+    const normalRead = await server.inject({ method: "GET", url: tileUrl });
+    const cacheOnlyRead = await server.inject({
+      method: "GET",
+      url: `${tileUrl}?refresh=cache-only`,
+    });
+    expect(normalRead.rawPayload).toEqual(validPng);
+    expect(cacheOnlyRead.rawPayload).toEqual(validPng);
+    expect(requestProvider).not.toHaveBeenCalled();
+
+    const identical = await server.inject({
+      method: "POST",
+      url: tileUrl,
+      headers: { "content-type": "image/png" },
+      payload: validPng,
+    });
+    expect(identical.statusCode).toBe(200);
+    expect(identical.json()).toEqual({
+      revisionId: seeded.json().revisionId,
+      created: false,
+    });
+
+    const wrongMediaType = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/jpeg" },
+      payload: validPng,
+    });
+    expect(wrongMediaType).toMatchObject({ statusCode: 415 });
+    expect(wrongMediaType.json()).toMatchObject({
+      error: { code: "TILE_MEDIA_TYPE_INVALID" },
+    });
+
+    const invalidContent = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/png" },
+      payload: Buffer.alloc(validPng.byteLength),
+    });
+    expect(invalidContent).toMatchObject({ statusCode: 400 });
+    expect(invalidContent.json()).toMatchObject({
+      error: { code: "TILE_CONTENT_INVALID" },
+    });
+
+    const emptyContent = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/png" },
+      payload: Buffer.alloc(0),
+    });
+    expect(emptyContent).toMatchObject({ statusCode: 400 });
+    expect(emptyContent.json()).toMatchObject({
+      error: { code: "TILE_CONTENT_INVALID" },
+    });
+
+    const tooLarge = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/png" },
+      payload: Buffer.concat([validPng, Buffer.from([0])]),
+    });
+    expect(tooLarge).toMatchObject({ statusCode: 413 });
+    expect(tooLarge.json()).toMatchObject({
+      error: { code: "TILE_BODY_TOO_LARGE" },
+    });
+
+    const revisions = await server.inject({
+      method: "GET",
+      url: `/api/map-sets/${mapSetId}/tile-revisions`,
+    });
+    expect(revisions.json()).toMatchObject({
+      total: 1,
+      items: [{ id: seeded.json().revisionId, origin: "upload" }],
+    });
+
+    const constrained = await server.inject({
+      method: "PATCH",
+      url: `/api/map-sets/${mapSetId}`,
+      payload: {
+        cachePolicy: {
+          enabled: true,
+          maximumAgeSeconds: 604_800,
+          maximumStorageBytes: 1,
+        },
+      },
+    });
+    expect(constrained.statusCode).toBe(200);
+    const storageLimited = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/png" },
+      payload: validPng,
+    });
+    expect(storageLimited).toMatchObject({ statusCode: 507 });
+    expect(storageLimited.json()).toMatchObject({
+      error: { code: "TILE_STORAGE_LIMIT" },
+    });
+    const unchangedStats = await server.inject({
+      method: "GET",
+      url: `/api/map-sets/${mapSetId}/cache/stats`,
+    });
+    expect(unchangedStats.json()).toMatchObject({
+      logicalTileCount: 1,
+      totalRevisionCount: 1,
+      totalStorageBytes: validPng.byteLength,
+    });
+
+    const disabledMapSet = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        urlTemplate: "http://tiles.example.test/{z}/{x}/{y}.png",
+        cachePolicy: {
+          enabled: false,
+          maximumAgeSeconds: 60,
+          maximumStorageBytes: null,
+        },
+      },
+    });
+    const archiveDisabled = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${disabledMapSet.json().id}/tiles/2/2/1`,
+      headers: { "content-type": "image/png" },
+      payload: validPng,
+    });
+    expect(archiveDisabled).toMatchObject({ statusCode: 409 });
+    expect(archiveDisabled.json()).toMatchObject({
+      error: { code: "TILE_ARCHIVE_DISABLED" },
+    });
+
+    await server.close();
   });
 
   it("uses a route-relative base for clean SPA routes and assets", async () => {

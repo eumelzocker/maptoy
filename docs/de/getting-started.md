@@ -30,10 +30,14 @@ Verzeichnis muss für UID `1000`, den nicht privilegierten Containerbenutzer,
 beschreibbar sein.
 
 SQLite-Schema-Version 4 ist die produktive Baseline von maptoy. Neue Installationen
-legen diese Baseline direkt an; alle künftigen nummerierten Migrationen bauen
-darauf auf und erhalten vorhandene Daten. Die Versionen 1 bis 3 waren ausschließlich
-Entwicklungsschemas und sind keine unterstützten Upgradequellen; produktive
-Datenbanken vor Version 4 existieren nicht.
+legen zuerst diese Baseline an und wenden danach jede nummerierte Migration an,
+einschließlich der Revisionsherkunft aus Version 5. Die Versionen 1 bis 3 waren
+ausschließlich Entwicklungsschemas und sind keine unterstützten Upgradequellen;
+produktive Datenbanken vor Version 4 existieren nicht.
+
+`MAPTOY_MAX_TILE_BYTES` begrenzt sowohl Providerantworten als auch den Raw-Body der
+Tile-Seeding-Route. Das Uploadlimit gilt routenspezifisch und verkleinert nicht die
+zulässige Größe von Map-Set-JSON oder anderen API-Requests.
 
 ## Traffic-Logs
 

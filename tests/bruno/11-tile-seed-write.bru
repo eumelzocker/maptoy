@@ -1,0 +1,27 @@
+meta {
+  name: Tile Cache - Seed Tile (writes data)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/tiles/0/0/0
+  body: file
+  auth: none
+}
+
+headers {
+  Content-Type: image/png
+}
+
+body:file {
+  file: @file({{tileFile}}) @contentType(image/png)
+}
+
+tests {
+  test("creates or observes one Tile Revision", function() {
+    expect(res.status).to.be.oneOf([200, 201]);
+    expect(res.body.revisionId).to.be.a("string");
+    expect(res.body.created).to.be.a("boolean");
+  });
+}

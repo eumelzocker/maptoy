@@ -6,7 +6,7 @@ language: de
 
 # Tile-Provider
 
-Letzte inhaltliche Prüfung: **2026-08-23**.
+Letzte inhaltliche Prüfung: **2026-08-24**.
 
 Diese Seite dient der technischen Orientierung. Sie ist weder Empfehlung noch
 Rechtsprüfung oder Garantie dafür, dass ein Provider eine bestimmte Nutzung erlaubt.
@@ -30,7 +30,7 @@ Secrets.
 | Provider | Technische Raster-XYZ-Eignung für v1 | Archiv- und Batch-Regeln |
 | --- | --- | --- |
 | [OpenStreetMap Standard](https://openstreetmap.org/) | Direkt | Bulk-Download und Prefetch sind verboten; nur policykonforme interaktive Nutzung und Zwischenspeicherung. [Wiki](https://wiki.openstreetmap.org/wiki/DE:Hauptseite) |
-| [OpenTopoMap](https://opentopomap.org/) | Direkt | Massendownloads vermeiden; vor größerer Nutzung das Projekt kontaktieren. |
+| [OpenTopoMap](https://opentopomap.org/) | Direkt; maptoys manuelle Entwicklungsquelle | Entwicklung mit geringem Volumen ohne Zugangsdaten und mit Attribution; Massendownloads vermeiden und vor größerer Nutzung das Projekt kontaktieren. |
 | [MapTiler Cloud](https://www.maptiler.com/) | Direkt | Serverseitiger Proxy/Cache, Export und Bulk-Download benötigen eine individuelle Vereinbarung. |
 | [Mapbox](https://www.mapbox.com/) | Direkt über die Static Tiles API | Aus HTTP-Cache-Headern keine Archivrechte ableiten; aktuelle Vereinbarung zu Proxy, Speicherung, Export und Offline-Nutzung prüfen. |
 | [Stadia Maps](https://stadiamaps.com/) | Direkt | Standardbedingungen verbieten serverseitigen Proxy/Cache und allgemeinen Bulk-Download. |
@@ -76,13 +76,20 @@ Schummerung; Abdeckung und sinnvoll nutzbare maximale Zoomstufe können variiere
 **Parameter und Header:** Kein API-Schlüssel. Die vorgeschriebene Attribution für
 OpenTopoMap und die Datenquellen anzeigen.
 
-**Policy:** Einbindung ist zulässig, solange der gemeinschaftlich betriebene Server
-nicht stark belastet wird, insbesondere nicht durch Massendownloads. Es gibt keine
-Verfügbarkeitsgarantie; vor größerer Nutzung soll das Projekt kontaktiert werden.
-maptoy-Batch-Jobs sind ungeeignet, solange der Betreiber Last und Aufbewahrung nicht
-zugestimmt hat.
+**Entwicklungsnutzung:** Dies ist maptoys dokumentierte Quelle für manuelle
+Entwicklung, Smoke-Checks, Screenshots und Demos, die echte Tiles benötigen. Sie
+wird ausdrücklich konfiguriert; automatisierte Tests greifen nie auf öffentliche
+Tile-Dienste zu. Die veröffentlichten Nutzungshinweise stellen die Karte mit
+Attribution unter CC-BY-SA bereit. Damit passt eine kontrollierte Entwicklung mit
+geringem Volumen ohne Zugangsdaten zu diesem Profil.
 
-**Offizielle Informationen:** [Dienst, Lizenz, Legende und Nutzungshinweise](https://services.opentopomap.org/about)
+**Policy:** Es gibt keine Verfügbarkeitsgarantie. Massendownloads, großflächiges
+Pre-Seeding und Lasttests sind zu vermeiden; vor größerer Nutzung soll das Projekt
+kontaktiert werden. maptoy-Batch-Downloads bleiben deaktiviert, solange der Betreiber
+Last und Aufbewahrung nicht zugestimmt hat. Das Entwicklungsprofil ist weder eine
+allgemeine Rechtsprüfung noch eine Garantie für unbegrenzte Nutzung.
+
+**Offizielle Informationen:** [Dienst, Lizenz, Legende und Nutzungshinweise](https://opentopomap.org/about#verwendung)
 und [Projektquellcode](https://github.com/der-stefan/OpenTopoMap).
 
 ## MapTiler Cloud

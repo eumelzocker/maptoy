@@ -27,12 +27,58 @@ Die API erhält den Modus als `?refresh=auto`, `?refresh=force` oder
 `?refresh=cache-only`. Parallele Abrufe desselben noch nicht gespeicherten logischen
 Tiles teilen sich einen Provider-Request.
 
+## Externes Tile-Seeding
+
+Vertrauenswürdige API-Clients können ein logisches Tile einspielen, ohne dessen
+konfigurierten Provider zu kontaktieren:
+
+```sh
+curl --request POST \
+  --header 'Content-Type: image/png' \
+  --data-binary '@tile.png' \
+  "$MAPTOY_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
+```
+
+Der Request-Body ist die unveränderte PNG-, JPEG- oder WebP-Datei; dieser Endpunkt
+verwendet kein Multipart. Media-Type und Dateisignatur müssen zum konfigurierten
+Tile-Format des Map Sets passen. Koordinaten müssen innerhalb der Zoom- und
+XYZ-Grenzen liegen, Tile-Archiv-Capability und Cache-Policy müssen aktiv sein und
+sowohl `MAPTOY_MAX_TILE_BYTES` als auch das Speicherlimit des Map Sets gelten.
+
+Eine neue unveränderliche Revision antwortet mit `201` und
+`{ "revisionId": "...", "created": true }`. Entsprechen die Bytes der aktuellen
+Revision, lautet die Antwort `200` mit `created: false`; nur die Sichtungszeitpunkte
+werden aktualisiert und es wird kein zusätzlicher Speicher belegt. Hochgeladene
+Revisionen tragen die Herkunft `upload`. Normale und `cache-only`-Abrufe liefern
+anschließend exakt diese Bytes ohne Providerkontakt, solange die Revision frisch ist.
+
+Für Uploadfehler gelten folgende Verträge:
+
+- `415 TILE_MEDIA_TYPE_INVALID` bei fehlendem, nicht unterstütztem oder nicht zum
+  Map Set passendem Content-Type.
+- `400 TILE_CONTENT_INVALID`, wenn die Bytes nicht die konfigurierte Bildsignatur
+  besitzen.
+- `409 TILE_ARCHIVE_DISABLED`, wenn Archiv-Capability oder Cache-Policy deaktiviert
+  ist.
+- `413 TILE_BODY_TOO_LARGE` beim Überschreiten des routenspezifischen Limits
+  `MAPTOY_MAX_TILE_BYTES`.
+- `507 TILE_STORAGE_LIMIT`, wenn das Speicherlimit des Map Sets überschritten würde.
+
+maptoy v1 besitzt keine Anwendungsauthentifizierung. Dieser schreibende Endpunkt ist
+nur für vertrauenswürdige private Clients vorgesehen. Ist maptoy über ein nicht
+vertrauenswürdiges Netz erreichbar, muss der Reverse Proxy den Zugriff authentifizieren
+und autorisieren; veröffentliche die Uploadroute nicht ungeschützt. Der Betreiber ist
+selbst dafür verantwortlich, dass die eingespielten Bytes zur konfigurierten Quelle
+gehören und gespeichert werden dürfen.
+
 ## Unveränderliche Revisionen
 
 Neue Bytes erzeugen eine über ihren SHA-256-Hash adressierte Revision. Frühere
 Revisionen werden nicht überschrieben. Ändert sich der Providerinhalt von A zu B und
 später zurück zu A, zeichnet maptoy drei zeitliche Revisionen auf, verwendet aber
 die ursprüngliche A-Datei erneut.
+Jede Revision hält außerdem fest, ob ihre erzeugenden Bytes vom `provider` oder aus
+einem API-`upload` stammen.
 
 Dateien verwenden dieses Layout:
 

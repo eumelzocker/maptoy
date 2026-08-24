@@ -34,6 +34,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Map Sets anlegen, bearbeiten, validieren, duplizieren und löschen
 - Rasterkarten im Vue-/Leaflet-Frontend anzeigen
 - Tiles über das Backend laden und lokal cachen
+- Tile-Bytes über die API kontrolliert einspielen und als revisionsfähige Cache-Stände speichern
 - sämtliche inhaltlich unterschiedlichen Tile-Revisionen dauerhaft nachvollziehbar speichern
 - aktuelle, historische, zeitbezogene oder als Snapshot benannte Cache-Stände auswählen und vergleichen
 - Cache-Abdeckung für ein Gebiet und Zoomstufen sichtbar machen
@@ -192,9 +193,14 @@ Ein **logisches Tile** wird durch Map Set und Koordinate `(z, x, y)` identifizie
 - kryptografischen Content-Hash, Dateiformat, Content-Type, Byte-Größe und Dateipfad
 - `firstSeenAt`, `lastSeenAt`, `lastValidatedAt` und zeitliche Gültigkeit innerhalb der bekannten Historie
 - soweit vorhanden `ETag`, `Last-Modified` und relevante, redigierte Provider-Metadaten
+- Entstehungsquelle der Revision (`provider` oder `upload`)
 - Status der Inhaltsprüfung und Kennzeichnung als aktuell ausgewählte Revision
 
 Der Content-Hash bezieht sich auf die tatsächlich gespeicherten Bytes. Entspricht eine Validierung weiterhin der aktuell ausgewählten Revision, entsteht weder eine doppelte Datei noch eine neue Revision; stattdessen werden `lastSeenAt` und `lastValidatedAt` aktualisiert. Wechselt der Inhalt, entsteht ein neuer Revisionsdatensatz. War derselbe Hash bereits früher vorhanden, wird die vorhandene Content-Datei wiederverwendet, aber eine neue zeitliche Revision angelegt, damit auch eine Folge wie `A → B → A` vollständig nachvollziehbar bleibt. Alle früheren Revisionen bleiben erhalten.
+
+Tile-Bytes können außerdem ohne Providerabruf über die API eingespielt werden. Der Upload verwendet einen unveränderten PNG-, JPEG- oder WebP-Body und muss in Content-Type und Dateisignatur zum konfigurierten Tile-Format des Map Sets passen. Es gelten dieselben Koordinaten-, Bounds-, Cache-Policy-, Capability-, Größen-, Speicherlimit- und atomaren Schreibregeln wie beim Providerabruf. Der erste erfolgreiche Upload gilt als erster Cache-Eintrag und sperrt damit die quellbestimmenden Map-Set-Felder. Der Nutzer ist dafür verantwortlich, dass die eingespielten Bytes tatsächlich zur konfigurierten Quelle und Koordinate gehören.
+
+Providerabruf, Revalidierung und Upload teilen sich je logischem Tile dieselbe Schreibkoordination, damit konkurrierende Änderungen eine deterministische Revisionshistorie erzeugen. Ist der hochgeladene Inhalt mit der aktuellen Revision identisch, werden nur Sichtungs- und Validierungszeitpunkt aktualisiert; es entstehen weder eine neue Revision noch zusätzlicher Speicherbedarf. Neue oder erneut auftretende Inhalte folgen denselben Hash- und Historienregeln wie Providerinhalte. Eine hochgeladene Revision trägt die Entstehungsquelle `upload`, keine Provider-Validatoren und gilt ab der lokalen Inhaltsprüfung als frisch für den Modus `auto`.
 
 Empfohlener Dateipfad ohne separates Versionssegment im Verzeichnisbaum:
 
@@ -288,6 +294,9 @@ Alle Endpunkte liegen relativ unter `api/`; keine Antwort darf absolute interne 
 - `DELETE api/map-sets/:id`
 - `POST api/map-sets/:id/test`
 - `GET api/map-sets/:id/tiles/:z/:x/:y` – Auswahl über `current`, `snapshot`, `asOf` oder Revisions-ID; Aktualisierung über `refresh=auto|force|cache-only`
+- `POST api/map-sets/:id/tiles/:z/:x/:y` – unveränderten PNG-, JPEG- oder WebP-Body passend zum Tile-Format als aktuelle Revision einspielen
+
+Der Tile-Upload verwendet bewusst kein Multipart. Eine neu angelegte Revision antwortet mit `201` und `{ revisionId, created: true }`; entspricht der Inhalt bereits der aktuellen Revision, antwortet der Endpunkt mit `200` und `{ revisionId, created: false }`. Fehlender, nicht unterstützter oder zum Map Set unpassender Media-Type führt zu `415`, ungültige Bildbytes zu `400`, deaktiviertes Tile-Archiv zu `409`, eine Überschreitung des routenspezifischen Bytelimits zu `413` und ein ausgeschöpftes Speicherlimit zu `507`. Erfolgreiche Antworten liefern zusätzlich die Revisions-ID im gleichen Header wie der normale Tile-Abruf.
 
 ### 6.3 Cache und Abdeckung
 
@@ -365,14 +374,14 @@ Die Dokumentation ist ein fester Teil der SPA und über die Hauptnavigation sowi
 
 **Inhaltsbereiche**
 
-- **App-Handbuch:** Schnellstart, Navigation und vollständige Anleitungen für Map Sets, Tile-Revisionen, Snapshots, Vergleiche, Coverage, Downloads, Jobs, Layer-Plugins und Exporte
-- **API:** authentizitätsgetreue OpenAPI-Referenz, Request-/Response-Beispiele, Fehlercodes, relative URL-Nutzung und Versionshinweise
+- **App-Handbuch:** Schnellstart, Navigation und vollständige Anleitungen für Map Sets, Tile-Revisionen, externes Tile-Seeding, Snapshots, Vergleiche, Coverage, Downloads, Jobs, Layer-Plugins und Exporte
+- **API:** authentizitätsgetreue OpenAPI-Referenz, Request-/Response-Beispiele einschließlich des binären Tile-Uploads, Fehlercodes, relative URL-Nutzung und Versionshinweise
 - **Map-Provider:** Konfigurationsfelder, URL-Templates, Attribution, Header, API-Schlüssel, Rate-Limits, technische Cache-/Export-Fähigkeiten sowie Links zu offiziellen Nutzungsbedingungen und Provider-Dokumentationen
 - **Erweiterungen:** Renderer-Adapter- und Layer-Plugin-Verträge, Capability-Modell, Referenz-Plugins, Versionskompatibilität und klarer Hinweis, dass Google Maps in v1.0 noch nicht implementiert ist
 - **Projektionen:** unterstützte EPSG-Codes, typische Einsatzfälle, Grenzen, Quell-/Zielprojektion und Auswirkungen der Reprojektion
 - **Glossar:** Abkürzungen und Begriffe wie XYZ, EPSG, WGS84, Web Mercator, Tile, Bounds, GPX, GeoJSON, DPI und SSRF
 - **Betrieb und Fehlersuche:** Environment-Variablen, Host-Bind-Mounts, Reverse-Proxy, Backup/Restore, Migrationen, Logs und typische Fehlerszenarien
-- **Sicherheit und Verantwortung:** Secret-Verwaltung, Netzwerkzugriffe und klare Eigenverantwortung des Nutzers für Prüfung und Einhaltung der jeweils aktuellen Provider-Nutzungsbedingungen; keine Rechtsberatung oder Zulässigkeitsgarantie durch maptoy
+- **Sicherheit und Verantwortung:** Secret-Verwaltung, Netzwerkzugriffe, Betriebsgrenzen unauthentifizierter Schreibendpunkte und klare Eigenverantwortung des Nutzers für Prüfung und Einhaltung der jeweils aktuellen Provider-Nutzungsbedingungen; keine Rechtsberatung oder Zulässigkeitsgarantie durch maptoy
 - **Version und Änderungen:** App-Version, Dokumentationsversion und Link zum zugehörigen Changelog
 
 **Darstellung und Navigation**
@@ -413,6 +422,7 @@ MAPTOY_API_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/api
 MAPTOY_PROVIDER_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/provider
 MAPTOY_TRAFFIC_LOG_MAX_BYTES=10485760
 MAPTOY_TRAFFIC_LOG_MAX_FILES=5
+MAPTOY_MAX_TILE_BYTES=10485760
 MAPTOY_MAX_CONCURRENT_JOBS=1
 MAPTOY_MAX_EXPORT_PIXELS=100000000
 MAPTOY_TEMP_DIR=${MAPTOY_DATA_DIR}/tmp
@@ -421,6 +431,8 @@ MAPTOY_TEMP_DIR=${MAPTOY_DATA_DIR}/tmp
 ```
 
 Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende Pflichtwerte führen zu einer klaren Fehlermeldung. Konfigurationsschemata unterscheiden `server-secret`, `public-client` und `public`. Das Backend gibt echte Server-Secrets weder an das Frontend noch in Logs oder Jobparameter weiter. Die Kategorie `public-client` ist als Adapter-Vertrag vorgesehen, wird in v1.0 aber von keinem ausgelieferten Adapter benötigt.
+
+`MAPTOY_MAX_TILE_BYTES` begrenzt sowohl Providerantworten als auch den Body der Tile-Upload-Route. Das Limit wird für Uploads routenspezifisch angewendet und darf insbesondere Map-Set-JSON oder andere API-Bodies nicht unbeabsichtigt begrenzen.
 
 `MAPTOY_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Pfad für persistente Fachdaten. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Anwendungsdatenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr sind Betriebsartefakte und erhalten eigene konfigurierbare Hostverzeichnisse und Bind-Mounts; ihre Vorgaben liegen unterhalb von `MAPTOY_DATA_DIR`, dürfen aber auf andere Hostpfade zeigen. Für persistente Fachdaten oder Traffic-Logs werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar. Ein Backup des Anwendungsdatenverzeichnisses umfasst die Fachdaten vollständig; extern konfigurierte Traffic-Logs müssen nur dann separat gesichert werden, wenn sie ebenfalls erhalten bleiben sollen.
 
@@ -468,7 +480,7 @@ Auch als private Anwendung verarbeitet maptoy fremde URLs und potenziell große 
 - erlaubte Protokolle für Tile-Quellen auf `https` und optional bewusst freigegebenes `http` begrenzen
 - SSRF-Schutz: lokale, Link-Local- und private Zielnetze standardmäßig sperren; bewusste Ausnahme nur über Serverkonfiguration
 - Redirect-Ziele erneut gegen die Netzwerkregeln prüfen
-- Größenlimits für Layer-Assets, Exporte, Auflösung und Jobanzahl
+- Größenlimits für Tile-Uploads, Layer-Assets, Exporte, Auflösung und Jobanzahl
 - Dateityp anhand tatsächlicher Inhalte beziehungsweise sicherer Decoder prüfen
 - Timeouts, Response-Größenlimits, kontrollierte Retries und Circuit-Breaker-artige Pause bei anhaltenden Anbieterfehlern
 - Log-Redaktion für API-Schlüssel, Authorization-Header und Query-Secrets
@@ -478,6 +490,8 @@ Auch als private Anwendung verarbeitet maptoy fremde URLs und potenziell große 
 - nur beim Build/Deployment zugelassene Plugins laden; Plugin-Hooks erhalten kontrollierte Asset-, Logging- und Rendering-Schnittstellen statt beliebiger Pfad- oder Secret-Zugriffe
 - Content-Security-Policy standardmäßig auf maptoy selbst beschränken und externe Ursprünge erst mit einem künftig tatsächlich aktivierten Adapter gezielt freigeben
 - Datenbankmigrationen und Cache-Löschungen transaktional beziehungsweise wiederaufnehmbar gestalten
+
+Die Anwendung besitzt in v1.0 keine eigene Authentifizierung. Damit ist auch der schreibende Tile-Upload nur für einen privaten, vertrauenswürdigen Betrieb vorgesehen und darf nicht ungeschützt für fremde Clients veröffentlicht werden. Wird maptoy über ein nicht vertrauenswürdiges Netz erreichbar gemacht, muss der vorgeschaltete Reverse Proxy den Zugriff authentifizieren und autorisieren. Diese Betriebsgrenze wird beim Endpunkt und in der integrierten Dokumentation sichtbar beschrieben.
 
 ## 10. Eigenverantwortung und verantwortliche Downloads
 
@@ -507,6 +521,8 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - URL-Template-Auflösung ohne Secret-Leak
 - Konfigurations- und Map-Set-Validierung
 - Sperre relevanter Quellenfelder nach der ersten Tile-Revision, logische Tile-Schlüssel, Content-Hash und hashbasierte Pfadbildung
+- Tile-Upload-Validierung für Media-Type, Dateisignatur, Format, Policy, Capability, Bounds sowie Größen- und Speicherlimit
+- Revisionsherkunft und Deduplizierung von Uploads sowie gemeinsame Koordination konkurrierender Uploads und Providerabrufe
 - Auswahlregeln für `current`, Snapshot, `asOf` und explizite Tile-Revision
 - Retry-/Backoff- und Rate-Limit-Logik mit kontrollierter Zeit
 - Exportgrößen- und Tile-Anzahlschätzung
@@ -521,6 +537,10 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Cache-Miss, Cache-Hit, atomarer Schreibvorgang und parallele identische Anfragen
 - bedingte Validierung mit 304, unverändertem 200-Inhalt und geändertem 200-Inhalt
 - Revisionsfolge `A → B → A` mit erneuter Verwendung der Content-Datei, aber vollständiger zeitlicher DB-Historie
+- Tile-Upload mit anschließend bytegleichem normalem und `cache-only`-Abruf ohne Providerkontakt
+- wiederholter identischer Tile-Upload ohne neue Revision oder zusätzlichen Speicher sowie geänderter Upload mit unveränderlicher Historie und korrekter Entstehungsquelle
+- abgewiesene Tile-Uploads bei ungültigem oder unpassendem Inhalt, deaktiviertem Archiv sowie überschrittenem Body- oder Speicherlimit ohne partielle Datei- oder Metadatenreste
+- deterministische Historie bei konkurrierendem Upload und Providerabruf desselben logischen Tiles
 - dauerhafte Revisionshistorie, Content-Deduplizierung, Snapshot-Auswahl und zeitbezogener Abruf
 - Hash-/Metadatenvergleich zweier Cache-Stände und Schutz referenzierter Revisionen vor Löschung
 - Datenbankmigration und Neustart mit laufendem Job
@@ -551,7 +571,7 @@ Tests verwenden keine echten öffentlichen Tile-Dienste.
 
 ### 11.4 Manuelle API-Tests mit Bruno
 
-Die unter `tests/bruno/` versionierte Bruno Collection ergänzt automatisierte Tests um nachvollziehbare manuelle Diagnose- und Smoke-Abläufe. Sie enthält mindestens Health/Readiness, Map-Set-Verwaltung, Tile-Abruf mit allen Refresh-Modi, Revisionshistorie und Snapshot-Vergleich, Batch-Jobs, Layer-Asset-Upload und Export. Zustandsverändernde oder löschende Requests sind eindeutig benannt und nicht Teil eines unabsichtlichen Standardlaufs.
+Die unter `tests/bruno/` versionierte Bruno Collection ergänzt automatisierte Tests um nachvollziehbare manuelle Diagnose- und Smoke-Abläufe. Sie enthält mindestens Health/Readiness, Map-Set-Verwaltung, Tile-Abruf mit allen Refresh-Modi, Tile-Upload, Revisionshistorie und Snapshot-Vergleich, Batch-Jobs, Layer-Asset-Upload und Export. Zustandsverändernde oder löschende Requests sind eindeutig benannt und nicht Teil eines unabsichtlichen Standardlaufs.
 
 Eine eingecheckte lokale Beispielumgebung definiert die relative beziehungsweise konfigurierbare `baseUrl`, aber keine echten Secrets. Lokale Secret-Dateien werden ignoriert. Die Collection ist zunächst ein manuelles Werkzeug; ein späterer `bru`-CLI-Smoke-Lauf kann ergänzt werden, ist für v1.0 aber kein verpflichtendes Qualitäts-Gate.
 
@@ -659,7 +679,32 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Revisionsanzahl und belegter Speicher stimmen mit den gespeicherten Dateien überein; ein bestätigter Abgleich entfernt sowohl verwaiste Dateien als auch unbrauchbare DB-Revisionen für extern gelöschte Dateien.
 - Der normale Aufruf der Cache-Seite lädt weder sämtliche Revisionen noch scannt er das Tile-Verzeichnis; beide teuren Operationen erfolgen begrenzt beziehungsweise ausdrücklich.
 
-Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckung baut unmittelbar auf dem Tile-Archiv auf, und das Layer-Plugin-System benötigt kein persistentes Jobmodell. Erst die Kennzeichnung aktuell bearbeiteter Coverage-Bereiche wird mit dem späteren Download-Worker verbunden. Das Job-System bleibt Voraussetzung für den anschließenden Kartenbild-Export.
+### Phase 3a: Externes Tile-Seeding über die API
+
+**Status:** abgeschlossen am 24. August 2026 als Version `0.0.7`
+
+**Aufgaben**
+
+- die Entstehungsquelle einer Tile-Revision (`provider` oder `upload`) über eine nummerierte SQL-Migration oberhalb der produktiven Schema-Baseline 4 ergänzen und vorhandene Baseline-4-Daten verlustfrei als Providerrevisionen übernehmen
+- gemeinsamen Servicepfad für Providerinhalte und hochgeladene Tile-Bytes schaffen, ohne Providerabruf beim Upload
+- `POST api/map-sets/:id/tiles/:z/:x/:y` mit unverändertem Bild-Body, gemeinsamem Antwortschema und routenspezifischem `MAPTOY_MAX_TILE_BYTES`-Limit implementieren
+- Content-Type und Dateisignatur gegen das konfigurierte Tile-Format prüfen sowie Koordinaten-, Bounds-, Cache-Policy-, Capability-, Größen- und Speicherregeln wiederverwenden
+- Upload, Providerabruf und Revalidierung je logischem Tile gemeinsam koordinieren; Hash-Deduplizierung, zeitliche Revisionen und atomare Dateischreibvorgänge beibehalten
+- präzise Fehlerverträge für Media-Type, Bildinhalt, deaktiviertes Archiv, Bodylimit und Speicherlimit dokumentieren
+- OpenAPI-/Contract-Schemas, integrierte API-Dokumentation, Bruno-Request sowie Unit- und Integrationstests ergänzen; eine eigene UI ist für diesen Schritt nicht vorgesehen
+- die fehlende Anwendungsauthentifizierung und den ausschließlich vertrauenswürdigen Betrieb des schreibenden Endpunkts samt Reverse-Proxy-Schutz dokumentieren
+
+**Ergebnis/Akzeptanz**
+
+- Ein gültiger Upload legt mit `201` genau eine Revision der Herkunft `upload` an; der normale und der `cache-only`-Abruf liefern anschließend exakt dieselben Bytes ohne Providerkontakt.
+- Ein zum aktuellen Stand identischer Upload antwortet mit `200` und `created: false`, aktualisiert nur die Zeitmetadaten und erzeugt weder eine neue Revision noch zusätzlichen Speicherbedarf.
+- Ein geänderter oder erneut auftretender Inhalt folgt denselben unveränderlichen Historien- und Deduplizierungsregeln wie Providerinhalte.
+- Ungültige, unpassende, zu große oder durch Policy, Capability beziehungsweise Speicherlimit ausgeschlossene Uploads werden mit dem dokumentierten Statuscode abgewiesen und hinterlassen keine partielle Datei oder Metadaten.
+- Gleichzeitiger Upload und Providerabruf desselben logischen Tiles erzeugen eine deterministische, unbeschädigte Revisionshistorie.
+- Die Revisionsherkunft ist in API und Persistenz nachvollziehbar; bestehende Datenbanken ab Baseline 4 werden verlustfrei migriert.
+- Die Dokumentation weist sichtbar darauf hin, dass der weiterhin unauthentifizierte Endpunkt nur in vertrauenswürdiger Umgebung oder hinter Zugriffsschutz betrieben werden darf.
+
+Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckung baut unmittelbar auf dem Tile-Archiv auf, und das Layer-Plugin-System benötigt kein persistentes Jobmodell. Erst die Kennzeichnung aktuell bearbeiteter Coverage-Bereiche wird mit dem späteren Download-Worker verbunden.
 
 ### Phase 4: Cache-Abdeckung
 
@@ -790,44 +835,37 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 - Persistente Daten überleben Upgrade und Container-Neuerstellung.
 - Alle Qualitäts-Gates und die unten stehende Definition of Done sind erfüllt.
 
-## 13. Priorisierung nach Releases
+## 13. Release- und Versionsplanung
 
-### v0.1 – Technischer Durchstich
+Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhöhen. Eine Phase darf deshalb mehrere `0.0.x`-Releases umfassen; umgekehrt muss ein Release keine vollständige Phase markieren. Maßgeblich für tatsächlich veröffentlichte Inhalte ist das [`CHANGELOG.md`](./CHANGELOG.md), nicht eine vorab reservierte Versionsnummer.
 
-- Grundrahmen, gleicher HTTP-Port, Nix/Docker
-- ein Map Set
-- Leaflet-/XYZ-Adapter hinter der allgemeinen Renderer-Schnittstelle
-- hashbasiertes Tile-Archiv mit aktuellem Stand und dauerhaft erhaltener Revisionshistorie
-- integrierte Dokumentationsnavigation mit vollständigem englischem Schnellstart sowie Deutsch-/Thai-Fallback
+### 13.1 Versionsstand
 
-### v0.2 – Cache-Analyse und interaktive Layer
+| Version | Inhaltlicher Stand |
+| --- | --- |
+| `0.0.1` | Phase 1: Fundament mit Monorepo, Server, Web-App, Nix und Container-Betrieb |
+| `0.0.2` | Phase 2: Map Sets, Provider-Konfiguration und interaktive Karte |
+| `0.0.3` | Phase 3: hashbasiertes Tile-Archiv mit Revisionshistorie |
+| `0.0.4`–`0.0.5` | phasenübergreifende UI-, Cache- und Dokumentationsverbesserungen |
+| `0.0.6` | Traffic-Logs, Schema-Baseline 4 und Betriebsverbesserungen |
+| `0.0.7` | aktueller veröffentlichter Stand mit Phase 3a: externes Tile-Seeding über die API und nachvollziehbare Revisionsherkunft |
 
-- mehrere Map Sets mit jeweils stabiler Quellenkonfiguration
-- Cache-Snapshots, Zeitstände und Hash-/Metadatenvergleiche
-- Coverage-Ansicht
-- allgemeines Layer-Plugin-System mit SDK und Contract-Tests
-- Track- und Bild-Referenz-Plugins einschließlich GPS-getaggter Bilder
-- verwalteter Asset-Upload über Frontend und API
-- lokalisierbare Dokumentation für Map Sets, Cache, Coverage und Layer
+### 13.2 Weitere Releases
 
-### v0.3 – Automatisierung und Kartenerzeugung
+Die ausstehenden Phasen bestimmen die fachliche Reihenfolge, erhalten aber erst beim tatsächlichen Release eine konkrete Patchnummer:
 
-- belastbares Job-System
-- Batch-Download mit Limits
-- Bildexport in Quellprojektion
-- ausgewählte alternative Projektionen
-- Exporthistorie und Download
-- vollständige englische Download-, Projektions-, Plugin- und Exportdokumentation mit lokalisierten Fassungen
+1. Phase 4: Cache-Snapshots, Zeitstände, Vergleiche und Coverage
+2. Phase 5: Layer-Plugin-System, Track-/Bild-Referenzen und Asset-Upload
+3. Phase 6: Jobs, kontrollierter Batch-Download und Limits
+4. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
+5. Phase 8: vollständige Dokumentation und lokalisierte Suche
+6. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
 
-### v1.0 – Stabiler Privatbetrieb
+Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als eigene Versionen erscheinen.
 
-- Sicherheits- und Performance-Härtung
-- Backup-/Upgrade-Dokumentation
-- vollständiges englisches App-Handbuch, API-Referenz, Provider-/Plugin-Bereich, Glossar und lokalisierte Suche mit Deutsch-/Thai-Fallback
-- versionierte Renderer-Adapter- und Layer-Plugin-Verträge; Google-Maps-Adapter weiterhin bewusst nicht implementiert
-- vollständige Reverse-Proxy- und Container-Tests
-- definierte Kompatibilitäts- und Migrationsregeln ab der produktiven Schema-Baseline 4
-- vollständige manuelle Bruno Collection für die zentralen API-Abläufe
+### 13.3 Ziel `1.0.0`
+
+`1.0.0` bezeichnet den ersten stabilen Stand für den vorgesehenen Privatbetrieb. Er wird erst erreicht, wenn Phase 9 abgeschlossen ist und die Definition of Done aus Abschnitt 10 erfüllt ist. Bis dahin besteht insbesondere keine Zusage, dass öffentliche APIs, Renderer-Adapter, Plugin-Verträge oder interne Datenmodelle bereits die Kompatibilitätsgarantien einer stabilen Hauptversion besitzen.
 
 ## 14. Risiken und Gegenmaßnahmen
 
@@ -839,6 +877,7 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 | Dauerhaft erhaltene Tile-Revisionen lassen den Speicher wachsen | neue Abrufe oder Exporte scheitern wegen Platzmangel | getrennte Statistik, Warn-/Aufnahmelimits, Kapazitätsschätzung und ausschließlich explizite bestätigte Löschung |
 | SQLite und Dateisystem laufen auseinander | Historie, aktuelle Zeiger oder Snapshots werden unzuverlässig | atomare Writes, transaktionale Zustände, Backup sowie nicht destruktive Reparatur-/Scan-Funktion |
 | Historische oder von Snapshots referenzierte Revision wird versehentlich gelöscht | reproduzierbare Stände und Vergleiche gehen verloren | Referenzschutz, ausdrückliche Bestätigung, Vorschau der Auswirkungen und Backup |
+| Unauthentifizierter Tile-Upload ist für fremde Clients erreichbar | Manipulation des aktuellen Kartenstands und unkontrolliertes Speicherwachstum | nur vertrauenswürdiger Privatbetrieb, deutlicher Betriebshinweis und Authentifizierung/Autorisierung am Reverse Proxy bei externer Erreichbarkeit |
 | Reverse-Proxy-Unterpfad bricht Assets oder API | Anwendung nicht erreichbar | ausschließlich relative URL-Helfer und automatisierter Proxy-E2E-Test ab Phase 1 |
 | Bösartige oder falsche Quell-URL ermöglicht SSRF | Zugriff auf interne Dienste | IP-/DNS-Prüfung, Redirect-Prüfung, Protokoll-Allowlist und explizite Ausnahmen |
 | Export verbraucht zu viel RAM | Containerabsturz | Pixelgrenzen, Worker-Limit, Streaming/Tile-basierte Verarbeitung und Messungen |
@@ -862,6 +901,7 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 - keine Google-Maps-Laufzeitabhängigkeit oder Google-spezifische Implementierung enthalten ist, die Adapterarchitektur eine spätere Implementierung aber ohne Umbau fachlicher Komponenten erlaubt;
 - Map Sets ohne Secret-Leaks verwaltet und validiert werden können;
 - sämtliche unterschiedlichen Tile-Revisionen hashbasiert, unveränderlich und dauerhaft in Dateien sowie Datenbank nachvollziehbar sind und Quellenfelder nach dem ersten Cache-Eintrag nicht mehr verändert werden können;
+- Tile-Bytes über die API format-, policy-, capability-, größen- und speichergeprüft eingespielt werden können, ihre Herkunft nachvollziehbar bleibt und gleichzeitige Uploads und Providerabrufe keine widersprüchliche Historie erzeugen;
 - aktueller Stand, Snapshot, Zeitstand und explizite Revision reproduzierbar auswählbar und vergleichbar sind;
 - keine historische Revision automatisch gelöscht wird und explizite Löschungen aktuelle beziehungsweise von Snapshots referenzierte Revisionen schützen;
 - Batch-Jobs konfigurierte technische Limits und Provider-Signale respektieren sowie Neustart, Pause und Abbruch konsistent behandeln;
@@ -879,21 +919,53 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 - die versionierte Bruno Collection alle zentralen API-Abläufe für manuelle Smoke- und Diagnosetests abdeckt, ohne Secrets zu enthalten;
 - Konfiguration, Datenpersistenz, Backup, Upgrade, Reverse-Proxy und Eigenverantwortung des Nutzers für Providerbedingungen dokumentiert sind.
 
-## 16. Noch zu entscheidende Punkte
+## 16. Entscheidungsstand und offene Punkte
 
-Diese Entscheidungen sollten während Phase 0 beziehungsweise vor der jeweils betroffenen Phase getroffen und als Architecture Decision Records dokumentiert werden:
+Dieser Abschnitt enthält nur Entscheidungen, die für die noch ausstehenden v1-Phasen
+tatsächlich offen sind. Bereits festgelegte Architektur wird nicht erneut als Frage
+geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
 
-1. Welche konkreten Tile-Anbieter dienen als erste Beispiele, und welche rein technischen Defaults sollen dafür vorgeschlagen werden?
-2. **Entschieden:** `sharp` und `proj4` genügen nicht als allgemeiner Raster-Warper; GDAL wird gemäß [ADR 0004](docs/internal/adr/0004-use-gdal-for-raster-reprojection.md) verwendet.
-3. Welche alternativen Projektionen müssen in v0.3 tatsächlich unterstützt werden?
-4. Welche maximalen Gebiets-, Tile-, Speicher- und Exportgrößen sind für die Zielhardware sinnvoll, und wann soll das Tile-Archiv warnen beziehungsweise neue Datenaufnahme blockieren?
-5. Sollen Map Sets ausschließlich in SQLite verwaltet oder zusätzlich als importierbare/exportierbare JSON-Dateien unterstützt werden?
-6. Soll das Bild-Plugin neben EXIF-GPS und geografischen Bounds bereits Worldfiles oder GeoTIFF-Metadaten unterstützen?
-7. Wie lange bleiben fertige Exporte und Jobprotokolle standardmäßig erhalten?
-8. Soll eine spätere Version MBTiles als Import-/Exportformat unterstützen?
-9. Welche offiziellen Provider-Links werden beispielhaft mitgeliefert, ohne dadurch Aktualität oder Zulässigkeit zu garantieren?
-10. Welcher Mindestübersetzungsgrad wird für Deutsch und Thai pro Release angestrebt, ohne den definierten Englisch-Fallback infrage zu stellen?
-11. Sollen Plugins nach v1 ausschließlich als eigene Builds oder über einen signierten, administrativen Installationsweg verteilt werden?
-12. Welche Capabilities soll ein späterer Google-Maps-JavaScript-Adapter tatsächlich anbieten, insbesondere im Verhältnis zu Cache, Batch-Download und Export?
-13. Reicht für v1 der Hash-/Metadatenvergleich von Cache-Ständen oder sollen bereits visuelle Tile-Differenzbilder erzeugt werden?
-14. Ist eine ausreichend gute Thai-Suche mit vertretbarem Aufwand möglich oder wird sie in v1 bewusst deaktiviert?
+### 16.1 Bereits festgelegt
+
+- Als dokumentierte Quelle für manuelle Entwicklung, Smoke-Checks und Demos dient
+  OpenTopoMap über `https://tile.opentopomap.org/{z}/{x}/{y}.png`; ein eigener lokaler
+  Tile-Server ist nicht vorgesehen. Automatisierte Tests bleiben mit generierten
+  Bytes und einem In-Process-Fake netzwerkfrei. Nutzungsprofil und Grenzen stehen in
+  [Example provider decision](docs/internal/provider-example.md).
+- Renderer-Adapter und vertrauenswürdige Buildzeit-Plugins folgen
+  [ADR 0001](docs/internal/adr/0001-map-renderer-adapter-boundary.md) und
+  [ADR 0002](docs/internal/adr/0002-trusted-layer-plugin-lifecycle.md). Ein
+  Google-Maps-Adapter und eine administrative Plugin-Installation gehören nicht zu
+  v1.
+- Rasterreprojektion, Zielprojektionen und anfängliche Exportgrenzen sind mit GDAL,
+  `EPSG:3857`, `EPSG:4326` und `EPSG:25833` in
+  [ADR 0004](docs/internal/adr/0004-use-gdal-for-raster-reprojection.md)
+  festgelegt. Phase 7 überprüft die Messwerte mit der produktiven Pipeline, ohne die
+  Grundsatzentscheidung neu zu öffnen.
+- Für v1 genügen Hash- und Metadatenvergleiche von Cache-Ständen. Visuelle
+  Differenzbilder bleiben eine optionale spätere Erweiterung.
+- Englisch ist vollständig. Für Deutsch und Thai gilt seitenweiser, sichtbarer
+  Englisch-Fallback; ein zusätzlicher Mindestübersetzungsgrad ist kein v1-Gate.
+- Das Bild-Plugin unterstützt in v1 EXIF-GPS, explizite Punktkoordinaten und
+  geografische Bounds. Worldfiles und GeoTIFF-Metadaten sind nicht Bestandteil des
+  v1-Umfangs.
+
+### 16.2 Offen für verbleibende v1-Phasen
+
+| Spätestens vor | Entscheidung | Benötigtes Ergebnis |
+| --- | --- | --- |
+| Phase 4/6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_MAX_TILE_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
+| Phase 6/7 | Wie lange bleiben abgeschlossene Jobs, begrenzte Fehlerhistorien und fertige Exportdateien erhalten? | Standardfristen, konfigurierbare Aufbewahrung, Schutz laufender Downloads und ein nachvollziehbarer manueller beziehungsweise automatischer Bereinigungsweg. |
+| Phase 8 | Ist eine ausreichend gute Thai-Suche mit vertretbarem Aufwand möglich? | Entweder getestete Thai-Segmentierung und Suche oder eine bewusst deaktivierte Thai-Suche mit sichtbarem Verweis auf die englische Suche. |
+
+Die jeweilige Entscheidung wird vor Beginn der betroffenen Implementierung anhand
+von Messungen beziehungsweise eines kleinen Spikes getroffen. Ein ADR ist nur nötig,
+wenn die Entscheidung eine dauerhafte Architektur- oder Betriebsgrenze setzt.
+
+### 16.3 Nach v1 geparkt
+
+- Import und Export von Map Sets als JSON sowie MBTiles-Unterstützung
+- Worldfiles und GeoTIFF-Metadaten im Bild-Plugin
+- signierter administrativer Installationsweg für Plugins
+- konkrete Capabilities eines späteren Google-Maps-JavaScript-Adapters
+- visuelle Tile-Differenzbilder als Vergleichsjob

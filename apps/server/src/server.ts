@@ -91,6 +91,11 @@ export async function buildServer(
   const config = options.config ?? loadConfig();
   const environment = options.environment ?? process.env;
   const server = Fastify({ logger: options.logger ?? false });
+  server.addContentTypeParser(
+    "*",
+    { parseAs: "buffer" },
+    (_request, body, done) => done(null, body),
+  );
   const trafficLogOptions = {
     maximumBytes: config.trafficLogMaxBytes,
     maximumFiles: config.trafficLogMaxFiles,
@@ -138,6 +143,7 @@ export async function buildServer(
     {
       allowPrivateTileHosts: config.allowPrivateTileHosts,
       environment,
+      maximumTileBytes: config.maximumTileBytes,
     },
   );
 
@@ -146,7 +152,21 @@ export async function buildServer(
     database.close();
   });
 
-  server.setErrorHandler((error, _request, reply) => {
+  server.setErrorHandler((error, request, reply) => {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "FST_ERR_CTP_BODY_TOO_LARGE" &&
+      request.method === "POST" &&
+      request.routeOptions.url === "/api/map-sets/:id/tiles/:z/:x/:y"
+    ) {
+      return reply.code(413).send({
+        error: {
+          code: "TILE_BODY_TOO_LARGE",
+          message: "The upload exceeds MAPTOY_MAX_TILE_BYTES.",
+        },
+      });
+    }
     if (
       error instanceof Error &&
       "validation" in error &&
@@ -208,7 +228,9 @@ export async function buildServer(
     items: layerPluginRegistry.list().map(({ manifest }) => manifest),
   }));
 
-  registerMapSetRoutes(server, mapSetService, tileArchive);
+  registerMapSetRoutes(server, mapSetService, tileArchive, {
+    maximumTileBytes: config.maximumTileBytes,
+  });
 
   if (options.serveWeb ?? true) {
     const root = options.staticDirectory ?? defaultStaticDirectory();

@@ -12,6 +12,8 @@ import type {
   TileRefreshMode,
   TileRevisionListResponse,
   TileRevisionSummary,
+  TileRevisionOrigin,
+  TileUploadResponse,
 } from "@maptoy/contracts";
 import type { ProviderResponse } from "../providerClient.js";
 import type {
@@ -27,6 +29,9 @@ export class TileArchiveError extends Error {
     readonly code:
       | "TILE_NOT_CACHED"
       | "TILE_CONTENT_INVALID"
+      | "TILE_MEDIA_TYPE_INVALID"
+      | "TILE_ARCHIVE_DISABLED"
+      | "TILE_BODY_TOO_LARGE"
       | "TILE_STORAGE_LIMIT"
       | "SNAPSHOT_NOT_FOUND"
       | "SNAPSHOT_NAME_CONFLICT"
@@ -55,12 +60,11 @@ function headerValue(value: string | string[] | undefined): string | null {
 }
 
 function normalizedContentType(response: ProviderResponse): string | null {
-  return (
-    headerValue(response.headers["content-type"])
-      ?.split(";", 1)[0]
-      ?.trim()
-      .toLowerCase() ?? null
-  );
+  return normalizeContentType(headerValue(response.headers["content-type"]));
+}
+
+function normalizeContentType(value: string | null | undefined): string | null {
+  return value?.split(";", 1)[0]?.trim().toLowerCase() || null;
 }
 
 function hasExpectedSignature(
@@ -121,7 +125,11 @@ function validateProviderTile(
 }
 
 export class TileArchiveService {
-  private readonly inFlight = new Map<string, Promise<ArchivedTileResponse>>();
+  private readonly providerRequests = new Map<
+    string,
+    Promise<ArchivedTileResponse>
+  >();
+  private readonly coordinateOperations = new Map<string, Promise<void>>();
 
   constructor(
     private readonly repository: TileArchiveRepository,
@@ -175,18 +183,90 @@ export class TileArchiveService {
     }
 
     const key = `${mapSet.id}/${tile.zoom}/${tile.x}/${tile.y}`;
-    const existing = this.inFlight.get(key);
+    const existing = this.providerRequests.get(key);
     if (existing !== undefined) {
       return existing;
     }
-    const operation = this.fetchAndStore(
-      mapSet,
-      tile,
-      cached,
-      requestProvider,
-    ).finally(() => this.inFlight.delete(key));
-    this.inFlight.set(key, operation);
+    const operation = this.withCoordinateLock(key, async () => {
+      const latest = this.repository.selectedRevision(mapSet.id, tile, {
+        kind: "current",
+      });
+      if (
+        options.refresh === "auto" &&
+        latest !== undefined &&
+        this.isFresh(latest, mapSet.cachePolicy.maximumAgeSeconds) &&
+        (await this.storage.exists(latest.filePath))
+      ) {
+        try {
+          return await this.readRevision(latest, "hit");
+        } catch (error) {
+          if (
+            !(error instanceof TileArchiveError) ||
+            error.code !== "TILE_CONTENT_INVALID"
+          ) {
+            throw error;
+          }
+        }
+      }
+      return this.fetchAndStore(mapSet, tile, latest, requestProvider);
+    }).finally(() => this.providerRequests.delete(key));
+    this.providerRequests.set(key, operation);
     return operation;
+  }
+
+  async upload(
+    mapSet: MapSet,
+    tile: TileCoordinate,
+    input: {
+      body: Buffer;
+      contentType: string | undefined;
+      maximumTileBytes: number;
+    },
+  ): Promise<TileUploadResponse> {
+    if (!mapSet.cachePolicy.enabled || !mapSet.capabilities.tileArchive) {
+      throw new TileArchiveError(
+        "TILE_ARCHIVE_DISABLED",
+        "Tile uploads require an enabled Tile Archive capability and cache policy.",
+        409,
+      );
+    }
+    const contentType = normalizeContentType(input.contentType);
+    if (contentType !== expectedContentType(mapSet.tileFormat)) {
+      throw new TileArchiveError(
+        "TILE_MEDIA_TYPE_INVALID",
+        `The upload Content-Type must be ${expectedContentType(mapSet.tileFormat)} for this Map Set.`,
+        415,
+      );
+    }
+    if (input.body.byteLength > input.maximumTileBytes) {
+      throw new TileArchiveError(
+        "TILE_BODY_TOO_LARGE",
+        "The upload exceeds MAPTOY_MAX_TILE_BYTES.",
+        413,
+      );
+    }
+    if (!hasExpectedSignature(mapSet.tileFormat, input.body)) {
+      throw new TileArchiveError(
+        "TILE_CONTENT_INVALID",
+        `The upload body is not a valid ${mapSet.tileFormat.toUpperCase()} tile.`,
+        400,
+      );
+    }
+
+    const key = this.coordinateKey(mapSet.id, tile);
+    return this.withCoordinateLock(key, async () => {
+      const recorded = await this.persistContent(mapSet, tile, {
+        body: input.body,
+        contentType,
+        origin: "upload",
+        etag: null,
+        lastModified: null,
+      });
+      return {
+        revisionId: recorded.revision.id,
+        created: recorded.created,
+      };
+    });
   }
 
   listRevisions(mapSetId: string): TileRevisionSummary[] {
@@ -493,9 +573,32 @@ export class TileArchiveService {
     }
 
     const contentType = validateProviderTile(mapSet, response);
-    const contentHash = createHash("sha256")
-      .update(response.body)
-      .digest("hex");
+    const recorded = await this.persistContent(mapSet, tile, {
+      body: response.body,
+      contentType,
+      origin: "provider",
+      etag: headerValue(response.headers.etag),
+      lastModified: headerValue(response.headers["last-modified"]),
+    });
+    return {
+      ...response,
+      cacheStatus: cached === undefined ? "miss" : "validated",
+      revisionId: recorded.revision.id,
+    };
+  }
+
+  private async persistContent(
+    mapSet: MapSet,
+    tile: TileCoordinate,
+    input: {
+      body: Buffer;
+      contentType: string;
+      origin: TileRevisionOrigin;
+      etag: string | null;
+      lastModified: string | null;
+    },
+  ) {
+    const contentHash = createHash("sha256").update(input.body).digest("hex");
     const filePath = this.storage.relativeTilePath(
       mapSet.id,
       tile,
@@ -512,7 +615,7 @@ export class TileArchiveService {
       const replacedBytes =
         files.find((file) => file.filePath === filePath)?.byteLength ?? 0;
       if (
-        currentBytes - replacedBytes + response.body.byteLength >
+        currentBytes - replacedBytes + input.body.byteLength >
         maximumStorageBytes
       ) {
         throw new TileArchiveError(
@@ -522,23 +625,44 @@ export class TileArchiveService {
         );
       }
     }
-    await this.storage.writeAtomic(filePath, response.body);
-    const recorded = this.repository.recordContent({
+    await this.storage.writeAtomic(filePath, input.body);
+    return this.repository.recordContent({
       mapSetId: mapSet.id,
       tile,
       contentHash,
       filePath,
-      contentType,
-      byteLength: response.body.byteLength,
-      etag: headerValue(response.headers.etag),
-      lastModified: headerValue(response.headers["last-modified"]),
-      timestamp,
+      contentType: input.contentType,
+      byteLength: input.body.byteLength,
+      etag: input.etag,
+      lastModified: input.lastModified,
+      timestamp: this.clock().toISOString(),
+      origin: input.origin,
     });
-    return {
-      ...response,
-      cacheStatus: cached === undefined ? "miss" : "validated",
-      revisionId: recorded.revision.id,
-    };
+  }
+
+  private coordinateKey(mapSetId: string, tile: TileCoordinate): string {
+    return `${mapSetId}/${tile.zoom}/${tile.x}/${tile.y}`;
+  }
+
+  private withCoordinateLock<T>(
+    key: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.coordinateOperations.get(key);
+    const result =
+      previous === undefined
+        ? operation()
+        : previous.catch(() => undefined).then(operation);
+    const tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.coordinateOperations.set(key, tail);
+    return result.finally(() => {
+      if (this.coordinateOperations.get(key) === tail) {
+        this.coordinateOperations.delete(key);
+      }
+    });
   }
 
   private comparisonSelector(

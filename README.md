@@ -49,3 +49,8 @@ location /tools/maptoy/ {
     proxy_pass http://127.0.0.1:4004/;
 }
 ```
+
+maptoy v1 does not authenticate API clients. Keep the service on a trusted private
+network, or add authentication and authorization at the reverse proxy before making
+it reachable from an untrusted network. In particular, never expose the Tile
+seeding `POST` endpoint to untrusted clients without access control.
