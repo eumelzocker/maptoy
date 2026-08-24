@@ -4,6 +4,16 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Reusable, accessible centered Vue dialog with modal and non-modal modes,
+  viewport-bounded title-bar dragging, and no background dimming or blur. Modal
+  dialogs retain focus containment and backdrop dismissal; the Map view's new
+  **Goto Coordinates** and **Tile Calculator** tools use the non-modal mode with
+  frozen opening values while the map remains operable.
+- WGS84 map centering and a live XYZ Tile calculator prefilled from the current
+  viewport, including on-demand Tile preview through the selected Map Set.
+
 ## [0.0.7] - 2026-08-24
 
 ### Added

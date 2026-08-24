@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
-import type { MapRendererInstance } from "@maptoy/map-adapter-sdk";
+import type {
+  GeographicCoordinate,
+  MapRendererInstance,
+} from "@maptoy/map-adapter-sdk";
 import { storeToRefs } from "pinia";
 import {
   computed,
@@ -12,9 +15,13 @@ import {
   watch,
 } from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import GotoCoordinatesDialog from "../components/GotoCoordinatesDialog.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import TileCalculatorDialog from "../components/TileCalculatorDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import TogglePanel from "../components/TogglePanel.vue";
 import {
@@ -24,6 +31,7 @@ import {
   saveShowCoordinates,
 } from "../mapDisplayPreferences.js";
 import { availableLocalStorage } from "../localStorage.js";
+import { applyMapCenter } from "../mapViewportActions.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
 import { MAP_RENDERER_FACTORY_REGISTRY_KEY } from "../registries.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
@@ -44,6 +52,18 @@ const zoom = ref<number | null>(null);
 const browserStorage = availableLocalStorage();
 const showCoordinates = ref(loadShowCoordinates(browserStorage));
 const showAttribution = ref(loadShowAttribution(browserStorage));
+const displayOptionsPanel = ref<{ close: () => void } | null>(null);
+const gotoCoordinatesOpen = ref(false);
+const gotoInitialCoordinate = ref<GeographicCoordinate>({
+  longitude: 0,
+  latitude: 0,
+});
+const tileCalculatorOpen = ref(false);
+const tileCalculatorInitialInput = ref({
+  zoom: 0,
+  longitude: 0,
+  latitude: 0,
+});
 const uiPreferences = useUiPreferencesStore();
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const showTitleBar = computed({
@@ -169,6 +189,52 @@ function resetToInitialViewport(): void {
     zoom: mapSet.defaultZoom - zoomOptions.zoomOffset,
   });
 }
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function openGotoCoordinates(): void {
+  if (renderer === null) {
+    return;
+  }
+  const viewport = renderer.getViewport();
+  gotoInitialCoordinate.value = viewport.center;
+  displayOptionsPanel.value?.close();
+  gotoCoordinatesOpen.value = true;
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function applyGotoCoordinates(
+  coordinate: GeographicCoordinate,
+): Promise<void> {
+  if (renderer === null) {
+    return;
+  }
+  await applyMapCenter(renderer, coordinate);
+  saveMapViewport(browserStorage, renderer.getViewport());
+  gotoCoordinatesOpen.value = false;
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function openTileCalculator(): void {
+  const mapSet = selected.value;
+  if (renderer === null || mapSet === null) {
+    return;
+  }
+  const viewport = renderer.getViewport();
+  const zoomOptions = leafletXyzZoomOptions(mapSet);
+  tileCalculatorInitialInput.value = {
+    longitude: viewport.center.longitude,
+    latitude: viewport.center.latitude,
+    zoom: Math.min(
+      mapSet.maxZoom,
+      Math.max(
+        mapSet.minZoom,
+        Math.round(viewport.zoom + zoomOptions.zoomOffset),
+      ),
+    ),
+  };
+  displayOptionsPanel.value?.close();
+  tileCalculatorOpen.value = true;
+}
 </script>
 
 <template>
@@ -214,11 +280,30 @@ function resetToInitialViewport(): void {
       </div>
 
       <div class="map-bottom-left">
-        <TogglePanel label="Display Options" align="start">
+        <TogglePanel ref="displayOptionsPanel" label="Display Options" align="start">
           <template #trigger>
             <i class="mdi mdi-tune" aria-hidden="true"></i>
           </template>
           <strong class="options-heading">Display Options</strong>
+          <hr class="options-divider" />
+          <button
+            type="button"
+            class="display-tool-action"
+            :disabled="!selected || zoom === null"
+            @click="openGotoCoordinates"
+          >
+            <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>
+            <span>Goto Coordinates</span>
+          </button>
+          <button
+            type="button"
+            class="display-tool-action"
+            :disabled="!selected || zoom === null"
+            @click="openTileCalculator"
+          >
+            <i class="mdi mdi-grid" aria-hidden="true"></i>
+            <span>Tile Calculator</span>
+          </button>
           <hr class="options-divider" />
           <label class="check-field">
             <input v-model="showTitleBar" type="checkbox" />
@@ -255,6 +340,20 @@ function resetToInitialViewport(): void {
       </div>
       <div v-if="mapError" class="map-overlay error" role="alert">{{ mapError }}</div>
     </section>
+
+    <GotoCoordinatesDialog
+      :open="gotoCoordinatesOpen"
+      :initial-coordinate="gotoInitialCoordinate"
+      @close="gotoCoordinatesOpen = false"
+      @apply="applyGotoCoordinates"
+    />
+
+    <TileCalculatorDialog
+      :open="tileCalculatorOpen"
+      :map-set="selected"
+      :initial-input="tileCalculatorInitialInput"
+      @close="tileCalculatorOpen = false"
+    />
   </main>
 </template>
 
@@ -403,6 +502,34 @@ function resetToInitialViewport(): void {
   margin: 0.5rem 0;
   border: 0;
   border-top: 1px solid #d7e0db;
+}
+
+.display-tool-action {
+  display: flex;
+  width: 100%;
+  min-height: 2rem;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
+  border: 0;
+  border-radius: 0.35rem;
+  color: #17453c;
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.display-tool-action:hover,
+.display-tool-action:focus-visible {
+  background: #dfe9e3;
+}
+
+.display-tool-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .coordinates,

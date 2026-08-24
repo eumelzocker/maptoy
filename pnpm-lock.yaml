@@ -95,6 +95,9 @@ importers:
       '@maptoy/map-adapter-sdk':
         specifier: workspace:*
         version: link:../../packages/map-adapter-sdk
+      '@maptoy/map-core':
+        specifier: workspace:*
+        version: link:../../packages/map-core
       '@maptoy/track-layer':
         specifier: workspace:*
         version: link:../../plugins/track-layer

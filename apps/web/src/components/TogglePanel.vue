@@ -20,6 +20,8 @@ const {
 } = useDisclosure();
 const root = ref<HTMLElement | null>(null);
 
+defineExpose({ close });
+
 function onOutsideClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Node) || !root.value?.contains(target)) {
