@@ -41,6 +41,11 @@ the same host-controlled directory. maptoy does not use a Docker-managed named o
 anonymous volume for persistent application data. The directory must be writable
 by UID `1000`, which is the non-root user running the container.
 
+SQLite schema version 4 is maptoy's production baseline. New installations create
+that baseline directly, and all future numbered migrations build on it while
+preserving existing data. Versions 1 through 3 were development-only schemas and
+are not supported upgrade sources; no production database predates version 4.
+
 ## Traffic logs
 
 maptoy keeps client/API traffic and backend/tile-provider traffic in separate
@@ -54,3 +59,8 @@ active files are named `api-traffic.log` and `provider-traffic.log`.
 including the active file. Authentication headers, cookies, and common secret
 query parameters are redacted. The log directories must exist before Compose
 starts and must be writable by UID `1000`.
+
+The readiness endpoint verifies the database and the continued writability of the
+application data directory and both traffic-log directories. Traffic logs configured
+outside `MAPTOY_DATA_DIR` are not part of the core application-data backup and only
+need a separate backup if these bounded operational records should be retained.

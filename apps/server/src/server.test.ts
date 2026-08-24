@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -139,6 +139,23 @@ describe("maptoy server", () => {
     });
     await server.close();
   });
+
+  it.each(["apiTrafficLogDirectory", "providerTrafficLogDirectory"] as const)(
+    "reports not-ready when %s is no longer writable",
+    async (key) => {
+      const config = await testConfig();
+      const server = await buildServer({ config, serveWeb: false });
+      const directory = config[key];
+      await rename(directory, `${directory}-moved`);
+      await writeFile(directory, "blocks directory recreation");
+
+      const ready = await server.inject({ method: "GET", url: "/api/ready" });
+
+      expect(ready.statusCode).toBe(503);
+      expect(ready.json()).toEqual({ status: "not-ready" });
+      await server.close();
+    },
+  );
 
   it("creates, updates, tests, persists, and deletes Map Sets", async () => {
     const config = await testConfig();

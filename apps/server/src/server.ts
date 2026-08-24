@@ -186,7 +186,11 @@ export async function buildServer(
     "/api/ready",
     async (_request, reply) => {
       try {
-        await assertWritableDirectory(config.dataDirectory);
+        await Promise.all([
+          assertWritableDirectory(config.dataDirectory),
+          assertWritableDirectory(config.apiTrafficLogDirectory),
+          assertWritableDirectory(config.providerTrafficLogDirectory),
+        ]);
         database.assertReady();
         return { status: "ready" };
       } catch (error) {

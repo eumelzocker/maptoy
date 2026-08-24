@@ -4,6 +4,8 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-08-24
+
 ### Added
 
 - Separate detailed JSON Lines traffic logs for client/API and
@@ -13,7 +15,13 @@ All notable changes to maptoy are documented in this file.
 ### Changed
 
 - The current SQLite schema is now a single version 4 baseline `.sql` package
-  asset instead of a chain of pre-release migrations embedded in TypeScript.
+  asset instead of a chain of pre-release migrations embedded in TypeScript. No
+  production database predates this baseline; future numbered migrations build on
+  version 4 and preserve its data.
+- Readiness now verifies the independently configured API and provider traffic-log
+  directories in addition to the application data directory and database.
+- The README now focuses on user setup and startup, with implementation and
+  architectural details kept in the project plan and ADRs.
 
 ## [0.0.5] - 2026-08-24
 

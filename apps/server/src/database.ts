@@ -2,6 +2,8 @@ import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+// Version 4 is the first production schema baseline. Development-only versions
+// 1 through 3 are intentionally not upgrade sources; append future migrations.
 const migrationFiles = [
   { version: 4, filename: "0004-initial-schema.sql" },
 ] as const;

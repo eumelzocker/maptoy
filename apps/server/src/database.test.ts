@@ -54,12 +54,44 @@ describe("database migrations", () => {
     const databasePath = path.join(directory, "maptoy.sqlite");
 
     const first = await openDatabase(databasePath);
-    first.sqlite.exec(`
-      INSERT INTO schema_migrations(version, applied_at) VALUES
-        (1, '2026-08-21T00:00:00.000Z'),
-        (2, '2026-08-22T00:00:00.000Z'),
-        (3, '2026-08-23T00:00:00.000Z');
-    `);
+    first.sqlite
+      .prepare(
+        `INSERT INTO map_sets (
+          id, name, source_type, url_template, attribution, terms_url, notes,
+          terms_reviewed_at, min_zoom, max_zoom, tile_size, tile_format,
+          subdomains_json, headers_json, source_projection, default_longitude,
+          default_latitude, default_zoom, renderer_id, capabilities_json,
+          cache_policy_json, download_policy_json, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )`,
+      )
+      .run(
+        "00000000-0000-4000-8000-000000000001",
+        "Preserved Map Set",
+        "xyz-raster",
+        "https://tiles.example.test/{z}/{x}/{y}.png",
+        "Example",
+        "",
+        "",
+        "",
+        0,
+        18,
+        256,
+        "png",
+        "[]",
+        "{}",
+        "EPSG:3857",
+        0,
+        0,
+        2,
+        "leaflet-xyz",
+        "{}",
+        "{}",
+        "{}",
+        "2026-08-24T00:00:00.000Z",
+        "2026-08-24T00:00:00.000Z",
+      );
     first.close();
 
     const reopened = await openDatabase(databasePath);
@@ -67,7 +99,12 @@ describe("database migrations", () => {
       reopened.sqlite
         .prepare("SELECT version FROM schema_migrations ORDER BY version")
         .all(),
-    ).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    ).toEqual([{ version: 4 }]);
+    expect(
+      reopened.sqlite
+        .prepare("SELECT name FROM map_sets WHERE id = ?")
+        .get("00000000-0000-4000-8000-000000000001"),
+    ).toEqual({ name: "Preserved Map Set" });
     reopened.assertReady();
     reopened.close();
   });

@@ -29,6 +29,12 @@ Anwendungsdaten kein von Docker verwaltetes benanntes oder anonymes Volume. Das
 Verzeichnis muss für UID `1000`, den nicht privilegierten Containerbenutzer,
 beschreibbar sein.
 
+SQLite-Schema-Version 4 ist die produktive Baseline von maptoy. Neue Installationen
+legen diese Baseline direkt an; alle künftigen nummerierten Migrationen bauen
+darauf auf und erhalten vorhandene Daten. Die Versionen 1 bis 3 waren ausschließlich
+Entwicklungsschemas und sind keine unterstützten Upgradequellen; produktive
+Datenbanken vor Version 4 existieren nicht.
+
 ## Traffic-Logs
 
 maptoy protokolliert Client/API-Traffic und Backend/Tile-Provider-Traffic getrennt
@@ -44,6 +50,12 @@ aufbewahrten Dateien einschließlich der aktiven Datei. Authentifizierungsheader
 Cookies und übliche geheime Query-Parameter werden redigiert. Die
 Logverzeichnisse müssen vor dem Compose-Start existieren und für UID `1000`
 beschreibbar sein.
+
+Der Readiness-Endpunkt prüft die Datenbank sowie fortlaufend die Schreibbarkeit des
+Anwendungsdatenverzeichnisses und beider Traffic-Log-Verzeichnisse. Außerhalb von
+`MAPTOY_DATA_DIR` konfigurierte Traffic-Logs gehören nicht zum Backup der fachlichen
+Anwendungsdaten und müssen nur separat gesichert werden, wenn diese begrenzten
+Betriebsprotokolle erhalten bleiben sollen.
 
 ## Entwicklungsbefehle
 

@@ -12,8 +12,8 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 
 - Die erste Version ist eine Single-User-Anwendung ohne Benutzerverwaltung.
 - Die Anwendung läuft zunächst als einzelner Container und benötigt keine externen Cloud-Dienste.
-- Persistente Daten liegen in einem eingebundenen Datenverzeichnis.
-- SQLite verwaltet Metadaten, Konfigurationen und Jobs; Tile-Dateien und Exporte liegen als Dateien im Datenverzeichnis.
+- Persistente Fachdaten liegen im explizit eingebundenen Anwendungsdatenverzeichnis; größenrotierte Traffic-Logs sind davon getrennte Betriebsartefakte und dürfen über eigene Host-Bind-Mounts bereitgestellt werden.
+- SQLite verwaltet Metadaten, Konfigurationen und Jobs; Tile-Dateien und Exporte liegen als Dateien im Anwendungsdatenverzeichnis.
 - Auswahl und Nutzung einer Kartenquelle erfolgen in Eigenverantwortung des Nutzers. maptoy verlinkt Nutzungsbedingungen und dokumentiert konfigurierbare technische Limits, bewertet oder erzwingt aber nicht, ob Caching, Batch-Abrufe oder Exporte rechtlich beziehungsweise vertraglich zulässig sind.
 - Anbieterbedingungen können sich ändern. Der Nutzer muss sie eigenständig prüfen und Map Sets, Limits sowie Nutzung entsprechend anpassen; die mitgelieferte Dokumentation ist keine Rechtsberatung und keine Garantie für Zulässigkeit.
 - Eine `Map Set`-Konfiguration beschreibt Kartenquelle, Renderer-Adapter, Darstellung, Cache-Regeln und zugeordnete Layer; echte Server-Secrets werden nur per Environment referenziert und nicht im Klartext in Map Sets gespeichert.
@@ -43,7 +43,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Kartenbilder aus Kartenausschnitt, Größe, Projektion und optionalen Plugin-Layern erzeugen
 - integrierte, über die Hauptnavigation erreichbare Dokumentation mit vollständiger englischer Fassung, Deutsch, Thai, Fallback, Suche, Sprachwechsel und externen Referenzlinks
 - Konfiguration über Environment und `.env` für die Entwicklung
-- Persistenz über Docker-Volumes
+- Persistenz über explizite Host-Bind-Mounts
 - Betrieb hinter einem Reverse-Proxy unter `/` oder einem Unterpfad
 - Health- und Readiness-Endpunkte für den Containerbetrieb
 
@@ -88,7 +88,7 @@ Node.js HTTP server (one port)
 - Dokumentation: Markdown-basierte Inhalte, beim Build in sichere Vue-kompatible Seiten und einen lokalen Suchindex umgewandelt
 - Verträge: gemeinsam genutzte TypeScript-Typen und Laufzeitschemas, zum Beispiel mit TypeBox oder Zod
 - API-Referenz: aus den Backend-Schemas erzeugte OpenAPI-Spezifikation, eingebettet in die Dokumentationsoberfläche
-- Datenbank: SQLite mit Migrationen über die in Node.js 24 enthaltene `node:sqlite`-API gemäß [ADR 0005](docs/internal/adr/0005-use-node-sqlite-for-metadata.md)
+- Datenbank: SQLite mit externen, nummerierten SQL-Migrationen über die in Node.js 24 enthaltene `node:sqlite`-API gemäß [ADR 0005](docs/internal/adr/0005-use-node-sqlite-for-metadata.md); Schema-Version 4 ist die festgelegte produktive Baseline, alle künftigen Migrationen bauen auf ihr auf
 - Bildverarbeitung: `sharp` für Dekodierung, Komposition und PNG/JPEG/WebP-Ausgabe
 - Projektionen: `proj4` für Koordinatenberechnungen und die GDAL-CLI für Raster-Reprojektionen; zunächst `EPSG:3857`, `EPSG:4326` und `EPSG:25833`
 - Erweiterbarkeit: typisierte SDK-Verträge und Registries für Frontend-Renderer-Adapter und Layer-Plugins
@@ -273,7 +273,7 @@ Alle Endpunkte liegen relativ unter `api/`; keine Antwort darf absolute interne 
 ### 6.1 System
 
 - `GET api/health` – einfacher Liveness-Check
-- `GET api/ready` – prüft Datenbank und Schreibbarkeit der Datenverzeichnisse
+- `GET api/ready` – prüft Datenbank sowie Schreibbarkeit des Anwendungsdatenverzeichnisses und beider Traffic-Log-Verzeichnisse
 - `GET api/config/public` – ausschließlich ungefährliche Frontend-Konfiguration
 - `GET api/openapi.json` – zur laufenden Serverversion passende OpenAPI-Spezifikation ohne interne oder geheime Konfigurationswerte
 - `GET api/map-renderers` – registrierte Frontend-Adapter und ihre Capability-Flags
@@ -371,7 +371,7 @@ Die Dokumentation ist ein fester Teil der SPA und über die Hauptnavigation sowi
 - **Erweiterungen:** Renderer-Adapter- und Layer-Plugin-Verträge, Capability-Modell, Referenz-Plugins, Versionskompatibilität und klarer Hinweis, dass Google Maps in v1.0 noch nicht implementiert ist
 - **Projektionen:** unterstützte EPSG-Codes, typische Einsatzfälle, Grenzen, Quell-/Zielprojektion und Auswirkungen der Reprojektion
 - **Glossar:** Abkürzungen und Begriffe wie XYZ, EPSG, WGS84, Web Mercator, Tile, Bounds, GPX, GeoJSON, DPI und SSRF
-- **Betrieb und Fehlersuche:** Environment-Variablen, Docker-Volume, Reverse-Proxy, Backup/Restore, Migrationen, Logs und typische Fehlerszenarien
+- **Betrieb und Fehlersuche:** Environment-Variablen, Host-Bind-Mounts, Reverse-Proxy, Backup/Restore, Migrationen, Logs und typische Fehlerszenarien
 - **Sicherheit und Verantwortung:** Secret-Verwaltung, Netzwerkzugriffe und klare Eigenverantwortung des Nutzers für Prüfung und Einhaltung der jeweils aktuellen Provider-Nutzungsbedingungen; keine Rechtsberatung oder Zulässigkeitsgarantie durch maptoy
 - **Version und Änderungen:** App-Version, Dokumentationsversion und Link zum zugehörigen Changelog
 
@@ -422,7 +422,9 @@ MAPTOY_TEMP_DIR=${MAPTOY_DATA_DIR}/tmp
 
 Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende Pflichtwerte führen zu einer klaren Fehlermeldung. Konfigurationsschemata unterscheiden `server-secret`, `public-client` und `public`. Das Backend gibt echte Server-Secrets weder an das Frontend noch in Logs oder Jobparameter weiter. Die Kategorie `public-client` ist als Adapter-Vertrag vorgesehen, wird in v1.0 aber von keinem ausgelieferten Adapter benötigt.
 
-`MAPTOY_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Datenpfad. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Datenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr erhalten eigene konfigurierbare Hostverzeichnisse und Bind-Mounts; ihre Vorgaben liegen unterhalb von `MAPTOY_DATA_DIR`, dürfen aber auf andere Hostpfade zeigen. Für persistente Anwendungsdaten werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar.
+`MAPTOY_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Pfad für persistente Fachdaten. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Anwendungsdatenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr sind Betriebsartefakte und erhalten eigene konfigurierbare Hostverzeichnisse und Bind-Mounts; ihre Vorgaben liegen unterhalb von `MAPTOY_DATA_DIR`, dürfen aber auf andere Hostpfade zeigen. Für persistente Fachdaten oder Traffic-Logs werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar. Ein Backup des Anwendungsdatenverzeichnisses umfasst die Fachdaten vollständig; extern konfigurierte Traffic-Logs müssen nur dann separat gesichert werden, wenn sie ebenfalls erhalten bleiben sollen.
+
+Schema-Version 4 ist die produktive Datenbank-Baseline. Frühere, ausschließlich während der Entwicklung verwendete Schema-Versionen sind keine unterstützten Upgradequellen und existieren nicht im Produktivbetrieb. Alle neuen Datenbanken werden direkt mit Baseline 4 angelegt; künftige nummerierte SQL-Migrationen beginnen oberhalb dieser Version und müssen bestehende Baseline-4-Daten erhalten.
 
 ### 8.2 Reverse-Proxy-Fähigkeit
 
@@ -438,8 +440,9 @@ Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende P
 - Mehrstufiger Build: Dependencies, Test/Build, minimale Runtime
 - Betrieb als nicht privilegierter Benutzer
 - genau ein veröffentlichter HTTP-Port
-- explizite Host-Bind-Mounts von `MAPTOY_DATA_DIR` nach `/data` sowie der beiden getrennt konfigurierbaren Traffic-Log-Verzeichnisse; keine benannten oder anonymen Docker-Volumes für persistente Anwendungsdaten
+- explizite Host-Bind-Mounts von `MAPTOY_DATA_DIR` nach `/data` sowie der beiden getrennt konfigurierbaren Traffic-Log-Verzeichnisse; weder für Fachdaten noch Traffic-Logs benannte oder anonyme Docker-Volumes
 - Healthcheck gegen den Liveness-Endpunkt
+- Readiness-Prüfung für Datenbank und Schreibbarkeit des Anwendungsdatenverzeichnisses sowie beider konfigurierter Traffic-Log-Verzeichnisse
 - sauberer Shutdown: keine neuen Jobs, laufende Dateischreibvorgänge abschließen, Jobstatus sichern
 - temporäre Dateien beim Start prüfen und verwaiste Dateien kontrolliert bereinigen
 - Image-Tags mindestens als Version und unveränderlicher Commit-Bezug
@@ -528,6 +531,8 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Contract-Test des Leaflet-/XYZ-Adapters und eines minimalen Fake-Adapters
 - explizite Löschung einer unreferenzierten Tile-Revision ohne Beeinflussung anderer Revisionen oder Snapshots
 - Erzeugung von `openapi.json` aus den Server-Schemas und Abgleich aller dokumentierten Endpunkte
+- Erzeugung einer frischen Datenbank aus Schema-Baseline 4 sowie verlustfreies Öffnen und spätere Migrieren bestehender Baseline-4-Datenbanken
+- getrennte Rotation und Secret-Redaktion der API-/Provider-Traffic-Logs sowie Readiness-Fehler bei nicht beschreibbaren Daten- oder Logverzeichnissen
 
 Tests verwenden keine echten öffentlichen Tile-Dienste.
 
@@ -541,7 +546,7 @@ Tests verwenden keine echten öffentlichen Tile-Dienste.
 - englische, deutsche und thailändische Dokumentationsroute öffnen, Fallback prüfen und einen kontextbezogenen Hilfelink verfolgen
 - englische und deutsche Suche prüfen; für Thai entweder funktionsfähige Suche oder den ausdrücklich deaktivierten Zustand mit Verweis auf die englische Suche prüfen
 - Anwendung unter einem Präfix-entfernenden Reverse-Proxy-Unterpfad laden; Assets, API, Tiles, Downloads, Dokumentation, Suche und pfadbasierte Deep Links funktionieren
-- Container mit leerem sowie vorhandenem Volume starten
+- Container mit leeren sowie vorhandenen Host-Bind-Mounts für Anwendungsdaten und Traffic-Logs starten
 - SIGTERM während eines Jobs und anschließender konsistenter Neustart
 
 ### 11.4 Manuelle API-Tests mit Bruno
@@ -591,14 +596,14 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Vue-SPA bauen und durch Fastify auf demselben Port ausliefern
 - Health-/Readiness-Endpunkte und strukturiertes Logging ergänzen
 - Bruno Collection mit lokaler Beispielumgebung und ersten Health-/Readiness-Requests anlegen
-- mehrstufiges Dockerfile und Compose-Beispiel mit explizitem Host-Bind-Mount für das Datenverzeichnis erstellen
+- mehrstufiges Dockerfile und Compose-Beispiel mit explizitem Host-Bind-Mount für das Anwendungsdatenverzeichnis erstellen
 - gemeinsame semantische Versionierung aller auslieferungsrelevanten Paketmanifeste und einen Changelog einführen; Spikes werden unabhängig und nur bei eigenen Änderungen versioniert
 
 **Ergebnis/Akzeptanz**
 
 - Ein Befehl startet die Entwicklungsumgebung, ein weiterer alle Qualitätschecks.
 - Der Container startet ohne Root-Rechte, liefert SPA und API auf einem Port und wird gesund gemeldet.
-- Datenbank und spätere persistente Artefakte liegen über `MAPTOY_DATA_DIR` in einem direkt zugänglichen Hostverzeichnis; Compose legt dafür kein Docker-verwaltetes Volume an.
+- Datenbank und spätere persistente Fachdaten liegen über `MAPTOY_DATA_DIR` in einem direkt zugänglichen Hostverzeichnis; separat konfigurierte Betriebsartefakte verwenden ebenfalls explizite Host-Bind-Mounts, und Compose legt keine Docker-verwalteten Volumes an.
 - Die vollständige englische Startseite sowie deutsche und thailändische Routen mit funktionierendem Englisch-Fallback sind über die Hauptnavigation erreichbar.
 - Ein automatisierter Test bestätigt den Betrieb hinter einem Präfix-entfernenden Proxy-Unterpfad.
 - Der Abschluss der Phase 1 ist als gemeinsame Version `0.0.1` in allen Paketmanifesten und im Changelog nachvollziehbar.
@@ -654,31 +659,15 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Revisionsanzahl und belegter Speicher stimmen mit den gespeicherten Dateien überein; ein bestätigter Abgleich entfernt sowohl verwaiste Dateien als auch unbrauchbare DB-Revisionen für extern gelöschte Dateien.
 - Der normale Aufruf der Cache-Seite lädt weder sämtliche Revisionen noch scannt er das Tile-Verzeichnis; beide teuren Operationen erfolgen begrenzt beziehungsweise ausdrücklich.
 
-### Phase 4: Batch-Downloads und Job-System
+Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckung baut unmittelbar auf dem Tile-Archiv auf, und das Layer-Plugin-System benötigt kein persistentes Jobmodell. Erst die Kennzeichnung aktuell bearbeiteter Coverage-Bereiche wird mit dem späteren Download-Worker verbunden. Das Job-System bleibt Voraussetzung für den anschließenden Kartenbild-Export.
 
-**Aufgaben**
-
-- persistentes Jobmodell und einen In-Process-Worker implementieren
-- Gebiet-/Zoom-Schätzung mit Duplikat- und Cache-Berücksichtigung bauen
-- providerbezogene Rate-Limits, Parallelität, Retries und `Retry-After` umsetzen
-- Pause, Fortsetzung, Abbruch und Neustart-Recovery ergänzen
-- Download-Ansicht mit Gebietsauswahl und Jobfortschritt erstellen
-- konfigurierte Speicher-, Größen- und Betriebsgrenzen durchsetzen und Terms-/Attributionshinweise vor Start anzeigen
-
-**Ergebnis/Akzeptanz**
-
-- Eine kleine definierte Region kann vollständig vorab geladen werden.
-- Schätzung und tatsächliche Zahl der bearbeiteten Tiles sind nachvollziehbar.
-- 429-Antworten verlangsamen den Worker; Abbruch und Neustart führen nicht zu beschädigten Daten.
-- Die Oberfläche macht die Eigenverantwortung sichtbar, trifft aber keine rechtliche Zulässigkeitsentscheidung für den Nutzer.
-
-### Phase 5: Cache-Abdeckung
+### Phase 4: Cache-Abdeckung
 
 **Aufgaben**
 
 - effiziente Abdeckungsabfrage und Aggregation entwickeln
-- Zoomfilter und Statusklassen implementieren
-- Coverage-Layer über die neutrale Adapter-Schnittstelle für vorhanden, fehlend, veraltet und laufend bauen
+- Zoomfilter und Statusklassen für vorhanden, fehlend und veraltet implementieren; den später vom Job-System gelieferten Zustand `laufend` bereits im Vertrag vorsehen
+- Coverage-Layer über die neutrale Adapter-Schnittstelle bauen
 - Auswahl von aktuellem Stand, Snapshot und Zeitpunkt sowie Vergleichsdarstellung ergänzen
 - Detailansicht mit Tile-Zahl, Revisionen, Änderungen, Größe und Aktualität ergänzen
 - Performance für große Caches messen und bei Bedarf Indizes oder vorberechnete Aggregate ergänzen
@@ -688,8 +677,9 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Die Abdeckung eines typischen Caches wird ohne Übertragung sämtlicher Tile-Datensätze flüssig dargestellt.
 - Zwei ausgewählte Stände lassen sich aggregiert vergleichen und bis zu einzelnen geänderten Tiles untersuchen.
 - Die Anzeige stimmt in Stichproben mit dem Dateisystem und den Cache-Metadaten überein.
+- Die Coverage-Verträge können den Zustand `laufend` aufnehmen, ohne bereits ein Job-System vorauszusetzen.
 
-### Phase 6: Layer-Plugin-System
+### Phase 5: Layer-Plugin-System
 
 **Aufgaben**
 
@@ -709,6 +699,26 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Beide Referenz-Plugins verwenden ausschließlich die veröffentlichten Plugin-Schnittstellen und bestehen dieselbe Contract-Test-Suite.
 - Ein deaktiviertes oder fehlendes Plugin verursacht keinen Datenverlust; ungültige beziehungsweise inkompatible Zustände werden verständlich angezeigt.
 - Es kann kein ausführbarer Plugin-Code über API oder Weboberfläche installiert werden.
+
+### Phase 6: Batch-Downloads und Job-System
+
+**Aufgaben**
+
+- persistentes Jobmodell und einen In-Process-Worker implementieren
+- Gebiet-/Zoom-Schätzung mit Duplikat- und Cache-Berücksichtigung bauen
+- providerbezogene Rate-Limits, Parallelität, Retries und `Retry-After` umsetzen
+- Pause, Fortsetzung, Abbruch und Neustart-Recovery ergänzen
+- Download-Ansicht mit Gebietsauswahl und Jobfortschritt erstellen
+- laufende Download-Einheiten in die vorhandene Coverage-Abfrage integrieren und dort als `laufend` darstellen
+- konfigurierte Speicher-, Größen- und Betriebsgrenzen durchsetzen und Terms-/Attributionshinweise vor Start anzeigen
+
+**Ergebnis/Akzeptanz**
+
+- Eine kleine definierte Region kann vollständig vorab geladen werden.
+- Schätzung und tatsächliche Zahl der bearbeiteten Tiles sind nachvollziehbar.
+- 429-Antworten verlangsamen den Worker; Abbruch und Neustart führen nicht zu beschädigten Daten.
+- Die Coverage-Ansicht zeigt die vom Worker aktuell bearbeiteten Tiles konsistent als `laufend` an.
+- Die Oberfläche macht die Eigenverantwortung sichtbar, trifft aber keine rechtliche Zulässigkeitsentscheidung für den Nutzer.
 
 ### Phase 7: Kartenbild-Export
 
@@ -790,24 +800,24 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - hashbasiertes Tile-Archiv mit aktuellem Stand und dauerhaft erhaltener Revisionshistorie
 - integrierte Dokumentationsnavigation mit vollständigem englischem Schnellstart sowie Deutsch-/Thai-Fallback
 
-### v0.2 – Offline-Vorbereitung
+### v0.2 – Cache-Analyse und interaktive Layer
 
 - mehrere Map Sets mit jeweils stabiler Quellenkonfiguration
 - Cache-Snapshots, Zeitstände und Hash-/Metadatenvergleiche
-- belastbares Job-System
-- Batch-Download mit Limits
 - Coverage-Ansicht
-- lokalisierbare Dokumentation für Map Sets, Cache, Coverage und Downloads
-
-### v0.3 – Kartenerzeugung
-
-- Bildexport in Quellprojektion
-- ausgewählte alternative Projektionen
 - allgemeines Layer-Plugin-System mit SDK und Contract-Tests
 - Track- und Bild-Referenz-Plugins einschließlich GPS-getaggter Bilder
 - verwalteter Asset-Upload über Frontend und API
+- lokalisierbare Dokumentation für Map Sets, Cache, Coverage und Layer
+
+### v0.3 – Automatisierung und Kartenerzeugung
+
+- belastbares Job-System
+- Batch-Download mit Limits
+- Bildexport in Quellprojektion
+- ausgewählte alternative Projektionen
 - Exporthistorie und Download
-- vollständige englische Projektions-, Plugin- und Exportdokumentation mit lokalisierten Fassungen
+- vollständige englische Download-, Projektions-, Plugin- und Exportdokumentation mit lokalisierten Fassungen
 
 ### v1.0 – Stabiler Privatbetrieb
 
@@ -816,7 +826,7 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - vollständiges englisches App-Handbuch, API-Referenz, Provider-/Plugin-Bereich, Glossar und lokalisierte Suche mit Deutsch-/Thai-Fallback
 - versionierte Renderer-Adapter- und Layer-Plugin-Verträge; Google-Maps-Adapter weiterhin bewusst nicht implementiert
 - vollständige Reverse-Proxy- und Container-Tests
-- definierte Kompatibilitäts- und Migrationsregeln
+- definierte Kompatibilitäts- und Migrationsregeln ab der produktiven Schema-Baseline 4
 - vollständige manuelle Bruno Collection für die zentralen API-Abläufe
 
 ## 14. Risiken und Gegenmaßnahmen
