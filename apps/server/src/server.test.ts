@@ -25,6 +25,10 @@ async function testConfig(): Promise<MaptoyConfig> {
     dataDirectory,
     databasePath: path.join(dataDirectory, "maptoy.sqlite"),
     logLevel: "silent",
+    apiTrafficLogDirectory: path.join(dataDirectory, "logs", "api"),
+    providerTrafficLogDirectory: path.join(dataDirectory, "logs", "provider"),
+    trafficLogMaxBytes: 1024 * 1024,
+    trafficLogMaxFiles: 3,
     allowPrivateTileHosts: true,
     providerTimeoutMilliseconds: 1000,
     maximumTileBytes: 1024 * 1024,
@@ -48,6 +52,55 @@ afterEach(async () => {
 });
 
 describe("maptoy server", () => {
+  it("writes separate redacted API and provider traffic logs", async () => {
+    const config = await testConfig();
+    const server = await buildServer({
+      config,
+      environment: { MAPTOY_TEST_KEY: "provider-secret" },
+      providerClient,
+      serveWeb: false,
+    });
+    const input = {
+      ...createDefaultMapSetInput(),
+      urlTemplate:
+        "http://tiles.example.test/{z}/{x}/{y}.png?key=$" + "{MAPTOY_TEST_KEY}",
+      headers: { Authorization: "Bearer provider-secret" },
+    };
+
+    const health = await server.inject({
+      method: "GET",
+      url: "/api/health",
+      headers: { authorization: "Bearer client-secret" },
+    });
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: input,
+    });
+    await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${created.json().id}/test`,
+    });
+    await server.close();
+
+    const apiLog = await readFile(
+      path.join(config.apiTrafficLogDirectory, "api-traffic.log"),
+      "utf8",
+    );
+    const providerLog = await readFile(
+      path.join(config.providerTrafficLogDirectory, "provider-traffic.log"),
+      "utf8",
+    );
+    expect(health.statusCode).toBe(200);
+    expect(apiLog).toContain('"event":"api.response"');
+    expect(apiLog).toContain('"authorization":"[REDACTED]"');
+    expect(apiLog).not.toContain("client-secret");
+    expect(providerLog).toContain('"event":"provider.response"');
+    expect(providerLog).toContain("key=%5BREDACTED%5D");
+    expect(providerLog).toContain('"Authorization":"[REDACTED]"');
+    expect(providerLog).not.toContain("provider-secret");
+  });
+
   it("serves health, readiness, and extension manifests", async () => {
     const server = await buildServer({
       config: await testConfig(),

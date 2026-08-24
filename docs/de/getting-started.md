@@ -18,7 +18,7 @@ Hostverzeichnis ein und lege es vor dem Compose-Start an. Die Vorgabe verwendet:
 
 ```sh
 cp .env.example .env
-mkdir -p .data
+mkdir -p .data/logs/api .data/logs/provider
 docker compose up --build
 ```
 
@@ -27,6 +27,22 @@ die SQLite-Datenbank als `maptoy.sqlite`; spätere Tile-Archive und Exporte verw
 dasselbe vom Host kontrollierte Verzeichnis. maptoy verwendet für persistente
 Anwendungsdaten kein von Docker verwaltetes benanntes oder anonymes Volume. Das
 Verzeichnis muss für UID `1000`, den nicht privilegierten Containerbenutzer,
+beschreibbar sein.
+
+## Traffic-Logs
+
+maptoy protokolliert Client/API-Traffic und Backend/Tile-Provider-Traffic getrennt
+als JSON Lines. Compose bind-mountet die mit `MAPTOY_API_TRAFFIC_LOG_DIR` und
+`MAPTOY_PROVIDER_TRAFFIC_LOG_DIR` konfigurierten Verzeichnisse. Standardmäßig
+liegen sie unterhalb von `MAPTOY_DATA_DIR`; beide dürfen aber auf beliebige andere
+Hostpfade zeigen. Die aktiven Dateien heißen `api-traffic.log` und
+`provider-traffic.log`.
+
+`MAPTOY_TRAFFIC_LOG_MAX_BYTES` begrenzt die Größe jeder Datei vor der Rotation.
+`MAPTOY_TRAFFIC_LOG_MAX_FILES` bestimmt je Traffic-Typ die Gesamtzahl der
+aufbewahrten Dateien einschließlich der aktiven Datei. Authentifizierungsheader,
+Cookies und übliche geheime Query-Parameter werden redigiert. Die
+Logverzeichnisse müssen vor dem Compose-Start existieren und für UID `1000`
 beschreibbar sein.
 
 ## Entwicklungsbefehle

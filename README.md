@@ -16,7 +16,7 @@ Requirements: Docker with the Compose plugin.
 
 ```sh
 cp .env.example .env
-mkdir -p .data
+mkdir -p .data/logs/api .data/logs/provider
 docker compose up --build
 ```
 
@@ -44,6 +44,10 @@ MAPTOY_HOST=0.0.0.0
 MAPTOY_PORT=4004
 MAPTOY_DATA_DIR=./.data
 MAPTOY_LOG_LEVEL=info
+MAPTOY_API_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/api
+MAPTOY_PROVIDER_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/provider
+MAPTOY_TRAFFIC_LOG_MAX_BYTES=10485760
+MAPTOY_TRAFFIC_LOG_MAX_FILES=5
 MAPTOY_ALLOW_PRIVATE_TILE_HOSTS=false
 MAPTOY_PROVIDER_TIMEOUT_MS=10000
 MAPTOY_MAX_TILE_BYTES=10485760
@@ -56,6 +60,15 @@ without Docker, the same `.env` values are used directly. Compose does not creat
 Docker-managed named or anonymous data volume. Variables from `.env`, including
 provider secrets, are passed into the container; the internal data directory is
 overridden with `/data`.
+
+API traffic and tile-provider traffic are written as JSON Lines to separate,
+size-rotated logs. Compose bind-mounts `MAPTOY_API_TRAFFIC_LOG_DIR` and
+`MAPTOY_PROVIDER_TRAFFIC_LOG_DIR` independently; these host paths may be outside
+`MAPTOY_DATA_DIR`. The active files are `api-traffic.log` and
+`provider-traffic.log`, with older files named `.1`, `.2`, and so on.
+`MAPTOY_TRAFFIC_LOG_MAX_BYTES` limits each file and
+`MAPTOY_TRAFFIC_LOG_MAX_FILES` counts the active file plus retained rotations.
+Request credentials, cookies, and common secret query parameters are redacted.
 
 For operation below a URL prefix such as `/tools/maptoy/`, configure the reverse
 proxy to remove that prefix before forwarding requests. All frontend URLs and the

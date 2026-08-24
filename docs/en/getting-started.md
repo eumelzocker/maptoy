@@ -31,7 +31,7 @@ and create it before starting Compose. The default setup is:
 
 ```sh
 cp .env.example .env
-mkdir -p .data
+mkdir -p .data/logs/api .data/logs/provider
 docker compose up --build
 ```
 
@@ -40,3 +40,17 @@ database is stored as `maptoy.sqlite` in it; future tile archives and exports us
 the same host-controlled directory. maptoy does not use a Docker-managed named or
 anonymous volume for persistent application data. The directory must be writable
 by UID `1000`, which is the non-root user running the container.
+
+## Traffic logs
+
+maptoy keeps client/API traffic and backend/tile-provider traffic in separate
+JSON Lines logs. Compose bind-mounts the directories configured by
+`MAPTOY_API_TRAFFIC_LOG_DIR` and `MAPTOY_PROVIDER_TRAFFIC_LOG_DIR`; their defaults
+are below `MAPTOY_DATA_DIR`, but either path can point elsewhere on the host. The
+active files are named `api-traffic.log` and `provider-traffic.log`.
+
+`MAPTOY_TRAFFIC_LOG_MAX_BYTES` controls the size of each file before rotation.
+`MAPTOY_TRAFFIC_LOG_MAX_FILES` controls the total retained files per traffic type,
+including the active file. Authentication headers, cookies, and common secret
+query parameters are redacted. The log directories must exist before Compose
+starts and must be writable by UID `1000`.

@@ -12,6 +12,23 @@ describe("container persistence", () => {
     expect(compose).not.toContain("maptoy-data:");
   });
 
+  it("bind-mounts both rotating traffic log directories", async () => {
+    const compose = await readFile("compose.yaml", "utf8");
+    const apiLogDirectory =
+      "$" +
+      "{MAPTOY_API_TRAFFIC_LOG_DIR:-$" +
+      "{MAPTOY_DATA_DIR:-./.data}/logs/api}";
+    const providerLogDirectory =
+      "$" +
+      "{MAPTOY_PROVIDER_TRAFFIC_LOG_DIR:-$" +
+      "{MAPTOY_DATA_DIR:-./.data}/logs/provider}";
+
+    expect(compose).toContain(`source: ${apiLogDirectory}`);
+    expect(compose).toContain("target: /logs/api");
+    expect(compose).toContain(`source: ${providerLogDirectory}`);
+    expect(compose).toContain("target: /logs/provider");
+  });
+
   it("does not declare an implicit image volume", async () => {
     const dockerfile = await readFile("Dockerfile", "utf8");
 

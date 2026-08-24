@@ -17,6 +17,11 @@ import { SafeProviderClient, type ProviderClient } from "./providerClient.js";
 import { TileArchiveRepository } from "./tiles/repository.js";
 import { TileArchiveService } from "./tiles/service.js";
 import { TileStorage } from "./tiles/storage.js";
+import { RotatingTrafficLog } from "./trafficLog.js";
+import {
+  registerApiTrafficLogging,
+  TrafficLoggingProviderClient,
+} from "./trafficLogging.js";
 
 export interface BuildServerOptions {
   config?: MaptoyConfig;
@@ -54,11 +59,56 @@ function defaultStaticDirectory(): string {
   return path.resolve(import.meta.dirname, "../../web/dist");
 }
 
+const configurationEnvironmentNames = new Set([
+  "MAPTOY_HOST",
+  "MAPTOY_PORT",
+  "MAPTOY_DATA_DIR",
+  "MAPTOY_LOG_LEVEL",
+  "MAPTOY_API_TRAFFIC_LOG_DIR",
+  "MAPTOY_PROVIDER_TRAFFIC_LOG_DIR",
+  "MAPTOY_TRAFFIC_LOG_MAX_BYTES",
+  "MAPTOY_TRAFFIC_LOG_MAX_FILES",
+  "MAPTOY_ALLOW_PRIVATE_TILE_HOSTS",
+  "MAPTOY_PROVIDER_TIMEOUT_MS",
+  "MAPTOY_MAX_TILE_BYTES",
+]);
+
+function providerSecretValues(environment: NodeJS.ProcessEnv): string[] {
+  return Object.entries(environment)
+    .filter(
+      ([name, value]) =>
+        name.startsWith("MAPTOY_") &&
+        !configurationEnvironmentNames.has(name) &&
+        value !== undefined &&
+        value !== "",
+    )
+    .map(([, value]) => value as string);
+}
+
 export async function buildServer(
   options: BuildServerOptions = {},
 ): Promise<FastifyInstance> {
   const config = options.config ?? loadConfig();
+  const environment = options.environment ?? process.env;
   const server = Fastify({ logger: options.logger ?? false });
+  const trafficLogOptions = {
+    maximumBytes: config.trafficLogMaxBytes,
+    maximumFiles: config.trafficLogMaxFiles,
+    onError: (error: unknown) => {
+      server.log.error({ error }, "Traffic log write failed");
+    },
+  };
+  const apiTrafficLog = await RotatingTrafficLog.create({
+    ...trafficLogOptions,
+    directory: config.apiTrafficLogDirectory,
+    filename: "api-traffic.log",
+  });
+  const providerTrafficLog = await RotatingTrafficLog.create({
+    ...trafficLogOptions,
+    directory: config.providerTrafficLogDirectory,
+    filename: "provider-traffic.log",
+  });
+  registerApiTrafficLogging(server, apiTrafficLog);
   await mkdir(config.dataDirectory, { recursive: true });
   const database = await openDatabase(config.databasePath);
   const mapSetRepository = new MapSetRepository(database.sqlite);
@@ -68,13 +118,18 @@ export async function buildServer(
     new TileStorage(config.dataDirectory),
   );
   await tileArchive.initialize();
-  const providerClient =
+  const baseProviderClient =
     options.providerClient ??
     new SafeProviderClient({
       allowPrivateHosts: config.allowPrivateTileHosts,
       timeoutMilliseconds: config.providerTimeoutMilliseconds,
       maximumResponseBytes: config.maximumTileBytes,
     });
+  const providerClient = new TrafficLoggingProviderClient(
+    baseProviderClient,
+    providerTrafficLog,
+    providerSecretValues(environment),
+  );
   const mapSetService = new MapSetService(
     mapSetRepository,
     mapRendererRegistry,
@@ -82,11 +137,12 @@ export async function buildServer(
     tileArchive,
     {
       allowPrivateTileHosts: config.allowPrivateTileHosts,
-      environment: options.environment ?? process.env,
+      environment,
     },
   );
 
   server.addHook("onClose", async () => {
+    await Promise.all([apiTrafficLog.close(), providerTrafficLog.close()]);
     database.close();
   });
 

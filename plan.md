@@ -409,6 +409,10 @@ MAPTOY_HOST=0.0.0.0
 MAPTOY_PORT=4004
 MAPTOY_DATA_DIR=./.data
 MAPTOY_LOG_LEVEL=info
+MAPTOY_API_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/api
+MAPTOY_PROVIDER_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/provider
+MAPTOY_TRAFFIC_LOG_MAX_BYTES=10485760
+MAPTOY_TRAFFIC_LOG_MAX_FILES=5
 MAPTOY_MAX_CONCURRENT_JOBS=1
 MAPTOY_MAX_EXPORT_PIXELS=100000000
 MAPTOY_TEMP_DIR=${MAPTOY_DATA_DIR}/tmp
@@ -418,7 +422,7 @@ MAPTOY_TEMP_DIR=${MAPTOY_DATA_DIR}/tmp
 
 Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende Pflichtwerte führen zu einer klaren Fehlermeldung. Konfigurationsschemata unterscheiden `server-secret`, `public-client` und `public`. Das Backend gibt echte Server-Secrets weder an das Frontend noch in Logs oder Jobparameter weiter. Die Kategorie `public-client` ist als Adapter-Vertrag vorgesehen, wird in v1.0 aber von keinem ausgelieferten Adapter benötigt.
 
-`MAPTOY_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Datenpfad. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Datenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Für persistente Anwendungsdaten werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar.
+`MAPTOY_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Datenpfad. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Datenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr erhalten eigene konfigurierbare Hostverzeichnisse und Bind-Mounts; ihre Vorgaben liegen unterhalb von `MAPTOY_DATA_DIR`, dürfen aber auf andere Hostpfade zeigen. Für persistente Anwendungsdaten werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar.
 
 ### 8.2 Reverse-Proxy-Fähigkeit
 
@@ -434,7 +438,7 @@ Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende P
 - Mehrstufiger Build: Dependencies, Test/Build, minimale Runtime
 - Betrieb als nicht privilegierter Benutzer
 - genau ein veröffentlichter HTTP-Port
-- ausschließlich ein expliziter Host-Bind-Mount von `MAPTOY_DATA_DIR` nach `/data`; keine benannten oder anonymen Docker-Volumes für persistente Anwendungsdaten
+- explizite Host-Bind-Mounts von `MAPTOY_DATA_DIR` nach `/data` sowie der beiden getrennt konfigurierbaren Traffic-Log-Verzeichnisse; keine benannten oder anonymen Docker-Volumes für persistente Anwendungsdaten
 - Healthcheck gegen den Liveness-Endpunkt
 - sauberer Shutdown: keine neuen Jobs, laufende Dateischreibvorgänge abschließen, Jobstatus sichern
 - temporäre Dateien beim Start prüfen und verwaiste Dateien kontrolliert bereinigen

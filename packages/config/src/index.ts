@@ -4,6 +4,8 @@ export const DEFAULT_HTTP_HOST = "0.0.0.0";
 export const DEFAULT_HTTP_PORT = 4004;
 export const DEFAULT_DATA_DIR = ".data";
 export const DEFAULT_LOG_LEVEL = "info";
+export const DEFAULT_TRAFFIC_LOG_MAX_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_TRAFFIC_LOG_MAX_FILES = 5;
 export const DEFAULT_PROVIDER_TIMEOUT_MILLISECONDS = 10_000;
 export const DEFAULT_MAX_TILE_BYTES = 10 * 1024 * 1024;
 
@@ -22,9 +24,27 @@ export interface MaptoyConfig {
   dataDirectory: string;
   databasePath: string;
   logLevel: LogLevel;
+  apiTrafficLogDirectory: string;
+  providerTrafficLogDirectory: string;
+  trafficLogMaxBytes: number;
+  trafficLogMaxFiles: number;
   allowPrivateTileHosts: boolean;
   providerTimeoutMilliseconds: number;
   maximumTileBytes: number;
+}
+
+function parseLogDirectory(
+  value: string | undefined,
+  dataDirectory: string,
+  defaultName: string,
+): string {
+  const dataDirectoryReference = "$" + "{MAPTOY_DATA_DIR}";
+  const configured = value
+    ?.trim()
+    .replaceAll(dataDirectoryReference, dataDirectory);
+  return path.resolve(
+    configured || path.join(dataDirectory, "logs", defaultName),
+  );
 }
 
 function parsePort(value: string | undefined): number {
@@ -90,6 +110,26 @@ export function loadConfig(
     dataDirectory,
     databasePath,
     logLevel: parseLogLevel(environment.MAPTOY_LOG_LEVEL),
+    apiTrafficLogDirectory: parseLogDirectory(
+      environment.MAPTOY_API_TRAFFIC_LOG_DIR,
+      dataDirectory,
+      "api",
+    ),
+    providerTrafficLogDirectory: parseLogDirectory(
+      environment.MAPTOY_PROVIDER_TRAFFIC_LOG_DIR,
+      dataDirectory,
+      "provider",
+    ),
+    trafficLogMaxBytes: parsePositiveInteger(
+      environment.MAPTOY_TRAFFIC_LOG_MAX_BYTES,
+      DEFAULT_TRAFFIC_LOG_MAX_BYTES,
+      "MAPTOY_TRAFFIC_LOG_MAX_BYTES",
+    ),
+    trafficLogMaxFiles: parsePositiveInteger(
+      environment.MAPTOY_TRAFFIC_LOG_MAX_FILES,
+      DEFAULT_TRAFFIC_LOG_MAX_FILES,
+      "MAPTOY_TRAFFIC_LOG_MAX_FILES",
+    ),
     allowPrivateTileHosts: parseBoolean(
       environment.MAPTOY_ALLOW_PRIVATE_TILE_HOSTS,
       "MAPTOY_ALLOW_PRIVATE_TILE_HOSTS",

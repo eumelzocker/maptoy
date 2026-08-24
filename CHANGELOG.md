@@ -4,6 +4,17 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Separate detailed JSON Lines traffic logs for client/API and
+  backend/tile-provider exchanges, including credential redaction, independent
+  host bind mounts, and configurable size rotation with bounded retention.
+
+### Changed
+
+- The current SQLite schema is now a single version 4 baseline `.sql` package
+  asset instead of a chain of pre-release migrations embedded in TypeScript.
+
 ## [0.0.5] - 2026-08-24
 
 ### Added
