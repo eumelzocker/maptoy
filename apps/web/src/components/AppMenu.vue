@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
+import {
+  type CSSProperties,
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from "vue";
 import type { MenuItem } from "../menuModels.js";
 
 const props = withDefaults(
@@ -24,6 +31,76 @@ const emit = defineEmits<{
 
 const root = ref<HTMLElement | null>(null);
 const openSubmenuId = ref<string | null>(null);
+const openSubmenuDirection = ref<"start" | "end">(props.submenuDirection);
+const submenuStyle = ref<CSSProperties>();
+let scheduledClose: ReturnType<typeof setTimeout> | null = null;
+let activePointerType: string | null = null;
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const leafSubmenu = computed(
+  () => props.nested && !props.items.some((item) => item.children?.length),
+);
+
+onMounted(() => {
+  if (!props.nested || window.matchMedia("(max-width: 700px)").matches) {
+    return;
+  }
+  void nextTick(() => {
+    const box = root.value?.getBoundingClientRect();
+    if (box === undefined) {
+      return;
+    }
+    const edge = 8;
+    const offset =
+      box.bottom > window.innerHeight - edge
+        ? window.innerHeight - edge - box.bottom
+        : box.top < edge
+          ? edge - box.top
+          : 0;
+    if (offset !== 0) {
+      submenuStyle.value = { transform: `translateY(${offset}px)` };
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  if (scheduledClose !== null) {
+    clearTimeout(scheduledClose);
+  }
+});
+
+function cancelScheduledClose(): void {
+  if (scheduledClose !== null) {
+    clearTimeout(scheduledClose);
+    scheduledClose = null;
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function recordPointerType(event: PointerEvent): void {
+  activePointerType = event.pointerType;
+}
+
+function resolveSubmenuDirection(itemId: string): void {
+  const entry = directButtons().find(
+    ({ dataset }) => dataset.menuItemId === itemId,
+  )?.parentElement;
+  const submenu = entry?.querySelector<HTMLElement>(":scope > .app-menu");
+  if (
+    entry === undefined ||
+    entry === null ||
+    submenu === undefined ||
+    submenu === null
+  ) {
+    return;
+  }
+  const entryBox = entry.getBoundingClientRect();
+  const submenuWidth = submenu.getBoundingClientRect().width;
+  const edge = 8;
+  const spaceRight = window.innerWidth - entryBox.right - edge;
+  const spaceLeft = entryBox.left - edge;
+  openSubmenuDirection.value =
+    spaceRight >= submenuWidth || spaceRight >= spaceLeft ? "end" : "start";
+}
 
 function directButtons(): HTMLButtonElement[] {
   if (root.value === null) {
@@ -64,22 +141,30 @@ function openSubmenu(item: MenuItem, focusChild = false): void {
   if (!item.children?.length || item.disabled) {
     return;
   }
+  cancelScheduledClose();
+  const button = directButtons().find(
+    ({ dataset }) => dataset.menuItemId === item.id,
+  );
+  const buttonBox = button?.getBoundingClientRect();
+  openSubmenuDirection.value =
+    buttonBox !== undefined && window.innerWidth - buttonBox.right >= 224
+      ? "end"
+      : props.submenuDirection;
   openSubmenuId.value = item.id;
-  if (focusChild) {
-    void nextTick(() => {
-      const button = directButtons().find(
-        ({ dataset }) => dataset.menuItemId === item.id,
-      );
+  void nextTick(() => {
+    resolveSubmenuDirection(item.id);
+    if (focusChild) {
       button?.parentElement
         ?.querySelector<HTMLButtonElement>(
-          ".app-menu .menu-item:not(:disabled)",
+          ":scope > .app-menu > .menu-entry > .menu-item:not(:disabled)",
         )
         ?.focus();
-    });
-  }
+    }
+  });
 }
 
 function closeSubmenu(itemId: string, restoreFocus = false): void {
+  cancelScheduledClose();
   if (openSubmenuId.value !== itemId) {
     return;
   }
@@ -90,17 +175,29 @@ function closeSubmenu(itemId: string, restoreFocus = false): void {
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function scheduleSubmenuClose(itemId: string, event: PointerEvent): void {
+  if (event.pointerType === "touch") {
+    return;
+  }
+  cancelScheduledClose();
+  scheduledClose = setTimeout(() => {
+    scheduledClose = null;
+    closeSubmenu(itemId);
+  }, 150);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function selectItem(item: MenuItem): void {
   emit("select", item);
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-function activate(item: MenuItem): void {
+function activate(item: MenuItem, event: MouseEvent): void {
   if (item.disabled) {
     return;
   }
   if (item.children?.length) {
-    openSubmenu(item, true);
+    openSubmenu(item, event.detail === 0);
     return;
   }
   emit("select", item);
@@ -109,18 +206,24 @@ function activate(item: MenuItem): void {
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function closeAfterFocusLeaves(item: MenuItem, event: FocusEvent): void {
-  const nextTarget = event.relatedTarget;
-  const entry = event.currentTarget;
-  if (
-    entry instanceof HTMLElement &&
-    (!(nextTarget instanceof Node) || !entry.contains(nextTarget))
-  ) {
-    closeSubmenu(item.id);
+  if (activePointerType === "touch") {
+    return;
   }
+  const entry = event.currentTarget;
+  if (!(entry instanceof HTMLElement)) {
+    return;
+  }
+  void nextTick(() => {
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof Node) || !entry.contains(activeElement)) {
+      closeSubmenu(item.id);
+    }
+  });
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function onItemKeydown(event: KeyboardEvent, item: MenuItem): void {
+  activePointerType = null;
   const current = event.currentTarget;
   if (!(current instanceof HTMLButtonElement)) {
     return;
@@ -172,35 +275,41 @@ defineExpose({ focusFirst });
   <ul
     ref="root"
     class="app-menu"
-    :class="[`submenu-${submenuDirection}`, { submenu: nested }]"
+    :class="[
+      `submenu-${submenuDirection}`,
+      { submenu: nested, 'submenu-leaf': leafSubmenu },
+    ]"
+    :style="submenuStyle"
     role="menu"
     :aria-label="ariaLabel"
+    @pointerdown.capture="recordPointerType"
   >
     <li
       v-for="item in items"
       :key="item.id"
       class="menu-entry"
       role="none"
-      @mouseenter="openSubmenu(item)"
-      @mouseleave="closeSubmenu(item.id)"
+      @pointerenter="openSubmenu(item)"
+      @pointerleave="scheduleSubmenuClose(item.id, $event)"
       @focusout="closeAfterFocusLeaves(item, $event)"
     >
       <button
         class="menu-item"
         type="button"
-        role="menuitem"
+        :role="item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'"
         :title="item.title"
         :disabled="item.disabled"
         :data-menu-item-id="item.id"
         :aria-current="item.selected ? 'true' : undefined"
+        :aria-checked="item.checked"
         :aria-haspopup="item.children?.length ? 'menu' : undefined"
         :aria-expanded="item.children?.length ? openSubmenuId === item.id : undefined"
-        @click="activate(item)"
+        @click="activate(item, $event)"
         @keydown="onItemKeydown($event, item)"
       >
         <span class="item-icon" aria-hidden="true">
           <i v-if="item.icon" class="mdi" :class="item.icon"></i>
-          <i v-else-if="item.selected" class="mdi mdi-check"></i>
+          <i v-else-if="item.selected || item.checked" class="mdi mdi-check"></i>
         </span>
         <span class="item-label">{{ item.label }}</span>
         <i
@@ -214,7 +323,7 @@ defineExpose({ focusFirst });
         v-if="item.children?.length && openSubmenuId === item.id"
         :items="item.children"
         :aria-label="`${item.label} submenu`"
-        :submenu-direction="submenuDirection"
+        :submenu-direction="openSubmenuDirection"
         nested
         @select="selectItem"
         @close="emit('close')"
@@ -301,6 +410,11 @@ defineExpose({ focusFirst });
   z-index: 1;
 }
 
+.app-menu.submenu-leaf {
+  max-height: min(24rem, calc(100dvh - 1rem));
+  overflow-y: auto;
+}
+
 .app-menu.submenu-end {
   left: 100%;
 }
@@ -309,7 +423,7 @@ defineExpose({ focusFirst });
   right: 100%;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .app-menu.submenu {
     position: static;
     min-width: 0;
@@ -318,6 +432,7 @@ defineExpose({ focusFirst });
     border-left: 0.15rem solid #bfd0c7;
     border-radius: 0;
     box-shadow: none;
+    transform: none !important;
   }
 
   .menu-item {

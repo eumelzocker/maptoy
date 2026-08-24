@@ -4,6 +4,7 @@ import type {
   GeographicCoordinate,
   MapRendererInstance,
 } from "@maptoy/map-adapter-sdk";
+import { documentation } from "virtual:maptoy-docs";
 import { storeToRefs } from "pinia";
 import {
   computed,
@@ -14,6 +15,9 @@ import {
   ref,
   watch,
 } from "vue";
+import { useRouter } from "vue-router";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import AppContextMenu from "../components/AppContextMenu.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import GotoCoordinatesDialog from "../components/GotoCoordinatesDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
@@ -24,12 +28,21 @@ import MapSetSelect from "../components/MapSetSelect.vue";
 import TileCalculatorDialog from "../components/TileCalculatorDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import TogglePanel from "../components/TogglePanel.vue";
+import { loadDocumentationLanguage } from "../documentationLanguage.js";
 import {
   loadShowAttribution,
   loadShowCoordinates,
+  loadShowMapSelector,
   saveShowAttribution,
   saveShowCoordinates,
+  saveShowMapSelector,
 } from "../mapDisplayPreferences.js";
+import {
+  createMapContextMenuItems,
+  mapContextMenuIds,
+} from "../mapContextMenuItems.js";
+import type { MenuItem } from "../menuModels.js";
+import { mapDocumentTitle } from "../mapDocumentTitle.js";
 import { availableLocalStorage } from "../localStorage.js";
 import { applyMapCenter } from "../mapViewportActions.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
@@ -43,6 +56,7 @@ if (injectedFactories === undefined) {
 }
 const factories = injectedFactories;
 
+const router = useRouter();
 const store = useMapSetsStore();
 const { selected, selectedId } = storeToRefs(store);
 const mapHost = ref<HTMLElement | null>(null);
@@ -52,6 +66,7 @@ const zoom = ref<number | null>(null);
 const browserStorage = availableLocalStorage();
 const showCoordinates = ref(loadShowCoordinates(browserStorage));
 const showAttribution = ref(loadShowAttribution(browserStorage));
+const showMapSelector = ref(loadShowMapSelector(browserStorage));
 const displayOptionsPanel = ref<{ close: () => void } | null>(null);
 const gotoCoordinatesOpen = ref(false);
 const gotoInitialCoordinate = ref<GeographicCoordinate>({
@@ -65,15 +80,44 @@ const tileCalculatorInitialInput = ref({
   latitude: 0,
 });
 const uiPreferences = useUiPreferencesStore();
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const documentationLanguage = loadDocumentationLanguage(
+  documentation.languages.map(({ code }) => code),
+  documentation.defaultLanguage,
+);
+const mapContextMenu = ref<{ openAt(x: number, y: number): void } | null>(null);
 const showTitleBar = computed({
   get: () => uiPreferences.showTitleBar,
   set: (value) => uiPreferences.setShowTitleBar(value),
 });
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const mapContextMenuItems = computed(() =>
+  createMapContextMenuItems({
+    mapSets: store.items,
+    selectedMapSetId: selectedId.value,
+    minimumZoom: selected.value?.minZoom ?? null,
+    maximumZoom: selected.value?.maxZoom ?? null,
+    currentZoom:
+      selected.value === null || zoom.value === null
+        ? null
+        : Math.round(
+            zoom.value + leafletXyzZoomOptions(selected.value).zoomOffset,
+          ),
+    documentationLanguage,
+    documentationPages: documentation.pages.filter(
+      ({ requestedLanguage }) => requestedLanguage === documentationLanguage,
+    ),
+    toolsEnabled: selected.value !== null && zoom.value !== null,
+    showTitleBar: showTitleBar.value,
+    showMapSelector: showMapSelector.value,
+    showCoordinates: showCoordinates.value,
+    showAttribution: showAttribution.value,
+  }),
+);
 let renderer: MapRendererInstance | null = null;
 let renderGeneration = 0;
 
 watch(showCoordinates, (value) => saveShowCoordinates(value, browserStorage));
+watch(showMapSelector, (value) => saveShowMapSelector(value, browserStorage));
 watch(showAttribution, (value) => {
   saveShowAttribution(value, browserStorage);
   void renderer?.setAttributionVisible(value);
@@ -165,6 +209,13 @@ async function renderSelectedMap(): Promise<void> {
 }
 
 watch(selected, renderSelectedMap);
+watch(
+  selected,
+  (mapSet) => {
+    document.title = mapDocumentTitle(mapSet?.name ?? null);
+  },
+  { immediate: true },
+);
 watch(selectedId, (id) => store.select(id));
 
 onMounted(async () => {
@@ -176,6 +227,87 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(destroyRenderer);
+onBeforeUnmount(() => {
+  document.title = mapDocumentTitle(null);
+});
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function openMapContextMenu(event: MouseEvent): void {
+  event.preventDefault();
+  displayOptionsPanel.value?.close();
+  mapContextMenu.value?.openAt(event.clientX, event.clientY);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function onMapContextMenuKeydown(event: KeyboardEvent): void {
+  if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) {
+    return;
+  }
+  event.preventDefault();
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const box = target.getBoundingClientRect();
+  displayOptionsPanel.value?.close();
+  mapContextMenu.value?.openAt(
+    box.left + Math.min(box.width / 2, 160),
+    box.top + Math.min(box.height / 2, 120),
+  );
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function selectMapContextMenuItem(item: MenuItem): void {
+  if (item.id.startsWith(mapContextMenuIds.mapSetPrefix)) {
+    selectedId.value = item.id.slice(mapContextMenuIds.mapSetPrefix.length);
+  } else if (item.id.startsWith(mapContextMenuIds.zoomPrefix)) {
+    const requestedZoom = Number(
+      item.id.slice(mapContextMenuIds.zoomPrefix.length),
+    );
+    if (Number.isInteger(requestedZoom)) {
+      void applyMapZoom(requestedZoom);
+    }
+  } else if (item.id === mapContextMenuIds.mapSets) {
+    void router.push("/map-sets");
+  } else if (item.id === mapContextMenuIds.tileCache) {
+    void router.push("/cache");
+  } else if (item.id.startsWith(mapContextMenuIds.documentationPrefix)) {
+    const pageId = item.id.slice(mapContextMenuIds.documentationPrefix.length);
+    void router.push(`/docs/${documentationLanguage}/${pageId}`);
+  } else if (item.id === mapContextMenuIds.gotoCoordinates) {
+    openGotoCoordinates();
+  } else if (item.id === mapContextMenuIds.tileCalculator) {
+    openTileCalculator();
+  } else if (item.id === mapContextMenuIds.showTitleBar) {
+    showTitleBar.value = !showTitleBar.value;
+  } else if (item.id === mapContextMenuIds.showMapSelector) {
+    showMapSelector.value = !showMapSelector.value;
+  } else if (item.id === mapContextMenuIds.showCoordinates) {
+    showCoordinates.value = !showCoordinates.value;
+  } else if (item.id === mapContextMenuIds.showAttribution) {
+    showAttribution.value = !showAttribution.value;
+  }
+}
+
+async function applyMapZoom(sourceZoom: number): Promise<void> {
+  const mapSet = selected.value;
+  if (
+    renderer === null ||
+    mapSet === null ||
+    sourceZoom < mapSet.minZoom ||
+    sourceZoom > mapSet.maxZoom
+  ) {
+    return;
+  }
+  const viewport = renderer.getViewport();
+  const zoomOptions = leafletXyzZoomOptions(mapSet);
+  await renderer.setViewport({
+    center: viewport.center,
+    zoom: sourceZoom - zoomOptions.zoomOffset,
+  });
+  zoom.value = renderer.getViewport().zoom;
+  saveMapViewport(browserStorage, renderer.getViewport());
+}
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function resetToInitialViewport(): void {
@@ -190,7 +322,6 @@ function resetToInitialViewport(): void {
   });
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function openGotoCoordinates(): void {
   if (renderer === null) {
     return;
@@ -213,7 +344,6 @@ async function applyGotoCoordinates(
   gotoCoordinatesOpen.value = false;
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function openTileCalculator(): void {
   const mapSet = selected.value;
   if (renderer === null || mapSet === null) {
@@ -239,11 +369,17 @@ function openTileCalculator(): void {
 
 <template>
   <main class="map-page">
-    <section class="map-stage" aria-label="Interactive map">
+    <section
+      class="map-stage"
+      aria-label="Interactive map"
+      @contextmenu="openMapContextMenu"
+      @keydown="onMapContextMenuKeydown"
+    >
       <div ref="mapHost" class="map-host"></div>
 
       <div v-if="store.items.length > 0" class="map-controls">
         <MapSetSelect
+          v-if="showMapSelector"
           v-model="selectedId"
           class="map-set-picker"
           :items="store.items"
@@ -274,9 +410,6 @@ function openTileCalculator(): void {
             </a>
           </article>
         </HtmlTooltip>
-        <RouterLink class="manage-link" to="/map-sets" aria-label="Manage Map Sets" title="Manage Map Sets">
-          <i class="mdi mdi-cog-outline" aria-hidden="true"></i>
-        </RouterLink>
       </div>
 
       <div class="map-bottom-left">
@@ -286,36 +419,42 @@ function openTileCalculator(): void {
           </template>
           <strong class="options-heading">Display Options</strong>
           <hr class="options-divider" />
-          <button
-            type="button"
-            class="display-tool-action"
-            :disabled="!selected || zoom === null"
-            @click="openGotoCoordinates"
-          >
-            <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>
-            <span>Goto Coordinates</span>
-          </button>
-          <button
-            type="button"
-            class="display-tool-action"
-            :disabled="!selected || zoom === null"
-            @click="openTileCalculator"
-          >
-            <i class="mdi mdi-grid" aria-hidden="true"></i>
-            <span>Tile Calculator</span>
-          </button>
+          <div class="display-tool-actions">
+            <button
+              type="button"
+              class="display-tool-action"
+              :disabled="!selected || zoom === null"
+              @click="openGotoCoordinates"
+            >
+              <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>
+              <span>Goto Coordinates</span>
+            </button>
+            <button
+              type="button"
+              class="display-tool-action"
+              :disabled="!selected || zoom === null"
+              @click="openTileCalculator"
+            >
+              <i class="mdi mdi-grid" aria-hidden="true"></i>
+              <span>Tile Calculator</span>
+            </button>
+          </div>
           <hr class="options-divider" />
           <label class="check-field">
             <input v-model="showTitleBar" type="checkbox" />
-            <span>Show title bar</span>
+            <span>Show Title Bar</span>
+          </label>
+          <label class="check-field">
+            <input v-model="showMapSelector" type="checkbox" />
+            <span>Show Map Selector</span>
           </label>
           <label class="check-field">
             <input v-model="showCoordinates" type="checkbox" />
-            <span>Show coordinates</span>
+            <span>Show Coordinates</span>
           </label>
           <label class="check-field">
             <input v-model="showAttribution" type="checkbox" />
-            <span>Show attribution</span>
+            <span>Show Attribution</span>
           </label>
         </TogglePanel>
         <p
@@ -340,6 +479,13 @@ function openTileCalculator(): void {
       </div>
       <div v-if="mapError" class="map-overlay error" role="alert">{{ mapError }}</div>
     </section>
+
+    <AppContextMenu
+      ref="mapContextMenu"
+      :items="mapContextMenuItems"
+      aria-label="Map view context menu"
+      @select="selectMapContextMenuItem"
+    />
 
     <GotoCoordinatesDialog
       :open="gotoCoordinatesOpen"
@@ -381,22 +527,6 @@ function openTileCalculator(): void {
 
 .map-set-picker {
   width: min(18rem, 58vw);
-}
-
-.manage-link {
-  display: grid;
-  width: 2.35rem;
-  height: 2.35rem;
-  place-items: center;
-  border-radius: 0.35rem;
-  color: #163832;
-  font-size: 1.25rem;
-  text-decoration: none;
-}
-
-.manage-link:hover,
-.manage-link:focus-visible {
-  background: #dfe9e3;
 }
 
 .map-set-card > strong {
@@ -499,9 +629,14 @@ function openTileCalculator(): void {
 }
 
 .options-divider {
-  margin: 0.5rem 0;
+  margin: 0;
   border: 0;
   border-top: 1px solid #d7e0db;
+}
+
+.display-tool-actions {
+  display: grid;
+  gap: 0.1rem;
 }
 
 .display-tool-action {
@@ -593,5 +728,6 @@ function openTileCalculator(): void {
     bottom: 0.5rem;
     left: 0.5rem;
   }
+
 }
 </style>

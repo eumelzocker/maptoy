@@ -6,6 +6,17 @@ All notable changes to maptoy are documented in this file.
 
 ### Added
 
+- Map View context menu with hierarchical Map Set selection, available source
+  zoom levels, application and Documentation-page navigation, map tools, and
+  checked display preferences. It supports pointer and keyboard opening,
+  viewport-aware placement, outside-click and Escape dismissal, and contained
+  wheel scrolling for long submenus.
+- Browser-local **Show map selector** preference in both the Display Options
+  popup and Map context menu, plus the full selected Map Set name in the browser
+  title with automatic reset outside the Map view.
+- Reusable `AppContextMenu` overlay component that owns Teleport, positioning,
+  focus, dismissal, scrolling, and global-listener cleanup while the existing
+  menu component remains responsible for menu-tree interaction.
 - Reusable, accessible centered Vue dialog with modal and non-modal modes,
   viewport-bounded title-bar dragging, and no background dimming or blur. Modal
   dialogs retain focus containment and backdrop dismissal; the Map view's new
@@ -18,9 +29,20 @@ All notable changes to maptoy are documented in this file.
 
 ### Changed
 
+- The shared menu now provides accessible checkbox entries, chooses each
+  submenu direction from its actual available space, delays pointer-leave
+  closing by 150 ms, and keeps long leaf menus usable with bounded scrolling.
+- The Map View's upper-right control is reduced to the optional Map Set selector
+  and information action.
 - Uploaded and provider-fetched Tiles are now fully decoded before archival and
   rejected when their actual PNG/JPEG/WebP format or pixel dimensions do not
   match the Map Set.
+
+### Fixed
+
+- Nested-menu keyboard navigation now moves focus into the direct child menu
+  and returns exactly one level at a time instead of refocusing the parent or
+  collapsing the complete menu tree.
 
 ## [0.0.7] - 2026-08-24
 

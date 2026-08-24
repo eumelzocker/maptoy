@@ -5,6 +5,7 @@ type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 const showCoordinatesKey = "maptoy:show-coordinates";
 const showAttributionKey = "maptoy:show-attribution";
 const showTitleBarKey = "maptoy:show-title-bar";
+const showMapSelectorKey = "maptoy:show-map-selector";
 
 function loadBooleanPreference(
   key: string,
@@ -58,4 +59,17 @@ export function saveShowTitleBar(
   storage?: PreferenceStorage | null,
 ): void {
   saveBooleanPreference(showTitleBarKey, value, storage);
+}
+
+export function loadShowMapSelector(
+  storage?: PreferenceStorage | null,
+): boolean {
+  return loadBooleanPreference(showMapSelectorKey, true, storage);
+}
+
+export function saveShowMapSelector(
+  value: boolean,
+  storage?: PreferenceStorage | null,
+): void {
+  saveBooleanPreference(showMapSelectorKey, value, storage);
 }

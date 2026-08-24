@@ -460,19 +460,19 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
         <table>
           <thead>
             <tr>
-              <th>Map Set</th><th>Logical</th><th>Current</th><th>Historical</th>
-              <th>Snapshots</th><th>Files</th><th>Storage</th><th>Consistency</th><th></th>
+              <th>Map Set</th><th class="numeric">Logical</th><th class="numeric">Current</th><th class="numeric">Historical</th>
+              <th class="numeric">Snapshots</th><th class="numeric">Files</th><th class="numeric">Storage</th><th>Consistency</th><th></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in overviewRows" :key="row.mapSet.id">
               <td><strong>{{ row.mapSet.name }}</strong></td>
-              <td>{{ row.summary.logicalTileCount }}</td>
-              <td>{{ row.summary.currentRevisionCount }}</td>
-              <td>{{ row.summary.historicalRevisionCount }}</td>
-              <td>{{ row.summary.snapshotCount }}</td>
-              <td>{{ row.summary.uniqueContentCount }}</td>
-              <td>{{ formatBytes(row.summary.totalStorageBytes) }}</td>
+              <td class="numeric">{{ row.summary.logicalTileCount }}</td>
+              <td class="numeric">{{ row.summary.currentRevisionCount }}</td>
+              <td class="numeric">{{ row.summary.historicalRevisionCount }}</td>
+              <td class="numeric">{{ row.summary.snapshotCount }}</td>
+              <td class="numeric">{{ row.summary.uniqueContentCount }}</td>
+              <td class="numeric">{{ formatBytes(row.summary.totalStorageBytes) }}</td>
               <td>
                 <span
                   v-if="row.audit"
@@ -546,14 +546,14 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
       </header>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Zoom</th><th>Logical tiles</th><th>Current</th><th>Historical</th><th>Storage</th></tr></thead>
+          <thead><tr><th class="numeric">Zoom</th><th class="numeric">Logical tiles</th><th class="numeric">Current</th><th class="numeric">Historical</th><th class="numeric">Storage</th></tr></thead>
           <tbody>
             <tr v-for="level in stats.zoomLevels" :key="level.zoom">
-              <td>{{ level.zoom }}</td>
-              <td>{{ level.logicalTileCount }}</td>
-              <td>{{ level.currentRevisionCount }}</td>
-              <td>{{ level.historicalRevisionCount }}</td>
-              <td>{{ formatBytes(level.indexedStorageBytes) }}</td>
+              <td class="numeric">{{ level.zoom }}</td>
+              <td class="numeric">{{ level.logicalTileCount }}</td>
+              <td class="numeric">{{ level.currentRevisionCount }}</td>
+              <td class="numeric">{{ level.historicalRevisionCount }}</td>
+              <td class="numeric">{{ formatBytes(level.indexedStorageBytes) }}</td>
             </tr>
           </tbody>
         </table>
@@ -630,10 +630,10 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
       </form>
       <div v-if="revisionsLoaded && revisions.length" class="table-scroll revision-table">
         <table>
-          <thead><tr><th>Tile</th><th>State</th><th>Hash</th><th>Size</th><th>Validated</th><th></th></tr></thead>
+          <thead><tr><th class="numeric">Tile</th><th>State</th><th>Hash</th><th class="numeric">Size</th><th>Validated</th><th></th></tr></thead>
           <tbody>
             <tr v-for="revision in sortedRevisions" :key="revision.id">
-              <td>{{ revision.zoom }}/{{ revision.x }}/{{ revision.y }}</td>
+              <td class="numeric">{{ revision.zoom }}/{{ revision.x }}/{{ revision.y }}</td>
               <td>
                 <HtmlTooltip
                   :label="`Preview tile ${revision.zoom}/${revision.x}/${revision.y}`"
@@ -661,7 +661,7 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
                 </HtmlTooltip>
               </td>
               <td><code :title="revision.contentHash">{{ revision.contentHash.slice(0, 12) }}</code></td>
-              <td>{{ formatBytes(revision.byteLength) }}</td>
+              <td class="numeric">{{ formatBytes(revision.byteLength) }}</td>
               <td>{{ formatDate(revision.lastValidatedAt) }}</td>
               <td><button v-if="!revision.current" class="danger-button" type="button" :disabled="busy" @click="deleteRevision(revision)">Delete</button></td>
             </tr>
@@ -728,6 +728,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 0.65rem; border-bottom: 1px solid #d7e0db; text-align: left; white-space: nowrap; }
+th.numeric, td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
 th { color: #536b64; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .state { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 999px; background: #e8ded6; }
 .state.current { color: #fff; background: #17453c; }
