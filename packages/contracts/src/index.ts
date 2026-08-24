@@ -223,7 +223,7 @@ export type TileRevisionListResponse = Static<
 export const TileUploadBodySchema = Type.Unsafe<unknown>({
   anyOf: [{ type: "string", format: "binary" }, { type: "object" }],
   description:
-    "Unmodified PNG, JPEG, or WebP tile bytes with the matching image Content-Type.",
+    "A decodable PNG, JPEG, or WebP image with the configured tile format, dimensions, and matching image Content-Type.",
   $id: "TileUploadBody",
 });
 

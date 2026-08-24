@@ -9,10 +9,18 @@ import type { ProviderClient } from "./providerClient.js";
 import { buildServer } from "./server.js";
 
 const temporaryDirectories: string[] = [];
-const validPng = Buffer.concat([
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-  Buffer.from("maptoy-test"),
-]);
+const validPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEUBAQHIpFY6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAH0lEQVRo3u3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAvg0hAAABfxmcpwAAAABJRU5ErkJggg==",
+  "base64",
+);
+const wrongSizePng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAAAA1BMVEUBAQHIpFY6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAGUlEQVRIx2NgGAWjYBSMglEwCkbBKKAvAAAIgAABbisdVAAAAABJRU5ErkJggg==",
+  "base64",
+);
+const jpeg = Buffer.from(
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAEAAQADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//9k=",
+  "base64",
+);
 
 async function testConfig(): Promise<MaptoyConfig> {
   const dataDirectory = await mkdtemp(
@@ -390,7 +398,7 @@ describe("maptoy server", () => {
 
   it("accepts bounded raw Tile uploads and exposes their revision origin", async () => {
     const config = await testConfig();
-    config.maximumTileBytes = validPng.byteLength;
+    config.maximumTileBytes = 1024;
     const requestProvider = vi.fn(async () => ({
       statusCode: 200,
       headers: { "content-type": "image/png" },
@@ -479,6 +487,39 @@ describe("maptoy server", () => {
       error: { code: "TILE_CONTENT_INVALID" },
     });
 
+    const mismatchedFormat = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/png" },
+      payload: jpeg,
+    });
+    expect(mismatchedFormat).toMatchObject({ statusCode: 400 });
+    expect(mismatchedFormat.json()).toMatchObject({
+      error: { code: "TILE_CONTENT_INVALID" },
+    });
+
+    const wrongDimensions = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/png" },
+      payload: wrongSizePng,
+    });
+    expect(wrongDimensions).toMatchObject({ statusCode: 400 });
+    expect(wrongDimensions.json()).toMatchObject({
+      error: { code: "TILE_CONTENT_INVALID" },
+    });
+
+    const corruptImage = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: { "content-type": "image/png" },
+      payload: validPng.subarray(0, 80),
+    });
+    expect(corruptImage).toMatchObject({ statusCode: 400 });
+    expect(corruptImage.json()).toMatchObject({
+      error: { code: "TILE_CONTENT_INVALID" },
+    });
+
     const emptyContent = await server.inject({
       method: "POST",
       url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
@@ -494,7 +535,7 @@ describe("maptoy server", () => {
       method: "POST",
       url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
       headers: { "content-type": "image/png" },
-      payload: Buffer.concat([validPng, Buffer.from([0])]),
+      payload: Buffer.alloc(config.maximumTileBytes + 1),
     });
     expect(tooLarge).toMatchObject({ statusCode: 413 });
     expect(tooLarge.json()).toMatchObject({

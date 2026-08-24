@@ -10,6 +10,18 @@ get {
   auth: none
 }
 
+docs {
+  Process liveness check.
+
+  ## Input
+
+  No parameters, headers, or body.
+
+  ## Response
+
+  - `200 OK`: `status` = `ok`.
+}
+
 tests {
   test("is healthy", function() {
     expect(res.status).to.equal(200);

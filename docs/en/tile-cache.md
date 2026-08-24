@@ -39,8 +39,9 @@ curl --request POST \
 ```
 
 The request body is the unmodified PNG, JPEG, or WebP file; this endpoint does not
-use multipart encoding. Its media type and file signature must match the Map Set's
-configured Tile format. Coordinates must be inside the Map Set's zoom and XYZ
+use multipart encoding. The file must decode successfully; its media type and
+actual image format must match the Map Set's configured Tile format, and its width
+and height must equal the configured Tile size. Coordinates must be inside the Map Set's zoom and XYZ
 bounds, its Tile Archive capability and cache policy must be enabled, and both
 `MAPTOY_MAX_TILE_BYTES` and the Map Set storage limit apply.
 
@@ -55,8 +56,8 @@ Upload errors use these contracts:
 
 - `415 TILE_MEDIA_TYPE_INVALID` for a missing, unsupported, or Map-Set-mismatched
   Content-Type.
-- `400 TILE_CONTENT_INVALID` when the bytes do not have the configured image
-  signature.
+- `400 TILE_CONTENT_INVALID` when the image cannot be decoded or its actual format
+  or dimensions do not match the Map Set.
 - `409 TILE_ARCHIVE_DISABLED` when archival capability or cache policy is disabled.
 - `413 TILE_BODY_TOO_LARGE` when the route-specific `MAPTOY_MAX_TILE_BYTES` limit is
   exceeded.
@@ -83,7 +84,8 @@ tiles/<map-set-id>/<z>/<x>/<y>.<content-hash>.<ext>
 ```
 
 Temporary files are written below the managed data directory and atomically moved
-only after content type, image signature, size, and hash have been checked.
+only after content type, actual image format, dimensions, decodability, size, and
+hash have been checked.
 
 ## Selecting a cache state
 

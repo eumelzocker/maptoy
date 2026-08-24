@@ -10,6 +10,19 @@ get {
   auth: none
 }
 
+docs {
+  Returns metadata statistics across all Tile Caches without scanning files.
+
+  ## Input
+
+  No parameters, headers, or body.
+
+  ## Response
+
+  - `200 OK`: `mapSetCount`, `populatedMapSetCount`, aggregate `stats`, and per-Map-Set `mapSets`.
+  - `stats` uses the same counters and per-zoom breakdown as the single-Map-Set statistics request.
+}
+
 tests {
   test("returns aggregate and per-Map-Set statistics", function() {
     expect(res.status).to.equal(200);

@@ -10,6 +10,19 @@ post {
   auth: none
 }
 
+docs {
+  Read-only file-system consistency audit across all Map Sets.
+
+  ## Input
+
+  No parameters, headers, or body.
+
+  ## Response
+
+  - `200 OK`: aggregate `totals` and per-Map-Set `mapSets`.
+  - Each result contains `scannedFileCount`, `physicalStorageBytes`, `missingFileCount`, and `orphanFileCount`; per-Map-Set entries also include `mapSetId`.
+}
+
 tests {
   test("returns aggregate and per-Map-Set consistency counts", function() {
     expect(res.status).to.equal(200);

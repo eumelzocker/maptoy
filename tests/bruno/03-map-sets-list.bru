@@ -10,6 +10,18 @@ get {
   auth: none
 }
 
+docs {
+  Lists all configured Map Sets.
+
+  ## Input
+
+  No parameters, headers, or body.
+
+  ## Response
+
+  - `200 OK`: `items` contains complete Map Sets plus `logicalTileCount`.
+}
+
 tests {
   test("lists Map Sets", function() {
     expect(res.status).to.equal(200);

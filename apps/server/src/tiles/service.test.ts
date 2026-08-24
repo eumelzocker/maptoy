@@ -13,12 +13,27 @@ import { TileStorage } from "./storage.js";
 
 const temporaryDirectories: string[] = [];
 const databases: MaptoyDatabase[] = [];
+const pngVariants = [
+  "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEUBAQHIpFY6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAH0lEQVRo3u3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAvg0hAAABfxmcpwAAAABJRU5ErkJggg==",
+  "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEUCAgJ4xuoaAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAH0lEQVRo3u3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAvg0hAAABfxmcpwAAAABJRU5ErkJggg==",
+  "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEUDAwMXGIH6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAH0lEQVRo3u3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAvg0hAAABfxmcpwAAAABJRU5ErkJggg==",
+  "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEUEBATDcpQbAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAH0lEQVRo3u3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAvg0hAAABfxmcpwAAAABJRU5ErkJggg==",
+].map((value) => Buffer.from(value, "base64"));
+const wrongSizePng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAAAA1BMVEUBAQHIpFY6AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAGUlEQVRIx2NgGAWjYBSMglEwCkbBKKAvAAAIgAABbisdVAAAAABJRU5ErkJggg==",
+  "base64",
+);
+const jpeg = Buffer.from(
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAEAAQADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//9k=",
+  "base64",
+);
 
 function png(label: string): Buffer {
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    Buffer.from(label),
-  ]);
+  const index = [...label].reduce(
+    (hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0,
+    0,
+  );
+  return pngVariants[index % pngVariants.length] ?? pngVariants[0];
 }
 
 function response(
@@ -207,6 +222,27 @@ describe("TileArchiveService", () => {
     await expect(
       service.upload(mapSet, tile, {
         body: Buffer.from("not-a-png"),
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      }),
+    ).rejects.toMatchObject({ code: "TILE_CONTENT_INVALID", statusCode: 400 });
+    await expect(
+      service.upload(mapSet, tile, {
+        body: jpeg,
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      }),
+    ).rejects.toMatchObject({ code: "TILE_CONTENT_INVALID", statusCode: 400 });
+    await expect(
+      service.upload(mapSet, tile, {
+        body: wrongSizePng,
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      }),
+    ).rejects.toMatchObject({ code: "TILE_CONTENT_INVALID", statusCode: 400 });
+    await expect(
+      service.upload(mapSet, tile, {
+        body: png("corrupt").subarray(0, 80),
         contentType: "image/png",
         maximumTileBytes: 1024,
       }),
@@ -476,6 +512,14 @@ describe("TileArchiveService", () => {
         async () => response(Buffer.from("not a png")),
       ),
     ).rejects.toBeInstanceOf(TileArchiveError);
+    await expect(
+      service.tile(
+        mapSet,
+        { zoom: 4, x: 10, y: 5 },
+        { refresh: "force", selection: { kind: "current" } },
+        async () => response(wrongSizePng),
+      ),
+    ).rejects.toMatchObject({ code: "TILE_CONTENT_INVALID", statusCode: 502 });
     expect(await service.stats(mapSet.id)).toMatchObject({
       logicalTileCount: 1,
       totalRevisionCount: 1,

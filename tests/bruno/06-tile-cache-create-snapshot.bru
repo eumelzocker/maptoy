@@ -16,6 +16,26 @@ body:json {
   }
 }
 
+docs {
+  Creates an immutable snapshot of the Map Set's current Tile revisions.
+
+  ## Input
+
+  - Path variable: `mapSetId` — existing Map Set UUID.
+  - Header: `Content-Type: application/json`.
+  - Body: `name` — unique snapshot name, 1–120 characters.
+
+  ## Response
+
+  - `201 Created`: `id`, `mapSetId`, `name`, `createdAt`, and captured `tileCount`.
+
+  ## Errors
+
+  - `400`: invalid or blank name (`SNAPSHOT_NAME_CONFLICT` after normalization).
+  - `404 MAP_SET_NOT_FOUND`.
+  - `409 SNAPSHOT_NAME_CONFLICT`: name already exists for this Map Set.
+}
+
 tests {
   test("creates an immutable snapshot", function() {
     expect(res.status).to.equal(201);

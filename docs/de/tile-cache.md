@@ -40,8 +40,10 @@ curl --request POST \
 ```
 
 Der Request-Body ist die unveränderte PNG-, JPEG- oder WebP-Datei; dieser Endpunkt
-verwendet kein Multipart. Media-Type und Dateisignatur müssen zum konfigurierten
-Tile-Format des Map Sets passen. Koordinaten müssen innerhalb der Zoom- und
+verwendet kein Multipart. Die Datei muss vollständig dekodierbar sein; Media-Type
+und tatsächliches Bildformat müssen zum konfigurierten Tile-Format des Map Sets
+passen und Breite sowie Höhe müssen der konfigurierten Tile-Größe entsprechen.
+Koordinaten müssen innerhalb der Zoom- und
 XYZ-Grenzen liegen, Tile-Archiv-Capability und Cache-Policy müssen aktiv sein und
 sowohl `MAPTOY_MAX_TILE_BYTES` als auch das Speicherlimit des Map Sets gelten.
 
@@ -56,8 +58,8 @@ Für Uploadfehler gelten folgende Verträge:
 
 - `415 TILE_MEDIA_TYPE_INVALID` bei fehlendem, nicht unterstütztem oder nicht zum
   Map Set passendem Content-Type.
-- `400 TILE_CONTENT_INVALID`, wenn die Bytes nicht die konfigurierte Bildsignatur
-  besitzen.
+- `400 TILE_CONTENT_INVALID`, wenn das Bild nicht dekodiert werden kann oder sein
+  tatsächliches Format beziehungsweise seine Abmessungen nicht zum Map Set passen.
 - `409 TILE_ARCHIVE_DISABLED`, wenn Archiv-Capability oder Cache-Policy deaktiviert
   ist.
 - `413 TILE_BODY_TOO_LARGE` beim Überschreiten des routenspezifischen Limits
@@ -87,7 +89,8 @@ tiles/<map-set-id>/<z>/<x>/<y>.<content-hash>.<ext>
 ```
 
 Temporäre Dateien werden im verwalteten Datenverzeichnis geschrieben und erst nach
-Prüfung von Content-Type, Bildsignatur, Größe und Hash atomar verschoben.
+Prüfung von Content-Type, tatsächlichem Bildformat, Abmessungen, Dekodierbarkeit,
+Größe und Hash atomar verschoben.
 
 ## Cache-Stand auswählen
 

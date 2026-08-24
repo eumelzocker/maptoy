@@ -10,6 +10,19 @@ get {
   auth: none
 }
 
+docs {
+  Checks the database plus data and traffic-log directories.
+
+  ## Input
+
+  No parameters, headers, or body.
+
+  ## Response
+
+  - `200 OK`: `status` = `ready`.
+  - `503 Service Unavailable`: `status` = `not-ready` when a dependency is unavailable.
+}
+
 tests {
   test("is ready", function() {
     expect(res.status).to.equal(200);

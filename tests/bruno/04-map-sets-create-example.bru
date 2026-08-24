@@ -50,6 +50,25 @@ body:json {
   }
 }
 
+docs {
+  Creates a persistent placeholder Map Set. Replace the example provider details before real use.
+
+  ## Input
+
+  - Header: `Content-Type: application/json`.
+  - Body: complete Map Set configuration shown in this request; all fields are required.
+  - This example disables Tile Archive, caching, batch download, and server export.
+
+  ## Response
+
+  - `201 Created`: complete Map Set plus generated `id`, `createdAt`, and `updatedAt`.
+  - Header: `Location: api/map-sets/{id}`.
+
+  ## Errors
+
+  - `400 MAP_SET_INVALID`: invalid field, URL template, capability, or value combination.
+}
+
 tests {
   test("creates a Map Set", function() {
     expect(res.status).to.equal(201);

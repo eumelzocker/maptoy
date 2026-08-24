@@ -21,7 +21,9 @@ include `X-Maptoy-Tile-Revision` and `X-Maptoy-Cache` headers.
 
 `POST api/map-sets/:id/tiles/:z/:x/:y` seeds unmodified image bytes without a
 provider request. Set `Content-Type` to the Map Set's configured `image/png`,
-`image/jpeg`, or `image/webp`; do not use JSON or multipart encoding.
+`image/jpeg`, or `image/webp`; do not use JSON or multipart encoding. The image
+must be decodable, its actual format must match the configured format, and its
+width and height must both equal the Map Set's configured Tile size.
 
 The binary request schema is bounded by `MAPTOY_MAX_TILE_BYTES`. A successful JSON
 response follows this contract:
@@ -41,7 +43,7 @@ return `200` and `created: false`. Both include the same revision ID in
 | Status | Error code | Meaning |
 | --- | --- | --- |
 | `400` | `MAP_SET_INVALID` | Coordinate or Zoom is outside the Map Set bounds. |
-| `400` | `TILE_CONTENT_INVALID` | Bytes do not match the configured image signature. |
+| `400` | `TILE_CONTENT_INVALID` | Image cannot be decoded or its actual format or dimensions do not match the Map Set. |
 | `404` | `MAP_SET_NOT_FOUND` | The Map Set does not exist. |
 | `409` | `TILE_ARCHIVE_DISABLED` | Cache policy or Tile Archive capability is disabled. |
 | `413` | `TILE_BODY_TOO_LARGE` | Raw body exceeds `MAPTOY_MAX_TILE_BYTES`. |

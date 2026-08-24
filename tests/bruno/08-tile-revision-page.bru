@@ -10,6 +10,28 @@ get {
   auth: none
 }
 
+docs {
+  Lists a bounded page of Tile revisions for one Map Set.
+
+  ## Input
+
+  - Path variable: `mapSetId` — existing Map Set UUID.
+  - Query: `limit` = 1–200; this request uses `50`.
+  - Query: `state` = `all`, `current`, or `historical`; this request uses `all`.
+  - Optional query: `cursor` from the previous `nextCursor`; `zoom` = 0–24.
+  - No headers or body.
+
+  ## Response
+
+  - `200 OK`: `items`, total matching the state/zoom filters, and nullable `nextCursor`.
+  - Each item includes coordinate, content metadata, timestamps, `origin`, and `current`.
+
+  ## Errors
+
+  - `400 MAP_SET_INVALID`: invalid cursor or query value.
+  - `404 MAP_SET_NOT_FOUND`.
+}
+
 tests {
   test("returns a bounded revision page", function() {
     expect(res.status).to.equal(200);

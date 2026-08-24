@@ -10,6 +10,23 @@ get {
   auth: none
 }
 
+docs {
+  Returns metadata statistics for one Tile Cache without scanning files.
+
+  ## Input
+
+  - Path variable: `mapSetId` — existing Map Set UUID.
+  - No headers or body.
+
+  ## Response
+
+  - `200 OK`: `logicalTileCount`, current/historical/total revision counts, `snapshotCount`, `uniqueContentCount`, `totalStorageBytes`, and per-zoom `zoomLevels`.
+
+  ## Errors
+
+  - `404 MAP_SET_NOT_FOUND`.
+}
+
 tests {
   test("returns Tile Cache statistics", function() {
     expect(res.status).to.equal(200);

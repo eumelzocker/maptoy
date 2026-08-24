@@ -15,6 +15,7 @@ import type {
   TileRevisionOrigin,
   TileUploadResponse,
 } from "@maptoy/contracts";
+import sharp from "sharp";
 import type { ProviderResponse } from "../providerClient.js";
 import type {
   StoredTileRevision,
@@ -98,10 +99,55 @@ function expectedContentType(format: MapSet["tileFormat"]): string {
   return format === "jpeg" ? "image/jpeg" : `image/${format}`;
 }
 
-function validateProviderTile(
+function invalidImageContent(
+  mapSet: MapSet,
+  source: "provider response" | "upload body",
+  statusCode: 400 | 502,
+): TileArchiveError {
+  return new TileArchiveError(
+    "TILE_CONTENT_INVALID",
+    `The ${source} must be a decodable ${mapSet.tileFormat.toUpperCase()} image with dimensions ${mapSet.tileSize} x ${mapSet.tileSize} pixels.`,
+    statusCode,
+  );
+}
+
+async function validateImageContent(
+  mapSet: MapSet,
+  body: Buffer,
+  source: "provider response" | "upload body",
+  statusCode: 400 | 502,
+): Promise<void> {
+  if (!hasExpectedSignature(mapSet.tileFormat, body)) {
+    throw invalidImageContent(mapSet, source, statusCode);
+  }
+
+  try {
+    const image = sharp(body, {
+      failOn: "error",
+      limitInputPixels: mapSet.tileSize * mapSet.tileSize,
+    });
+    const metadata = await image.metadata();
+    if (
+      metadata.format !== mapSet.tileFormat ||
+      metadata.width !== mapSet.tileSize ||
+      metadata.height !== mapSet.tileSize ||
+      (metadata.pages !== undefined && metadata.pages !== 1)
+    ) {
+      throw invalidImageContent(mapSet, source, statusCode);
+    }
+    await image.raw().toBuffer();
+  } catch (error) {
+    if (error instanceof TileArchiveError) {
+      throw error;
+    }
+    throw invalidImageContent(mapSet, source, statusCode);
+  }
+}
+
+async function validateProviderTile(
   mapSet: MapSet,
   response: ProviderResponse,
-): string {
+): Promise<string> {
   if (response.statusCode < 200 || response.statusCode >= 300) {
     throw new TileArchiveError(
       "TILE_CONTENT_INVALID",
@@ -111,16 +157,14 @@ function validateProviderTile(
   }
   const contentType = normalizedContentType(response);
   const expected = expectedContentType(mapSet.tileFormat);
-  if (
-    contentType !== expected ||
-    !hasExpectedSignature(mapSet.tileFormat, response.body)
-  ) {
+  if (contentType !== expected) {
     throw new TileArchiveError(
       "TILE_CONTENT_INVALID",
       `The provider response is not a valid ${mapSet.tileFormat.toUpperCase()} tile.`,
       502,
     );
   }
+  await validateImageContent(mapSet, response.body, "provider response", 502);
   return contentType;
 }
 
@@ -161,7 +205,7 @@ export class TileArchiveService {
     }
     if (!mapSet.cachePolicy.enabled || !mapSet.capabilities.tileArchive) {
       const response = await requestProvider({});
-      validateProviderTile(mapSet, response);
+      await validateProviderTile(mapSet, response);
       return { ...response, cacheStatus: "bypass", revisionId: null };
     }
     if (
@@ -245,13 +289,7 @@ export class TileArchiveService {
         413,
       );
     }
-    if (!hasExpectedSignature(mapSet.tileFormat, input.body)) {
-      throw new TileArchiveError(
-        "TILE_CONTENT_INVALID",
-        `The upload body is not a valid ${mapSet.tileFormat.toUpperCase()} tile.`,
-        400,
-      );
-    }
+    await validateImageContent(mapSet, input.body, "upload body", 400);
 
     const key = this.coordinateKey(mapSet.id, tile);
     return this.withCoordinateLock(key, async () => {
@@ -572,7 +610,7 @@ export class TileArchiveService {
       return this.readRevision(validated, "validated");
     }
 
-    const contentType = validateProviderTile(mapSet, response);
+    const contentType = await validateProviderTile(mapSet, response);
     const recorded = await this.persistContent(mapSet, tile, {
       body: response.body,
       contentType,

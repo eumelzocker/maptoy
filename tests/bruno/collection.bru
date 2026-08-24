@@ -1,0 +1,20 @@
+docs {
+  # maptoy API
+
+  Manual smoke requests for a trusted maptoy instance.
+
+  ## Environment
+
+  | Variable | Required for | Value |
+  | --- | --- | --- |
+  | `appUrl` | all requests | Public base URL, including any reverse-proxy prefix; Local defaults to `http://localhost:4004` |
+  | `mapSetId` | Map-Set-specific requests | Existing Map Set UUID |
+  | `tileFile` | Tile seeding | Absolute path to a PNG, JPEG, or WebP Tile |
+
+  ## Conventions
+
+  - No authorization header is used; maptoy v1 has no application authentication.
+  - JSON requests set `Content-Type: application/json`; Tile seeding requires the matching `image/png`, `image/jpeg`, or `image/webp` header.
+  - Errors use `error.code` and `error.message`.
+  - Requests marked **writes data** create persistent state. Audit requests use POST but are read-only.
+}

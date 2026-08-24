@@ -18,6 +18,32 @@ body:file {
   file: @file({{tileFile}}) @contentType(image/png)
 }
 
+docs {
+  Seeds Tile `0/0/0` without contacting the provider.
+
+  ## Input
+
+  - Path variables: `mapSetId` plus fixed coordinate `z=0`, `x=0`, `y=0`.
+  - File variable: `tileFile` — absolute path to the raw Tile image.
+  - Required header: `Content-Type: image/png`; change header and body content type together for JPEG or WebP Map Sets.
+  - The coordinate must be within Map Set bounds; Tile Archive and cache policy must be enabled.
+  - Actual format and dimensions must match the Map Set; the image must decode successfully and stay below configured size limits.
+
+  ## Response
+
+  - `201 Created`: new revision; `created` = `true`.
+  - `200 OK`: bytes equal the current revision; `created` = `false`.
+  - Body: `revisionId` and `created`.
+  - Header: `X-Maptoy-Tile-Revision` with the same revision ID.
+
+  ## Errors
+
+  - `400 TILE_CONTENT_INVALID` or `MAP_SET_INVALID`: invalid image, dimensions, or coordinate.
+  - `404 MAP_SET_NOT_FOUND`.
+  - `409 TILE_ARCHIVE_DISABLED`.
+  - `413 TILE_BODY_TOO_LARGE`; `415 TILE_MEDIA_TYPE_INVALID`; `507 TILE_STORAGE_LIMIT`.
+}
+
 tests {
   test("creates or observes one Tile Revision", function() {
     expect(res.status).to.be.oneOf([200, 201]);

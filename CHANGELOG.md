@@ -13,6 +13,14 @@ All notable changes to maptoy are documented in this file.
   frozen opening values while the map remains operable.
 - WGS84 map centering and a live XYZ Tile calculator prefilled from the current
   viewport, including on-demand Tile preview through the selected Map Set.
+- Structured in-app Bruno documentation for the API collection and every
+  included request, covering inputs, headers, responses, and relevant errors.
+
+### Changed
+
+- Uploaded and provider-fetched Tiles are now fully decoded before archival and
+  rejected when their actual PNG/JPEG/WebP format or pixel dimensions do not
+  match the Map Set.
 
 ## [0.0.7] - 2026-08-24
 

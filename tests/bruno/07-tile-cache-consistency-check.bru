@@ -10,6 +10,23 @@ post {
   auth: none
 }
 
+docs {
+  Read-only consistency audit for one Map Set; no files are changed.
+
+  ## Input
+
+  - Path variable: `mapSetId` — existing Map Set UUID.
+  - No headers or body.
+
+  ## Response
+
+  - `200 OK`: `scannedFileCount`, `physicalStorageBytes`, `missingFileCount`, and `orphanFileCount`.
+
+  ## Errors
+
+  - `404 MAP_SET_NOT_FOUND`.
+}
+
 tests {
   test("returns file-system consistency counts", function() {
     expect(res.status).to.equal(200);
