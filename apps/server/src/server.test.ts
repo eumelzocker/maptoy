@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MaptoyConfig } from "@maptoy/config";
 import { createDefaultMapSetInput } from "@maptoy/contracts";
+import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderClient } from "./providerClient.js";
 import { buildServer } from "./server.js";
@@ -80,6 +81,11 @@ describe("maptoy server", () => {
       url: "/api/health",
       headers: { authorization: "Bearer client-secret" },
     });
+    const ready = await server.inject({
+      method: "GET",
+      url: "/api/ready",
+      headers: { authorization: "Bearer readiness-secret" },
+    });
     const created = await server.inject({
       method: "POST",
       url: "/api/map-sets",
@@ -100,9 +106,13 @@ describe("maptoy server", () => {
       "utf8",
     );
     expect(health.statusCode).toBe(200);
+    expect(ready.statusCode).toBe(200);
     expect(apiLog).toContain('"event":"api.response"');
     expect(apiLog).toContain('"authorization":"[REDACTED]"');
     expect(apiLog).not.toContain("client-secret");
+    expect(apiLog).not.toContain("readiness-secret");
+    expect(apiLog).not.toContain('"url":"/api/health"');
+    expect(apiLog).toContain('"url":"/api/ready"');
     expect(providerLog).toContain('"event":"provider.response"');
     expect(providerLog).toContain("key=%5BREDACTED%5D");
     expect(providerLog).toContain('"Authorization":"[REDACTED]"');
@@ -222,6 +232,22 @@ describe("maptoy server", () => {
     expect(aboveMaximumZoom).toMatchObject({ statusCode: 400 });
     expect(aboveMaximumZoom.json()).toMatchObject({
       error: { code: "MAP_SET_INVALID" },
+    });
+
+    const uncachedTile = await server.inject({
+      method: "GET",
+      url: `/api/map-sets/${mapSet.id}/tiles/10/549/335?refresh=cache-only&displayGeneration=1`,
+    });
+    expect(uncachedTile.statusCode).toBe(200);
+    expect(uncachedTile.headers["content-type"]).toContain("image/png");
+    expect(uncachedTile.headers["cache-control"]).toBe("no-store");
+    expect(uncachedTile.headers["x-maptoy-cache"]).toBe("miss");
+    await expect(
+      sharp(uncachedTile.rawPayload).metadata(),
+    ).resolves.toMatchObject({
+      format: "png",
+      width: 256,
+      height: 256,
     });
 
     const tested = await server.inject({

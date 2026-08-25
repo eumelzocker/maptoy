@@ -53,7 +53,9 @@ Hostpfade zeigen. Die aktiven Dateien heißen `api-traffic.log` und
 aufbewahrten Dateien einschließlich der aktiven Datei. Authentifizierungsheader,
 Cookies und übliche geheime Query-Parameter werden redigiert. Die
 Logverzeichnisse müssen vor dem Compose-Start existieren und für UID `1000`
-beschreibbar sein.
+beschreibbar sein. Aufrufe des Liveness-Endpunkts `api/health` werden unabhängig
+von ihrer Herkunft nicht im API-Traffic-Log erfasst; Docker prüft den Endpunkt
+weiterhin und stellt den Containerzustand bereit.
 
 Der Readiness-Endpunkt prüft die Datenbank sowie fortlaufend die Schreibbarkeit des
 Anwendungsdatenverzeichnisses und beider Traffic-Log-Verzeichnisse. Außerhalb von

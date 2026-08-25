@@ -30,9 +30,11 @@ import TileCalculatorDialog from "../components/TileCalculatorDialog.vue";
 import TogglePanel from "../components/TogglePanel.vue";
 import { loadDocumentationLanguage } from "../documentationLanguage.js";
 import {
+  loadCachedTilesOnly,
   loadShowAttribution,
   loadShowCoordinates,
   loadShowMapSelector,
+  saveCachedTilesOnly,
   saveShowAttribution,
   saveShowCoordinates,
   saveShowMapSelector,
@@ -43,6 +45,7 @@ import {
 } from "../mapContextMenuItems.js";
 import type { MenuItem } from "../menuModels.js";
 import { mapDocumentTitle } from "../mapDocumentTitle.js";
+import { mapTileUrl } from "../mapTileUrl.js";
 import { availableLocalStorage } from "../localStorage.js";
 import { applyMapCenter } from "../mapViewportActions.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
@@ -64,6 +67,7 @@ const mapError = ref<string | null>(null);
 const pointer = ref<{ longitude: number; latitude: number } | null>(null);
 const zoom = ref<number | null>(null);
 const browserStorage = availableLocalStorage();
+const cachedTilesOnly = ref(loadCachedTilesOnly(browserStorage));
 const showCoordinates = ref(loadShowCoordinates(browserStorage));
 const showAttribution = ref(loadShowAttribution(browserStorage));
 const showMapSelector = ref(loadShowMapSelector(browserStorage));
@@ -107,6 +111,7 @@ const mapContextMenuItems = computed(() =>
       ({ requestedLanguage }) => requestedLanguage === documentationLanguage,
     ),
     toolsEnabled: selected.value !== null && zoom.value !== null,
+    cachedTilesOnly: cachedTilesOnly.value,
     showTitleBar: showTitleBar.value,
     showMapSelector: showMapSelector.value,
     showCoordinates: showCoordinates.value,
@@ -118,6 +123,10 @@ let renderGeneration = 0;
 
 watch(showCoordinates, (value) => saveShowCoordinates(value, browserStorage));
 watch(showMapSelector, (value) => saveShowMapSelector(value, browserStorage));
+watch(cachedTilesOnly, (value) => {
+  saveCachedTilesOnly(value, browserStorage);
+  void renderSelectedMap();
+});
 watch(showAttribution, (value) => {
   saveShowAttribution(value, browserStorage);
   void renderer?.setAttributionVisible(value);
@@ -169,7 +178,11 @@ async function renderSelectedMap(): Promise<void> {
       host: mapHost.value,
       initialViewport,
       configuration: {
-        tileUrl: `api/map-sets/${mapSet.id}/tiles/{z}/{x}/{y}`,
+        tileUrl: mapTileUrl({
+          mapSetId: mapSet.id,
+          cachedTilesOnly: cachedTilesOnly.value,
+          displayGeneration: generation,
+        }),
         attribution: mapSet.attribution,
         minZoom: mapSet.minZoom,
         maxZoom: mapSet.maxZoom,
@@ -278,6 +291,8 @@ function selectMapContextMenuItem(item: MenuItem): void {
     openGotoCoordinates();
   } else if (item.id === mapContextMenuIds.tileCalculator) {
     openTileCalculator();
+  } else if (item.id === mapContextMenuIds.cachedTilesOnly) {
+    cachedTilesOnly.value = !cachedTilesOnly.value;
   } else if (item.id === mapContextMenuIds.showTitleBar) {
     showTitleBar.value = !showTitleBar.value;
   } else if (item.id === mapContextMenuIds.showMapSelector) {
@@ -439,6 +454,11 @@ function openTileCalculator(): void {
               <span>Tile Calculator</span>
             </button>
           </div>
+          <hr class="options-divider" />
+          <label class="check-field">
+            <input v-model="cachedTilesOnly" type="checkbox" />
+            <span>Cached Tiles Only</span>
+          </label>
           <hr class="options-divider" />
           <label class="check-field">
             <input v-model="showTitleBar" type="checkbox" />

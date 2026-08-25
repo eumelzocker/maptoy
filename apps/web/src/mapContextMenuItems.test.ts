@@ -22,6 +22,7 @@ describe("Map context menu items", () => {
         { id: "home", title: "Introduction" },
       ],
       toolsEnabled: false,
+      cachedTilesOnly: true,
       showTitleBar: false,
       showMapSelector: true,
       showCoordinates: true,
@@ -67,6 +68,7 @@ describe("Map context menu items", () => {
       { id: mapContextMenuIds.tileCalculator, disabled: true },
     ]);
     expect(items[4]?.children).toMatchObject([
+      { id: mapContextMenuIds.cachedTilesOnly, checked: true },
       { id: mapContextMenuIds.showTitleBar, checked: false },
       { id: mapContextMenuIds.showMapSelector, checked: true },
       { id: mapContextMenuIds.showCoordinates, checked: true },

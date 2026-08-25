@@ -94,7 +94,10 @@ export function registerApiTrafficLogging(
   const completed = new WeakSet<FastifyRequest>();
 
   server.addHook("onRequest", async (request) => {
-    if (request.url.startsWith("/api/") || request.url === "/api") {
+    if (
+      request.routeOptions.url !== "/api/health" &&
+      (request.url.startsWith("/api/") || request.url === "/api")
+    ) {
       startedAt.set(request, process.hrtime.bigint());
     }
   });

@@ -9,6 +9,8 @@ docs {
   | --- | --- | --- |
   | `appUrl` | all requests | Public base URL, including any reverse-proxy prefix; Local defaults to `http://localhost:4004` |
   | `mapSetId` | Map-Set-specific requests | Existing Map Set UUID |
+  | `tileZ`, `tileX`, `tileY` | Tile retrieval and seeding | Valid XYZ coordinate for the selected Map Set |
+  | `tileRefresh` | Tile retrieval | `auto`, `force`, or `cache-only`; Local defaults to `auto` |
   | `tileFile` | Tile seeding | Absolute path to a PNG, JPEG, or WebP Tile |
 
   ## Conventions

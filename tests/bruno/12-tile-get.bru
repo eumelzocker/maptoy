@@ -1,0 +1,48 @@
+meta {
+  name: Tile - Get (read only)
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/tiles/{{tileZ}}/{{tileX}}/{{tileY}}?refresh={{tileRefresh}}
+  body: none
+  auth: none
+}
+
+params:query {
+  refresh: {{tileRefresh}}
+}
+
+docs {
+  Gets one Tile using the selected refresh strategy.
+
+  ## Input
+
+  - Path variables: `mapSetId`, `tileZ`, `tileX`, and `tileY`; the coordinate must be within the Map Set's Zoom and XYZ bounds.
+  - Query: `refresh` = `auto`, `force`, or `cache-only`; this request uses the `tileRefresh` environment variable.
+    - `auto` uses a fresh archived revision and otherwise requests or validates provider content.
+    - `force` always requests or validates provider content.
+    - `cache-only` never contacts the provider.
+  - Optional UI query: `displayGeneration` = non-negative integer. It only prevents reuse of an obsolete browser response and does not affect archive selection.
+  - Optional historical selector: exactly one of `snapshot`, `asOf`, or `revision`. Historical selections never contact the provider.
+  - No headers or body.
+
+  ## Response
+
+  - `200 OK` with PNG, JPEG, or WebP bytes and `X-Maptoy-Cache: hit`, `miss`, `validated`, or `bypass`.
+  - Archived responses include `X-Maptoy-Tile-Revision`.
+  - An unavailable `cache-only` Tile returns a generated, coordinate-labelled PNG with `X-Maptoy-Cache: miss` and `Cache-Control: no-store` instead of contacting the provider.
+
+  ## Errors
+
+  - `400 MAP_SET_INVALID`: coordinate, query, or historical selector is invalid.
+  - `404 MAP_SET_NOT_FOUND`, `SNAPSHOT_NOT_FOUND`, or `TILE_REVISION_NOT_FOUND` where applicable.
+  - `502 PROVIDER_*` or `TILE_CONTENT_INVALID`: provider request or returned content failed.
+}
+
+tests {
+  test("returns one Tile", function() {
+    expect(res.status).to.equal(200);
+  });
+}

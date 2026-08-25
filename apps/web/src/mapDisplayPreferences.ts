@@ -6,6 +6,7 @@ const showCoordinatesKey = "maptoy:show-coordinates";
 const showAttributionKey = "maptoy:show-attribution";
 const showTitleBarKey = "maptoy:show-title-bar";
 const showMapSelectorKey = "maptoy:show-map-selector";
+const cachedTilesOnlyKey = "maptoy:cached-tiles-only";
 
 function loadBooleanPreference(
   key: string,
@@ -72,4 +73,17 @@ export function saveShowMapSelector(
   storage?: PreferenceStorage | null,
 ): void {
   saveBooleanPreference(showMapSelectorKey, value, storage);
+}
+
+export function loadCachedTilesOnly(
+  storage?: PreferenceStorage | null,
+): boolean {
+  return loadBooleanPreference(cachedTilesOnlyKey, false, storage);
+}
+
+export function saveCachedTilesOnly(
+  value: boolean,
+  storage?: PreferenceStorage | null,
+): void {
+  saveBooleanPreference(cachedTilesOnlyKey, value, storage);
 }

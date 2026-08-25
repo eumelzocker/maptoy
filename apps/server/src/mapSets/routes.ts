@@ -25,6 +25,7 @@ import {
 } from "@maptoy/contracts";
 import type { FastifyInstance } from "fastify";
 import { ProviderRequestError } from "../providerClient.js";
+import { generateErrorTile } from "../tiles/errorTile.js";
 import type { TileSelection } from "../tiles/repository.js";
 import { TileArchiveError, type TileArchiveService } from "../tiles/service.js";
 import type { MapSetService } from "./service.js";
@@ -198,6 +199,7 @@ export function registerMapSetRoutes(
     Params: { id: string; z: number; x: number; y: number };
     Querystring: {
       refresh?: "auto" | "force" | "cache-only";
+      displayGeneration?: number;
       snapshot?: string;
       asOf?: string;
       revision?: string;
@@ -216,6 +218,7 @@ export function registerMapSetRoutes(
               enum: ["auto", "force", "cache-only"],
               default: "auto",
             },
+            displayGeneration: { type: "integer", minimum: 0 },
             snapshot: { type: "string" },
             asOf: { type: "string" },
             revision: { type: "string" },
@@ -250,6 +253,25 @@ export function registerMapSetRoutes(
         }
         return reply.code(response.statusCode).send(response.body);
       } catch (error) {
+        if (
+          error instanceof TileArchiveError &&
+          error.code === "TILE_NOT_CACHED" &&
+          request.query.refresh === "cache-only"
+        ) {
+          const body = await generateErrorTile({
+            type: "no_cache",
+            tileSize: service.get(request.params.id).tileSize,
+            zoom: request.params.z,
+            x: request.params.x,
+            y: request.params.y,
+          });
+          return reply
+            .code(200)
+            .type("image/png")
+            .header("cache-control", "no-store")
+            .header("x-maptoy-cache", "miss")
+            .send(body);
+        }
         if (error instanceof ProviderRequestError) {
           return reply.code(502).send({
             error: { code: error.code, message: error.message },

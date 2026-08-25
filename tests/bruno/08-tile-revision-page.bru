@@ -10,6 +10,13 @@ get {
   auth: none
 }
 
+params:query {
+  limit: 50
+  state: all
+  ~cursor: replace-with-nextCursor
+  ~zoom: 0
+}
+
 docs {
   Lists a bounded page of Tile revisions for one Map Set.
 

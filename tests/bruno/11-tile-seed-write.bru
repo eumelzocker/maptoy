@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{appUrl}}/api/map-sets/{{mapSetId}}/tiles/0/0/0
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/tiles/{{tileZ}}/{{tileX}}/{{tileY}}
   body: file
   auth: none
 }
@@ -19,11 +19,11 @@ body:file {
 }
 
 docs {
-  Seeds Tile `0/0/0` without contacting the provider.
+  Seeds the configured Tile coordinate without contacting the provider.
 
   ## Input
 
-  - Path variables: `mapSetId` plus fixed coordinate `z=0`, `x=0`, `y=0`.
+  - Path variables: `mapSetId`, `tileZ`, `tileX`, and `tileY`.
   - File variable: `tileFile` — absolute path to the raw Tile image.
   - Required header: `Content-Type: image/png`; change header and body content type together for JPEG or WebP Map Sets.
   - The coordinate must be within Map Set bounds; Tile Archive and cache policy must be enabled.

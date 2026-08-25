@@ -17,6 +17,7 @@ interface MapContextMenuState {
   documentationLanguage: string;
   documentationPages: readonly DocumentationMenuPage[];
   toolsEnabled: boolean;
+  cachedTilesOnly: boolean;
   showTitleBar: boolean;
   showMapSelector: boolean;
   showCoordinates: boolean;
@@ -31,6 +32,7 @@ export const mapContextMenuIds = {
   documentationPrefix: "goto-documentation:",
   gotoCoordinates: "tool-goto-coordinates",
   tileCalculator: "tool-tile-calculator",
+  cachedTilesOnly: "option-cached-tiles-only",
   showTitleBar: "option-show-title-bar",
   showMapSelector: "option-show-map-selector",
   showCoordinates: "option-show-coordinates",
@@ -137,6 +139,11 @@ export function createMapContextMenuItems(
       label: "Options",
       icon: "mdi-tune",
       children: [
+        {
+          id: mapContextMenuIds.cachedTilesOnly,
+          label: "Cached Tiles Only",
+          checked: state.cachedTilesOnly,
+        },
         {
           id: mapContextMenuIds.showTitleBar,
           label: "Show Title Bar",

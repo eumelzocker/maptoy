@@ -6,6 +6,12 @@ All notable changes to maptoy are documented in this file.
 
 ### Added
 
+- Browser-local **Cached Tiles Only** display option. The mode renders uncached
+  areas as dynamically generated, seamless `no_cache` Tiles, labelled with
+  their `z`, `x`, and `y` coordinates.
+- Bounded in-memory LRU caching for generated error Tiles in both supported Tile
+  sizes, with non-cacheable HTTP responses so newly archived content can replace
+  placeholders immediately.
 - Map View context menu with hierarchical Map Set selection, available source
   zoom levels, application and Documentation-page navigation, map tools, and
   checked display preferences. It supports pointer and keyboard opening,
@@ -29,6 +35,9 @@ All notable changes to maptoy are documented in this file.
 
 ### Changed
 
+- Requests to the `api/health` liveness endpoint are excluded from detailed API
+  traffic logs regardless of their origin, while Docker health evaluation remains
+  unchanged.
 - The shared menu now provides accessible checkbox entries, chooses each
   submenu direction from its actual available space, delays pointer-leave
   closing by 150 ms, and keeps long leaf menus usable with bounded scrolling.

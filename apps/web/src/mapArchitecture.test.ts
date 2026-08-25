@@ -4,16 +4,24 @@ import { describe, expect, it } from "vitest";
 
 describe("Map view architecture", () => {
   it("uses the neutral adapter and a relative maptoy tile URL", async () => {
-    const source = await readFile(
-      fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
-      "utf8",
+    const [mapView, tileUrl] = await Promise.all([
+      readFile(
+        fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./mapTileUrl.ts", import.meta.url)),
+        "utf8",
+      ),
+    ]);
+    expect(mapView).toContain("MAP_RENDERER_FACTORY_REGISTRY_KEY");
+    expect(mapView).toContain("mapTileUrl");
+    expect(tileUrl).toContain(
+      "api/map-sets/$" + "{mapSetId}/tiles/{z}/{x}/{y}",
     );
-    expect(source).toContain("MAP_RENDERER_FACTORY_REGISTRY_KEY");
-    expect(source).toContain(
-      "api/map-sets/$" + "{mapSet.id}/tiles/{z}/{x}/{y}",
-    );
-    expect(source).not.toMatch(/from ["']leaflet["']/);
-    expect(source).not.toContain("https://");
+    expect(mapView).not.toMatch(/from ["']leaflet["']/);
+    expect(mapView).not.toContain("https://");
+    expect(tileUrl).not.toContain("https://");
   });
 
   it("delegates generic context-menu overlay behavior to AppContextMenu", async () => {

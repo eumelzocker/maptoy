@@ -15,7 +15,10 @@ clients must preserve a configured reverse-proxy prefix. Error responses use
 `GET api/map-sets/:id/tiles/:z/:x/:y` returns PNG, JPEG, or WebP bytes. The optional
 `refresh` query is `auto`, `force`, or `cache-only`. Exactly one historical selector
 may be supplied as `snapshot`, `asOf`, or `revision`. Successful archived responses
-include `X-Maptoy-Tile-Revision` and `X-Maptoy-Cache` headers.
+include `X-Maptoy-Tile-Revision` and `X-Maptoy-Cache` headers. An unavailable
+`cache-only` Tile returns a generated `no_cache` PNG with `X-Maptoy-Cache: miss` and
+`Cache-Control: no-store`. The image identifies the missing Tile by its `z`, `x`,
+and `y` coordinates and never causes a provider request.
 
 ## Tile upload
 

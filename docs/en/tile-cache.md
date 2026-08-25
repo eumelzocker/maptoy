@@ -19,12 +19,17 @@ updates validation timestamps.
 
 - `auto` uses a fresh cached revision and validates stale content.
 - `force` contacts the provider regardless of the configured maximum age.
-- `cache-only` never contacts the provider and returns `404` when the selected tile
-  is unavailable.
+- `cache-only` never contacts the provider. When the selected tile is unavailable,
+  maptoy returns a diagonally striped `no_cache` PNG in the configured Tile size
+  with its `z`, `x`, and `y` coordinates and `X-Maptoy-Cache: miss`.
 
 The API accepts the mode as `?refresh=auto`, `?refresh=force`, or
 `?refresh=cache-only`. Concurrent requests for the same uncached logical tile share
-one provider request.
+one provider request. The Map view's **Cached Tiles Only** display option uses
+`cache-only`; missing Tiles are therefore visible as hatched areas instead of
+triggering provider traffic. Generated error Tile bytes are cached in server memory,
+while their HTTP responses use `Cache-Control: no-store` so a newly archived Tile
+can replace the placeholder immediately.
 
 ## External Tile seeding
 

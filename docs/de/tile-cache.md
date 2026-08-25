@@ -20,12 +20,18 @@ Validierungszeitpunkte.
 
 - `auto` verwendet eine frische Cache-Revision und validiert veraltete Inhalte.
 - `force` kontaktiert den Provider unabhängig vom konfigurierten Höchstalter.
-- `cache-only` kontaktiert den Provider nie und antwortet mit `404`, wenn das
-  ausgewählte Tile fehlt.
+- `cache-only` kontaktiert den Provider nie. Fehlt das ausgewählte Tile, liefert
+  maptoy ein diagonal schraffiertes `no_cache`-PNG in der konfigurierten Tile-Größe
+  mit seinen `z`-, `x`- und `y`-Koordinaten sowie `X-Maptoy-Cache: miss` aus.
 
 Die API erhält den Modus als `?refresh=auto`, `?refresh=force` oder
 `?refresh=cache-only`. Parallele Abrufe desselben noch nicht gespeicherten logischen
-Tiles teilen sich einen Provider-Request.
+Tiles teilen sich einen Provider-Request. Die Anzeigeoption **Cached Tiles Only**
+der Kartenansicht verwendet `cache-only`; fehlende Tiles erscheinen deshalb als
+schraffierte Flächen, ohne Provider-Traffic auszulösen. Die generierten Error-Tile-
+Bytes werden im Arbeitsspeicher des Servers gecacht. Ihre HTTP-Antworten verwenden
+`Cache-Control: no-store`, damit ein neu archiviertes Tile den Platzhalter sofort
+ersetzen kann.
 
 ## Externes Tile-Seeding
 

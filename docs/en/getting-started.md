@@ -62,7 +62,9 @@ active files are named `api-traffic.log` and `provider-traffic.log`.
 `MAPTOY_TRAFFIC_LOG_MAX_FILES` controls the total retained files per traffic type,
 including the active file. Authentication headers, cookies, and common secret
 query parameters are redacted. The log directories must exist before Compose
-starts and must be writable by UID `1000`.
+starts and must be writable by UID `1000`. Requests to the liveness endpoint
+`api/health` are excluded from API traffic logs regardless of their origin; Docker
+continues to evaluate and expose the container health status.
 
 The readiness endpoint verifies the database and the continued writability of the
 application data directory and both traffic-log directories. Traffic logs configured
