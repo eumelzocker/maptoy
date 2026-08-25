@@ -5,6 +5,7 @@ import type {
   TileCacheMapSetSummary,
   TileCacheOverviewStats,
   TileCacheStats,
+  TileCacheUnsupportedZoomInfo,
   TileRevisionOrigin,
   TileRevisionSummary,
 } from "@maptoy/contracts";
@@ -49,6 +50,13 @@ export interface TileRevisionPage {
   items: TileRevisionSummary[];
   total: number;
   nextCursor: string | null;
+}
+
+export interface UnsupportedZoomDeletion {
+  removedLogicalTileCount: number;
+  removedRevisionCount: number;
+  removedIndexedStorageBytes: number;
+  filePaths: string[];
 }
 
 interface SnapshotRow {
@@ -654,6 +662,21 @@ export class TileArchiveRepository {
         }>
       ).map((row) => [row.map_set_id, row]),
     );
+    const oldestCurrentValidatedAtByMapSet = new Map(
+      (
+        this.database
+          .prepare(
+            `SELECT lt.map_set_id, MIN(tr.last_validated_at) AS oldest_validated_at
+               FROM tile_revisions tr
+               JOIN logical_tiles lt ON lt.current_revision_id = tr.id
+              GROUP BY lt.map_set_id`,
+          )
+          .all() as unknown as Array<{
+          map_set_id: string;
+          oldest_validated_at: string;
+        }>
+      ).map((row) => [row.map_set_id, row.oldest_validated_at]),
+    );
     const logicalByZoom = this.database
       .prepare(
         `SELECT zoom, COUNT(*) AS logical_count,
@@ -712,6 +735,8 @@ export class TileArchiveRepository {
         snapshotCount: snapshotCounts.get(row.map_set_id) ?? 0,
         uniqueContentCount: storage?.content_count ?? 0,
         totalStorageBytes: storage?.bytes ?? 0,
+        oldestCurrentValidatedAt:
+          oldestCurrentValidatedAtByMapSet.get(row.map_set_id) ?? null,
       };
     });
     const totals = mapSets.reduce(
@@ -760,6 +785,141 @@ export class TileArchiveRepository {
       },
       mapSets,
     };
+  }
+
+  unsupportedZoomInfo(
+    mapSetId: string,
+    minimumZoom: number,
+    maximumZoom: number,
+  ): TileCacheUnsupportedZoomInfo {
+    const parameters = [mapSetId, minimumZoom, maximumZoom] as const;
+    const totals = this.database
+      .prepare(
+        `SELECT COUNT(*) AS logical_count,
+                COALESCE(SUM((
+                  SELECT COUNT(*) FROM tile_revisions tr
+                   WHERE tr.logical_tile_id = lt.id
+                )), 0) AS revision_count,
+                COALESCE(SUM(CASE WHEN EXISTS (
+                  SELECT 1
+                    FROM tile_revisions tr
+                    JOIN cache_snapshot_tiles item ON item.tile_revision_id = tr.id
+                   WHERE tr.logical_tile_id = lt.id
+                ) THEN 1 ELSE 0 END), 0) AS protected_count
+           FROM logical_tiles lt
+          WHERE lt.map_set_id = ? AND (lt.zoom < ? OR lt.zoom > ?)`,
+      )
+      .get(...parameters) as {
+      logical_count: number;
+      revision_count: number;
+      protected_count: number;
+    };
+    const storage = this.database
+      .prepare(
+        `SELECT COALESCE(SUM(byte_length), 0) AS bytes
+           FROM (
+             SELECT tr.file_path, MAX(tr.byte_length) AS byte_length
+               FROM tile_revisions tr
+               JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+              WHERE lt.map_set_id = ? AND (lt.zoom < ? OR lt.zoom > ?)
+              GROUP BY tr.file_path
+           )`,
+      )
+      .get(...parameters) as { bytes: number };
+    const zoomLevels = (
+      this.database
+        .prepare(
+          `SELECT DISTINCT zoom
+             FROM logical_tiles
+            WHERE map_set_id = ? AND (zoom < ? OR zoom > ?)
+            ORDER BY zoom`,
+        )
+        .all(...parameters) as unknown as Array<{ zoom: number }>
+    ).map(({ zoom }) => zoom);
+
+    return {
+      zoomLevels,
+      logicalTileCount: totals.logical_count,
+      revisionCount: totals.revision_count,
+      deletableLogicalTileCount: totals.logical_count - totals.protected_count,
+      snapshotProtectedLogicalTileCount: totals.protected_count,
+      indexedStorageBytes: storage.bytes,
+    };
+  }
+
+  deleteUnsupportedZoomTiles(
+    mapSetId: string,
+    minimumZoom: number,
+    maximumZoom: number,
+  ): UnsupportedZoomDeletion {
+    const parameters = [mapSetId, minimumZoom, maximumZoom] as const;
+    const deletablePredicate = `
+      map_set_id = ? AND (zoom < ? OR zoom > ?)
+      AND NOT EXISTS (
+        SELECT 1
+          FROM tile_revisions protected_revision
+          JOIN cache_snapshot_tiles item
+            ON item.tile_revision_id = protected_revision.id
+         WHERE protected_revision.logical_tile_id = logical_tiles.id
+      )`;
+    const files = this.database
+      .prepare(
+        `SELECT tr.file_path, MAX(tr.byte_length) AS byte_length
+           FROM tile_revisions tr
+           JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+          WHERE lt.map_set_id = ? AND (lt.zoom < ? OR lt.zoom > ?)
+            AND NOT EXISTS (
+              SELECT 1
+                FROM tile_revisions protected_revision
+                JOIN cache_snapshot_tiles item
+                  ON item.tile_revision_id = protected_revision.id
+               WHERE protected_revision.logical_tile_id = lt.id
+            )
+          GROUP BY tr.file_path`,
+      )
+      .all(...parameters) as unknown as Array<{
+      file_path: string;
+      byte_length: number;
+    }>;
+    const removedRevisionCount = (
+      this.database
+        .prepare(
+          `SELECT COUNT(*) AS value
+             FROM tile_revisions tr
+             JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+            WHERE lt.map_set_id = ? AND (lt.zoom < ? OR lt.zoom > ?)
+              AND NOT EXISTS (
+                SELECT 1
+                  FROM tile_revisions protected_revision
+                  JOIN cache_snapshot_tiles item
+                    ON item.tile_revision_id = protected_revision.id
+                 WHERE protected_revision.logical_tile_id = lt.id
+              )`,
+        )
+        .get(...parameters) as { value: number }
+    ).value;
+
+    this.database.exec("BEGIN IMMEDIATE;");
+    try {
+      const removedLogicalTileCount = Number(
+        this.database
+          .prepare(`DELETE FROM logical_tiles WHERE ${deletablePredicate}`)
+          .run(...parameters).changes,
+      );
+      this.database.exec("COMMIT;");
+      return {
+        removedLogicalTileCount,
+        removedRevisionCount,
+        removedIndexedStorageBytes: files.reduce(
+          (total, file) => total + file.byte_length,
+          0,
+        ),
+        filePaths: files.map(({ file_path }) => file_path),
+      };
+    } catch (error) {
+      this.database.exec("ROLLBACK;");
+      throw error;
+    }
   }
 
   referencedFiles(

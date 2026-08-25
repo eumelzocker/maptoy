@@ -298,6 +298,40 @@ export const TileCacheStatsSchema = Type.Object(
 
 export type TileCacheStats = Static<typeof TileCacheStatsSchema>;
 
+export const TileCacheUnsupportedZoomInfoSchema = Type.Object(
+  {
+    zoomLevels: Type.Array(Type.Integer({ minimum: 0 })),
+    logicalTileCount: Type.Integer({ minimum: 0 }),
+    revisionCount: Type.Integer({ minimum: 0 }),
+    deletableLogicalTileCount: Type.Integer({ minimum: 0 }),
+    snapshotProtectedLogicalTileCount: Type.Integer({ minimum: 0 }),
+    indexedStorageBytes: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false, $id: "TileCacheUnsupportedZoomInfo" },
+);
+
+export type TileCacheUnsupportedZoomInfo = Static<
+  typeof TileCacheUnsupportedZoomInfoSchema
+>;
+
+export const TileCacheUnsupportedZoomCleanupResultSchema = Type.Object(
+  {
+    removedLogicalTileCount: Type.Integer({ minimum: 0 }),
+    removedRevisionCount: Type.Integer({ minimum: 0 }),
+    removedFileCount: Type.Integer({ minimum: 0 }),
+    removedIndexedStorageBytes: Type.Integer({ minimum: 0 }),
+    remaining: TileCacheUnsupportedZoomInfoSchema,
+  },
+  {
+    additionalProperties: false,
+    $id: "TileCacheUnsupportedZoomCleanupResult",
+  },
+);
+
+export type TileCacheUnsupportedZoomCleanupResult = Static<
+  typeof TileCacheUnsupportedZoomCleanupResultSchema
+>;
+
 export const TileCacheMapSetSummarySchema = Type.Object(
   {
     mapSetId: Type.String(),
@@ -308,6 +342,7 @@ export const TileCacheMapSetSummarySchema = Type.Object(
     snapshotCount: Type.Integer({ minimum: 0 }),
     uniqueContentCount: Type.Integer({ minimum: 0 }),
     totalStorageBytes: Type.Integer({ minimum: 0 }),
+    oldestCurrentValidatedAt: Type.Union([Type.String(), Type.Null()]),
   },
   { additionalProperties: false, $id: "TileCacheMapSetSummary" },
 );

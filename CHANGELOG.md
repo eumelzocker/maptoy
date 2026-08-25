@@ -4,6 +4,8 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-08-25
+
 ### Added
 
 - Browser-local **Cached Tiles Only** display option. The mode renders uncached
@@ -32,9 +34,20 @@ All notable changes to maptoy are documented in this file.
   viewport, including on-demand Tile preview through the selected Map Set.
 - Structured in-app Bruno documentation for the API collection and every
   included request, covering inputs, headers, responses, and relevant errors.
+- Per-zoom Tile Cache coverage statistics across the complete XYZ world, including
+  empty supported zoom levels, the number of supporting Map Sets, exact possible
+  Tile counts, and adaptive percentage formatting that keeps tiny high-zoom
+  values visible in scientific notation.
+- Automatic detection of cached Tiles outside a Map Set's current zoom range on
+  its Tile Cache detail page, with confirmed bulk cleanup of all unprotected
+  revisions and files, pruning of empty Tile directories, and explicit
+  preservation of snapshot-referenced Tiles.
 
 ### Changed
 
+- The Map Set editor's unsaved-changes guard now also covers navigation to every
+  other application view as well as browser reload, tab closing, and leaving the
+  page.
 - Requests to the `api/health` liveness endpoint are excluded from detailed API
   traffic logs regardless of their origin, while Docker health evaluation remains
   unchanged.

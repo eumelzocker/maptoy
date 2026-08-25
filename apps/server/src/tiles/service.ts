@@ -9,6 +9,8 @@ import type {
   TileCacheOverviewStats,
   TileCacheRepairResult,
   TileCacheStats,
+  TileCacheUnsupportedZoomCleanupResult,
+  TileCacheUnsupportedZoomInfo,
   TileRefreshMode,
   TileRevisionListResponse,
   TileRevisionSummary,
@@ -373,6 +375,40 @@ export class TileArchiveService {
 
   overview(): TileCacheOverviewStats {
     return this.repository.metadataOverview();
+  }
+
+  unsupportedZoomInfo(
+    mapSetId: string,
+    minimumZoom: number,
+    maximumZoom: number,
+  ): TileCacheUnsupportedZoomInfo {
+    return this.repository.unsupportedZoomInfo(
+      mapSetId,
+      minimumZoom,
+      maximumZoom,
+    );
+  }
+
+  async deleteUnsupportedZoomTiles(
+    mapSetId: string,
+    minimumZoom: number,
+    maximumZoom: number,
+  ): Promise<TileCacheUnsupportedZoomCleanupResult> {
+    const deletion = this.repository.deleteUnsupportedZoomTiles(
+      mapSetId,
+      minimumZoom,
+      maximumZoom,
+    );
+    for (const filePath of deletion.filePaths) {
+      await this.storage.delete(filePath);
+    }
+    return {
+      removedLogicalTileCount: deletion.removedLogicalTileCount,
+      removedRevisionCount: deletion.removedRevisionCount,
+      removedFileCount: deletion.filePaths.length,
+      removedIndexedStorageBytes: deletion.removedIndexedStorageBytes,
+      remaining: this.unsupportedZoomInfo(mapSetId, minimumZoom, maximumZoom),
+    };
   }
 
   logicalTileCounts(): ReadonlyMap<string, number> {

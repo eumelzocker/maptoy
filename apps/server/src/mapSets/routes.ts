@@ -18,6 +18,8 @@ import {
   TileCacheOverviewStatsSchema,
   TileCacheRepairResultSchema,
   TileCacheStatsSchema,
+  TileCacheUnsupportedZoomCleanupResultSchema,
+  TileCacheUnsupportedZoomInfoSchema,
   TileRevisionListResponseSchema,
   TileUploadBodySchema,
   type TileUploadResponse,
@@ -358,6 +360,48 @@ export function registerMapSetRoutes(
     async (request) => {
       service.get(request.params.id);
       return tileArchive.stats(request.params.id);
+    },
+  );
+
+  server.get<{ Params: { id: string } }>(
+    "/api/map-sets/:id/cache/unsupported-zoom-levels",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: {
+          200: TileCacheUnsupportedZoomInfoSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const mapSet = service.get(request.params.id);
+      return tileArchive.unsupportedZoomInfo(
+        mapSet.id,
+        mapSet.minZoom,
+        mapSet.maxZoom,
+      );
+    },
+  );
+
+  server.delete<{ Params: { id: string } }>(
+    "/api/map-sets/:id/cache/unsupported-zoom-levels",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: {
+          200: TileCacheUnsupportedZoomCleanupResultSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const mapSet = service.get(request.params.id);
+      return tileArchive.deleteUnsupportedZoomTiles(
+        mapSet.id,
+        mapSet.minZoom,
+        mapSet.maxZoom,
+      );
     },
   );
 

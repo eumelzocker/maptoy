@@ -609,6 +609,38 @@ describe("maptoy server", () => {
       totalStorageBytes: validPng.byteLength,
     });
 
+    const narrowedZoomRange = await server.inject({
+      method: "PATCH",
+      url: `/api/map-sets/${mapSetId}`,
+      payload: { minZoom: 3 },
+    });
+    expect(narrowedZoomRange.statusCode).toBe(200);
+    const unsupportedZoomInfo = await server.inject({
+      method: "GET",
+      url: `/api/map-sets/${mapSetId}/cache/unsupported-zoom-levels`,
+    });
+    expect(unsupportedZoomInfo.statusCode).toBe(200);
+    expect(unsupportedZoomInfo.json()).toMatchObject({
+      zoomLevels: [2],
+      logicalTileCount: 1,
+      revisionCount: 1,
+      deletableLogicalTileCount: 1,
+      snapshotProtectedLogicalTileCount: 0,
+      indexedStorageBytes: validPng.byteLength,
+    });
+    const unsupportedZoomCleanup = await server.inject({
+      method: "DELETE",
+      url: `/api/map-sets/${mapSetId}/cache/unsupported-zoom-levels`,
+    });
+    expect(unsupportedZoomCleanup.statusCode).toBe(200);
+    expect(unsupportedZoomCleanup.json()).toMatchObject({
+      removedLogicalTileCount: 1,
+      removedRevisionCount: 1,
+      removedFileCount: 1,
+      removedIndexedStorageBytes: validPng.byteLength,
+      remaining: { logicalTileCount: 0, zoomLevels: [] },
+    });
+
     const disabledMapSet = await server.inject({
       method: "POST",
       url: "/api/map-sets",

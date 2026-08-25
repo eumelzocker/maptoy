@@ -2,6 +2,7 @@
 import type {
   CacheSnapshot,
   CacheSnapshotListResponse,
+  MapSet,
   TileCacheAuditResult,
   TileCacheComparison,
   TileCacheMapSetAuditResult,
@@ -9,16 +10,25 @@ import type {
   TileCacheOverviewStats,
   TileCacheRepairResult,
   TileCacheStats,
+  TileCacheUnsupportedZoomCleanupResult,
+  TileCacheUnsupportedZoomInfo,
+  TileFormat,
   TileRevisionListResponse,
   TileRevisionSummary,
 } from "@maptoy/contracts";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiRequest } from "../api.js";
+import {
+  cacheCoverageByZoom,
+  // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+  formatCoveragePercent,
+} from "../cacheCoverage.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
+import { useDisclosure } from "../composables/useDisclosure.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
 const mapSets = useMapSetsStore();
@@ -30,6 +40,7 @@ const overview = ref<TileCacheOverviewStats | null>(null);
 const audit = ref<TileCacheAuditResult | null>(null);
 const overviewAudit = ref<TileCacheOverviewAuditResult | null>(null);
 const snapshots = ref<CacheSnapshot[]>([]);
+const unsupportedZoomInfo = ref<TileCacheUnsupportedZoomInfo | null>(null);
 const revisions = ref<TileRevisionSummary[]>([]);
 const revisionTotal = ref(0);
 const revisionCursor = ref<string | null>(null);
@@ -44,9 +55,7 @@ const message = ref<string | null>(null);
 let routeReady = false;
 let loadGeneration = 0;
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const isOverview = computed(() => selectedId.value === "");
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const selectedMapSet = computed(
   () => mapSets.items.find(({ id }) => id === selectedId.value) ?? null,
 );
@@ -68,6 +77,18 @@ const overviewRows = computed(() =>
 );
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const coverageRows = computed(() =>
+  cacheCoverageByZoom(
+    stats.value?.zoomLevels ?? [],
+    isOverview.value
+      ? mapSets.items
+      : selectedMapSet.value === null
+        ? []
+        : [selectedMapSet.value],
+  ),
+);
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const sortedRevisions = computed(() =>
   [...revisions.value].sort(
     (left, right) =>
@@ -77,6 +98,7 @@ const sortedRevisions = computed(() =>
 
 function resetScopeState(): void {
   stats.value = null;
+  unsupportedZoomInfo.value = null;
   snapshots.value = [];
   comparison.value = null;
   message.value = null;
@@ -104,13 +126,18 @@ async function loadDetails(): Promise<void> {
       snapshots.value = [];
     } else {
       const base = `api/map-sets/${mapSetId}`;
-      const [loadedStats, loadedSnapshots] = await Promise.all([
-        apiRequest<TileCacheStats>(`${base}/cache/stats`),
-        apiRequest<CacheSnapshotListResponse>(`${base}/snapshots`),
-      ]);
+      const [loadedStats, loadedSnapshots, loadedUnsupportedZoomInfo] =
+        await Promise.all([
+          apiRequest<TileCacheStats>(`${base}/cache/stats`),
+          apiRequest<CacheSnapshotListResponse>(`${base}/snapshots`),
+          apiRequest<TileCacheUnsupportedZoomInfo>(
+            `${base}/cache/unsupported-zoom-levels`,
+          ),
+        ]);
       if (generation !== loadGeneration) return;
       stats.value = loadedStats;
       snapshots.value = loadedSnapshots.items;
+      unsupportedZoomInfo.value = loadedUnsupportedZoomInfo;
     }
   } catch (cause) {
     if (generation !== loadGeneration) return;
@@ -288,6 +315,48 @@ async function deleteRevision(revision: TileRevisionSummary): Promise<void> {
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function deleteUnsupportedZoomTiles(): Promise<void> {
+  const info = unsupportedZoomInfo.value;
+  const mapSet = selectedMapSet.value;
+  if (
+    selectedId.value === "" ||
+    info === null ||
+    mapSet === null ||
+    info.deletableLogicalTileCount === 0 ||
+    !window.confirm(
+      `Delete ${info.deletableLogicalTileCount} cached Tile${info.deletableLogicalTileCount === 1 ? "" : "s"} outside the supported zoom range ${mapSet.minZoom}–${mapSet.maxZoom}, including all current and historical revisions? Snapshot-protected Tiles will be kept. This cannot be undone.`,
+    )
+  ) {
+    return;
+  }
+  busy.value = true;
+  error.value = null;
+  try {
+    const result = await apiRequest<TileCacheUnsupportedZoomCleanupResult>(
+      `api/map-sets/${selectedId.value}/cache/unsupported-zoom-levels`,
+      { method: "DELETE" },
+    );
+    message.value = `Removed ${result.removedLogicalTileCount} unsupported cached Tile${result.removedLogicalTileCount === 1 ? "" : "s"}, ${result.removedRevisionCount} revision${result.removedRevisionCount === 1 ? "" : "s"}, and ${formatBytes(result.removedIndexedStorageBytes)} of indexed storage.${result.remaining.snapshotProtectedLogicalTileCount > 0 ? ` ${result.remaining.snapshotProtectedLogicalTileCount} snapshot-protected Tile${result.remaining.snapshotProtectedLogicalTileCount === 1 ? " remains" : "s remain"}.` : ""}`;
+    audit.value = null;
+    overview.value = null;
+    overviewAudit.value = null;
+    revisions.value = [];
+    revisionTotal.value = 0;
+    revisionCursor.value = null;
+    revisionsLoaded.value = false;
+    await mapSets.load();
+    await loadDetails();
+  } catch (cause) {
+    error.value =
+      cause instanceof Error
+        ? cause.message
+        : "Unsupported cached Tiles could not be deleted.";
+  } finally {
+    busy.value = false;
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function auditCache(): Promise<void> {
   busy.value = true;
   error.value = null;
@@ -344,6 +413,11 @@ async function repairCache(): Promise<void> {
   }
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const mapSetsPanel = useDisclosure(true);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const zoomOverviewPanel = useDisclosure(true);
+
 async function loadRevisions(append: boolean): Promise<void> {
   if (selectedId.value === "") {
     return;
@@ -378,11 +452,61 @@ async function loadRevisions(append: boolean): Promise<void> {
   }
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KiB`;
   return `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function formatTileCount(count: bigint): string {
+  return new Intl.NumberFormat().format(count);
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function formatDurationMinutes(totalMinutes: number): string {
+  // Clamp negative durations (e.g. clock skew between server and browser) to zero
+  // instead of relying on negative floor/modulo results happening to fail every `> 0` check below.
+  const clampedMinutes = Math.max(0, totalMinutes);
+  const weeks = Math.floor(clampedMinutes / (7 * 24 * 60));
+  const days = Math.floor((clampedMinutes % (7 * 24 * 60)) / (24 * 60));
+  const hours = Math.floor((clampedMinutes % (24 * 60)) / 60);
+  const minutes = clampedMinutes % 60;
+  const parts = [
+    weeks > 0 ? pluralize(weeks, "wk", "wks") : null,
+    days > 0 ? pluralize(days, "day", "days") : null,
+    hours > 0 ? pluralize(hours, "hour", "hours") : null,
+    minutes > 0 ? pluralize(minutes, "min", "mins") : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(", ") : "0 mins";
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function formatCacheAge(value: string | null): string {
+  if (value === null) return "–";
+  return formatDurationMinutes(
+    Math.round((Date.now() - new Date(value).getTime()) / 60_000),
+  );
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function formatCacheAgeLimit(mapSet: MapSet): string {
+  if (!mapSet.cachePolicy.enabled) return "caching disabled";
+  return `limit ${formatDurationMinutes(Math.round(mapSet.cachePolicy.maximumAgeSeconds / 60))}`;
+}
+
+const tileFormatLabels: Record<TileFormat, string> = {
+  png: "PNG",
+  jpeg: "JPEG",
+  webp: "WebP",
+};
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function formatTileFormat(format: TileFormat): string {
+  return tileFormatLabels[format];
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
@@ -409,9 +533,12 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
         <p v-if="isOverview">
           Storage, revisions, and consistency across all Map Sets.
         </p>
-        <p v-else>
+        <p v-else-if="selectedMapSet">
           <RouterLink class="overview-link" to="/cache">All Map Sets</RouterLink>
-          <span aria-hidden="true"> / </span>{{ selectedMapSet?.name }}
+          <span aria-hidden="true"> / </span>{{ selectedMapSet.name }}
+          <span class="meta-dot" aria-hidden="true">●</span>{{ selectedMapSet.tileSize }} px
+          <span class="meta-dot" aria-hidden="true">●</span>{{ formatTileFormat(selectedMapSet.tileFormat) }}
+          <span class="meta-dot" aria-hidden="true">●</span>{{ formatCacheAgeLimit(selectedMapSet) }}
         </p>
       </div>
       <div class="map-set-picker">
@@ -450,29 +577,55 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
       v-if="isOverview && overview && overviewRows.length"
       class="panel compact-panel map-set-overview"
     >
-      <header>
-        <div>
-          <h2>Map Sets</h2>
-          <p>Indexed cache metadata by Map Set. Open a row for snapshots and revisions.</p>
+      <header
+        class="collapsible-heading"
+        role="button"
+        tabindex="0"
+        :aria-expanded="mapSetsPanel.open.value"
+        :aria-controls="mapSetsPanel.contentId"
+        @click="mapSetsPanel.toggle()"
+        @keydown.enter.prevent="mapSetsPanel.toggle()"
+        @keydown.space.prevent="mapSetsPanel.toggle()"
+      >
+        <div class="panel-title">
+          <i
+            class="mdi panel-caret"
+            :class="mapSetsPanel.open.value ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+            aria-hidden="true"
+          ></i>
+          <div>
+            <h2>Map Sets</h2>
+            <p>Indexed cache metadata by Map Set. Open a row for snapshots and revisions.</p>
+          </div>
         </div>
       </header>
-      <div class="table-scroll">
+      <div v-show="mapSetsPanel.open.value" :id="mapSetsPanel.contentId" class="table-scroll">
         <table>
           <thead>
             <tr>
               <th>Map Set</th><th class="numeric">Logical</th><th class="numeric">Current</th><th class="numeric">Historical</th>
-              <th class="numeric">Snapshots</th><th class="numeric">Files</th><th class="numeric">Storage</th><th>Consistency</th><th></th>
+              <th class="numeric">Snapshots</th><th class="numeric">Files</th><th class="numeric">Storage</th><th class="numeric">Max. cache age</th><th>Consistency</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in overviewRows" :key="row.mapSet.id">
-              <td><strong>{{ row.mapSet.name }}</strong></td>
+              <td>
+                <RouterLink class="detail-link" :to="`/cache/${row.mapSet.id}`">
+                  {{ row.mapSet.name }}
+                </RouterLink>
+              </td>
               <td class="numeric">{{ row.summary.logicalTileCount }}</td>
               <td class="numeric">{{ row.summary.currentRevisionCount }}</td>
               <td class="numeric">{{ row.summary.historicalRevisionCount }}</td>
               <td class="numeric">{{ row.summary.snapshotCount }}</td>
               <td class="numeric">{{ row.summary.uniqueContentCount }}</td>
               <td class="numeric">{{ formatBytes(row.summary.totalStorageBytes) }}</td>
+              <td class="numeric cache-age-cell">
+                <div class="cache-age-actual">
+                  {{ formatCacheAge(row.summary.oldestCurrentValidatedAt) }}
+                </div>
+                <div class="cache-age-limit">{{ formatCacheAgeLimit(row.mapSet) }}</div>
+              </td>
               <td>
                 <span
                   v-if="row.audit"
@@ -482,12 +635,6 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
                   {{ mapSetAuditNeedsAttention(row.audit) ? "Needs attention" : "OK" }}
                 </span>
                 <span v-else class="muted">Not checked</span>
-              </td>
-              <td>
-                <RouterLink class="detail-link" :to="`/cache/${row.mapSet.id}`">
-                  Details
-                  <i class="mdi mdi-chevron-right" aria-hidden="true"></i>
-                </RouterLink>
               </td>
             </tr>
           </tbody>
@@ -534,23 +681,48 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
       </p>
     </section>
 
-    <section v-if="stats && stats.zoomLevels.length" class="panel compact-panel">
-      <header>
-        <div>
-          <h2>Zoom overview</h2>
-          <p>
-            {{ isOverview ? "Totals across all Map Sets" : "Map Set totals" }} without a
-            file-system scan.
-          </p>
+    <section v-if="stats && coverageRows.length" class="panel compact-panel">
+      <header
+        class="collapsible-heading"
+        role="button"
+        tabindex="0"
+        :aria-expanded="zoomOverviewPanel.open.value"
+        :aria-controls="zoomOverviewPanel.contentId"
+        @click="zoomOverviewPanel.toggle()"
+        @keydown.enter.prevent="zoomOverviewPanel.toggle()"
+        @keydown.space.prevent="zoomOverviewPanel.toggle()"
+      >
+        <div class="panel-title">
+          <i
+            class="mdi panel-caret"
+            :class="zoomOverviewPanel.open.value ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+            aria-hidden="true"
+          ></i>
+          <div>
+            <h2>Zoom overview</h2>
+            <p>
+              Cached coverage of the complete XYZ world per zoom level. Tiny percentages
+              use scientific notation instead of being rounded to zero.
+            </p>
+          </div>
         </div>
       </header>
-      <div class="table-scroll">
+      <div
+        v-show="zoomOverviewPanel.open.value"
+        :id="zoomOverviewPanel.contentId"
+        class="table-scroll"
+      >
         <table>
-          <thead><tr><th class="numeric">Zoom</th><th class="numeric">Logical tiles</th><th class="numeric">Current</th><th class="numeric">Historical</th><th class="numeric">Storage</th></tr></thead>
+          <thead><tr><th class="numeric">Zoom</th><th v-if="isOverview" class="numeric">Map Sets</th><th class="numeric">Cached tiles</th><th class="numeric">Possible tiles</th><th class="numeric">Coverage</th><th class="numeric">Current</th><th class="numeric">Historical</th><th class="numeric">Storage</th></tr></thead>
           <tbody>
-            <tr v-for="level in stats.zoomLevels" :key="level.zoom">
+            <tr v-for="level in coverageRows" :key="level.zoom">
               <td class="numeric">{{ level.zoom }}</td>
+              <td v-if="isOverview" class="numeric">
+                {{ level.supportedMapSetCount }}/{{ overview?.mapSetCount ?? 0 }}
+              </td>
               <td class="numeric">{{ level.logicalTileCount }}</td>
+              <td class="numeric theoretical-count">{{ formatTileCount(level.possibleTileCount) }}</td>
+              <td class="numeric coverage-value">{{ formatCoveragePercent(level.coveragePercent) }}</td>
               <td class="numeric">{{ level.currentRevisionCount }}</td>
               <td class="numeric">{{ level.historicalRevisionCount }}</td>
               <td class="numeric">{{ formatBytes(level.indexedStorageBytes) }}</td>
@@ -558,6 +730,52 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section
+      v-if="!isOverview && unsupportedZoomInfo && unsupportedZoomInfo.logicalTileCount > 0"
+      class="panel unsupported-zoom-panel"
+    >
+      <header>
+        <div>
+          <h2>Unsupported zoom levels</h2>
+          <p>
+            The cache contains Tiles at zoom
+            {{ unsupportedZoomInfo.zoomLevels.join(", ") }}, outside this Map Set’s
+            current range {{ selectedMapSet?.minZoom }}–{{ selectedMapSet?.maxZoom }}.
+          </p>
+        </div>
+        <button
+          v-if="unsupportedZoomInfo.deletableLogicalTileCount > 0"
+          class="danger-button"
+          type="button"
+          :disabled="busy"
+          @click="deleteUnsupportedZoomTiles"
+        >
+          Delete unsupported Tiles
+        </button>
+      </header>
+      <div class="audit-results">
+        <article class="warning">
+          <span>Cached tiles</span>
+          <strong>{{ unsupportedZoomInfo.logicalTileCount }}</strong>
+        </article>
+        <article>
+          <span>Revisions</span>
+          <strong>{{ unsupportedZoomInfo.revisionCount }}</strong>
+        </article>
+        <article>
+          <span>Indexed storage</span>
+          <strong>{{ formatBytes(unsupportedZoomInfo.indexedStorageBytes) }}</strong>
+        </article>
+        <article v-if="unsupportedZoomInfo.snapshotProtectedLogicalTileCount > 0">
+          <span>Snapshot-protected</span>
+          <strong>{{ unsupportedZoomInfo.snapshotProtectedLogicalTileCount }}</strong>
+        </article>
+      </div>
+      <p v-if="unsupportedZoomInfo.snapshotProtectedLogicalTileCount > 0" class="muted">
+        Snapshot-protected Tiles are reported but never deleted by this cleanup.
+      </p>
     </section>
 
     <section v-if="!isOverview && selectedId" class="panel consistency-panel">
@@ -690,6 +908,7 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
 h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.3rem, 5vw, 4rem); font-weight: 500; }
 h2, p { margin-top: 0; }
 .overview-link, .detail-link { color: #17453c; font-weight: 700; }
+.meta-dot { margin: 0 0.5rem; color: #a3b8ae; font-size: 0.6rem; vertical-align: middle; }
 .detail-link { display: inline-flex; align-items: center; text-decoration: none; }
 .map-set-picker, .snapshot-form label, .revision-filters label { display: grid; gap: 0.35rem; font-weight: 700; }
 .map-set-picker .map-set-select { min-width: 18rem; }
@@ -708,8 +927,15 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .health-state { display: inline-flex; padding: 0.2rem 0.45rem; border-radius: 999px; color: #245744; background: #dcebe1; font-size: 0.75rem; font-weight: 700; }
 .health-state.warning { color: #8a281c; background: #ffe9e5; }
 .panel { margin-top: 1.25rem; padding: 1.25rem; }
+.collapsible-heading { cursor: pointer; border-radius: 0.5rem; user-select: none; }
+.collapsible-heading:hover { background: rgba(255, 255, 255, 0.45); }
+.collapsible-heading:focus-visible { outline: 2px solid #163832; outline-offset: 2px; }
+.panel-title { display: flex; align-items: flex-start; gap: 0.6rem; min-width: 0; }
+.panel-caret { flex: none; margin-top: 0.2rem; color: #657971; font-size: 1.15rem; transition: transform 0.15s ease; }
 .compact-panel { padding-bottom: 0.5rem; }
 .consistency-panel .audit-results { margin-top: 1rem; }
+.unsupported-zoom-panel { border-color: #d6aaa4; background: rgba(255, 243, 240, 0.78); }
+.unsupported-zoom-panel .audit-results { margin-top: 1rem; }
 .snapshot-form { align-items: end; gap: 0.75rem; }
 .snapshot-form label { flex: 1; }
 .snapshot-list { display: grid; gap: 0.6rem; margin-top: 1rem; }
@@ -729,6 +955,11 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 0.65rem; border-bottom: 1px solid #d7e0db; text-align: left; white-space: nowrap; }
 th.numeric, td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.theoretical-count { color: #617870; }
+.cache-age-cell { padding-block: 0.35rem; line-height: 1.15; }
+.cache-age-actual { font-size: 0.82rem; }
+.cache-age-limit { margin-top: 0.1rem; color: #617870; font-size: 0.68rem; font-weight: 600; }
+.coverage-value { color: #17453c; font-weight: 800; }
 th { color: #536b64; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .state { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 999px; background: #e8ded6; }
 .state.current { color: #fff; background: #17453c; }

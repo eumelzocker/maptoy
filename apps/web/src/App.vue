@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute } from "vue-router";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import { version as appVersion } from "../package.json";
 import { useUiPreferencesStore } from "./stores/uiPreferences.js";
 
 const route = useRoute();
@@ -14,12 +16,14 @@ const showHeader = computed(
 <template>
   <div class="shell">
     <header v-if="showHeader" class="topbar">
-      <RouterLink class="brand" to="/" aria-label="maptoy home">maptoy</RouterLink>
+      <RouterLink class="brand" to="/" aria-label="maptoy home">
+        maptoy<span class="brand-version">{{ appVersion }}</span>
+      </RouterLink>
       <nav aria-label="Main navigation">
-        <RouterLink to="/">Map</RouterLink>
-        <RouterLink to="/map-sets">Map Sets</RouterLink>
-        <RouterLink to="/cache">Tile Cache</RouterLink>
-        <RouterLink to="/docs">Documentation</RouterLink>
+        <RouterLink to="/"><i class="mdi mdi-map-outline" aria-hidden="true"></i>Map</RouterLink>
+        <RouterLink to="/map-sets"><i class="mdi mdi-layers-outline" aria-hidden="true"></i>Map Sets</RouterLink>
+        <RouterLink to="/cache"><i class="mdi mdi-database-outline" aria-hidden="true"></i>Cache</RouterLink>
+        <RouterLink to="/docs"><i class="mdi mdi-book-open-page-variant-outline" aria-hidden="true"></i>Docs</RouterLink>
       </nav>
     </header>
     <div class="app-viewport">

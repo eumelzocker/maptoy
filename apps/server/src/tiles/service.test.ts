@@ -477,6 +477,72 @@ describe("TileArchiveService", () => {
     ).toMatchObject({ identical: 1, changed: 0, added: 0, missing: 0 });
   });
 
+  it("deletes unsupported zoom Tiles while preserving snapshot selections", async () => {
+    const now = new Date("2026-08-25T12:00:00.000Z");
+    const { mapSet, service, storage } = await fixture(() => now);
+    await service.upload(
+      mapSet,
+      { zoom: 3, x: 4, y: 2 },
+      {
+        body: png("snapshot-protected"),
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      },
+    );
+    const snapshot = service.createSnapshot(mapSet.id, "protected");
+    await service.upload(
+      mapSet,
+      { zoom: 4, x: 8, y: 5 },
+      {
+        body: png("deletable"),
+        contentType: "image/png",
+        maximumTileBytes: 1024,
+      },
+    );
+
+    expect(service.unsupportedZoomInfo(mapSet.id, 5, 18)).toMatchObject({
+      zoomLevels: [3, 4],
+      logicalTileCount: 2,
+      revisionCount: 2,
+      deletableLogicalTileCount: 1,
+      snapshotProtectedLogicalTileCount: 1,
+    });
+
+    const firstCleanup = await service.deleteUnsupportedZoomTiles(
+      mapSet.id,
+      5,
+      18,
+    );
+    expect(firstCleanup).toMatchObject({
+      removedLogicalTileCount: 1,
+      removedRevisionCount: 1,
+      removedFileCount: 1,
+      remaining: {
+        zoomLevels: [3],
+        logicalTileCount: 1,
+        deletableLogicalTileCount: 0,
+        snapshotProtectedLogicalTileCount: 1,
+      },
+    });
+    expect(service.listSnapshots(mapSet.id)).toEqual([snapshot]);
+    expect(await storage.listMapSetFiles(mapSet.id)).toHaveLength(1);
+
+    service.deleteSnapshot(mapSet.id, snapshot.id);
+    const secondCleanup = await service.deleteUnsupportedZoomTiles(
+      mapSet.id,
+      5,
+      18,
+    );
+    expect(secondCleanup).toMatchObject({
+      removedLogicalTileCount: 1,
+      removedRevisionCount: 1,
+      removedFileCount: 1,
+      remaining: { logicalTileCount: 0, zoomLevels: [] },
+    });
+    expect(await storage.listMapSetFiles(mapSet.id)).toEqual([]);
+    expect(service.stats(mapSet.id).logicalTileCount).toBe(0);
+  });
+
   it("deduplicates concurrent misses and never records invalid content", async () => {
     const now = new Date("2026-08-21T11:00:00.000Z");
     const { mapSet, repository, service, storage } = await fixture(() => now);

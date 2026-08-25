@@ -1,4 +1,11 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -53,5 +60,39 @@ describe("TileStorage", () => {
     await expect(storage.read("../maptoy.sqlite")).rejects.toThrow(
       "managed tile directory",
     );
+  });
+
+  it("prunes empty Tile directories without removing non-empty siblings or the root", async () => {
+    const directory = await mkdtemp(
+      path.join(tmpdir(), "maptoy-storage-test-"),
+    );
+    temporaryDirectories.push(directory);
+    const storage = new TileStorage(directory);
+    await storage.initialize();
+    const mapSetId = "00000000-0000-4000-8000-000000000000";
+    const firstPath = storage.relativeTilePath(
+      mapSetId,
+      { zoom: 3, x: 4, y: 2 },
+      "first",
+      "png",
+    );
+    const siblingPath = storage.relativeTilePath(
+      mapSetId,
+      { zoom: 3, x: 4, y: 3 },
+      "sibling",
+      "png",
+    );
+    await storage.writeAtomic(firstPath, Buffer.from("first"));
+    await storage.writeAtomic(siblingPath, Buffer.from("sibling"));
+
+    await storage.delete(firstPath);
+    expect(await storage.exists(siblingPath)).toBe(true);
+    await access(path.join(storage.tileDirectory, mapSetId, "3", "4"));
+
+    await storage.delete(siblingPath);
+    await expect(
+      access(path.join(storage.tileDirectory, mapSetId)),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access(storage.tileDirectory)).resolves.toBeUndefined();
   });
 });

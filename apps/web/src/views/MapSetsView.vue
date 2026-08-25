@@ -6,7 +6,8 @@ import {
   type MapSetTestResponse,
   type TileCacheStats,
 } from "@maptoy/contracts";
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetForm from "../components/MapSetForm.vue";
 import { apiRequest } from "../api.js";
@@ -31,6 +32,23 @@ const editorPanel = ref<HTMLElement | null>(null);
 const mapSetGroups = computed(() =>
   groupMapSetsByFirstNameSegment(store.items),
 );
+const collapsedGroupKeys = ref<Set<string>>(new Set());
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function isGroupCollapsed(key: string): boolean {
+  return collapsedGroupKeys.value.has(key);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function toggleGroup(key: string): void {
+  const next = new Set(collapsedGroupKeys.value);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  collapsedGroupKeys.value = next;
+}
 
 async function scrollEditorIntoView(): Promise<void> {
   await nextTick();
@@ -38,11 +56,16 @@ async function scrollEditorIntoView(): Promise<void> {
 }
 
 onMounted(async () => {
+  window.addEventListener("beforeunload", guardBeforeUnload);
   try {
     await store.load();
   } catch {
     error.value = store.error;
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", guardBeforeUnload);
 });
 
 function hasUnsavedChanges(): boolean {
@@ -55,6 +78,14 @@ function confirmDiscardChanges(): boolean {
     window.confirm("Discard unsaved changes to this Map Set?")
   );
 }
+
+function guardBeforeUnload(event: BeforeUnloadEvent): void {
+  if (!hasUnsavedChanges()) return;
+  event.preventDefault();
+  event.returnValue = "";
+}
+
+onBeforeRouteLeave(() => confirmDiscardChanges());
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function newMapSet(): void {
@@ -243,8 +274,22 @@ async function test(mapSet: MapSet): Promise<void> {
         :class="{ ungrouped: group.ungrouped }"
         :aria-labelledby="`map-set-group-${groupIndex}`"
       >
-        <header class="group-heading">
+        <header
+          class="group-heading"
+          role="button"
+          tabindex="0"
+          :aria-expanded="!isGroupCollapsed(group.key)"
+          :aria-controls="`map-set-group-list-${groupIndex}`"
+          @click="toggleGroup(group.key)"
+          @keydown.enter.prevent="toggleGroup(group.key)"
+          @keydown.space.prevent="toggleGroup(group.key)"
+        >
           <div class="group-title">
+            <i
+              class="mdi group-caret"
+              :class="isGroupCollapsed(group.key) ? 'mdi-chevron-right' : 'mdi-chevron-down'"
+              aria-hidden="true"
+            ></i>
             <i
               class="mdi"
               :class="group.ungrouped ? 'mdi-format-list-bulleted' : 'mdi-folder-outline'"
@@ -257,7 +302,11 @@ async function test(mapSet: MapSet): Promise<void> {
           </span>
         </header>
 
-        <div class="map-set-list">
+        <div
+          v-show="!isGroupCollapsed(group.key)"
+          :id="`map-set-group-list-${groupIndex}`"
+          class="map-set-list"
+        >
           <article v-for="item in group.items" :key="item.mapSet.id" class="map-set-card">
             <div>
               <h3 :title="item.mapSet.name">{{ item.label }}</h3>
@@ -401,7 +450,19 @@ h1 {
 .group-heading {
   justify-content: space-between;
   gap: 1rem;
-  padding-inline: 0.35rem;
+  padding: 0.35rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.group-heading:hover {
+  background: rgb(255 255 255 / 45%);
+}
+
+.group-heading:focus-visible {
+  outline: 2px solid #163832;
+  outline-offset: 2px;
 }
 
 .group-title {
@@ -412,6 +473,12 @@ h1 {
 .group-title i {
   color: #a34521;
   font-size: 1.35rem;
+}
+
+.group-title .group-caret {
+  color: #657971;
+  font-size: 1.15rem;
+  transition: transform 0.15s ease;
 }
 
 .group-heading h2 {

@@ -7,6 +7,7 @@ import {
   readFile,
   rename,
   rm,
+  rmdir,
   stat,
   unlink,
   writeFile,
@@ -104,11 +105,13 @@ export class TileStorage {
   }
 
   async delete(relativePath: string): Promise<void> {
-    await unlink(this.absoluteManagedPath(relativePath)).catch((error) => {
+    const absolutePath = this.absoluteManagedPath(relativePath);
+    await unlink(absolutePath).catch((error) => {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         throw error;
       }
     });
+    await this.pruneEmptyTileDirectories(path.dirname(absolutePath));
   }
 
   async deleteMapSet(mapSetId: string): Promise<void> {
@@ -167,5 +170,20 @@ export class TileStorage {
       throw new Error("Tile path leaves the managed tile directory.");
     }
     return absolute;
+  }
+
+  private async pruneEmptyTileDirectories(start: string): Promise<void> {
+    const tilesRoot = path.resolve(this.tileDirectory);
+    let directory = path.resolve(start);
+    while (directory.startsWith(`${tilesRoot}${path.sep}`)) {
+      try {
+        await rmdir(directory);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ENOTEMPTY" || code === "EEXIST") return;
+        if (code !== "ENOENT") throw error;
+      }
+      directory = path.dirname(directory);
+    }
   }
 }

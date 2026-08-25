@@ -848,7 +848,8 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.0.3` | Phase 3: hashbasiertes Tile-Archiv mit Revisionshistorie |
 | `0.0.4`–`0.0.5` | phasenübergreifende UI-, Cache- und Dokumentationsverbesserungen |
 | `0.0.6` | Traffic-Logs, Schema-Baseline 4 und Betriebsverbesserungen |
-| `0.0.7` | aktueller veröffentlichter Stand mit Phase 3a: externes Tile-Seeding über die API und nachvollziehbare Revisionsherkunft |
+| `0.0.7` | Phase 3a: externes Tile-Seeding über die API und nachvollziehbare Revisionsherkunft |
+| `0.0.8` | aktueller veröffentlichter Stand mit Kartenwerkzeugen, Menü- und Anzeigeverbesserungen sowie Cache-Abdeckungsstatistik und Bereinigung nicht mehr unterstützter Zoomstufen |
 
 ### 13.2 Weitere Releases
 

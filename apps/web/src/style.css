@@ -53,13 +53,34 @@ a {
   text-decoration: none;
 }
 
+.brand-version {
+  margin-left: 0.5em;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+}
+
 nav {
   display: flex;
   gap: 1.25rem;
 }
 
 nav a {
-  text-underline-offset: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+nav a:hover,
+nav a:focus-visible {
+  color: #9fd8c2;
+}
+
+nav a i {
+  font-size: 1.1rem;
 }
 
 .home {
