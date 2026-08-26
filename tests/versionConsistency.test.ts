@@ -18,6 +18,7 @@ const ignoredDirectories = new Set([
   "coverage",
   "data",
   "dist",
+  "extensions",
   "node_modules",
   "playwright-report",
   "spikes",

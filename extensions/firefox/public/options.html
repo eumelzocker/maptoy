@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>maptoy-ff-ext</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 960px;
+        margin: 2rem auto;
+      }
+      textarea {
+        width: 100%;
+        height: 400px;
+        font-family: monospace;
+        font-size: 13px;
+        box-sizing: border-box;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+      .status {
+        color: green;
+      }
+      .error {
+        color: crimson;
+        white-space: pre-wrap;
+      }
+      .example {
+        margin-top: 2rem;
+        border-top: 1px solid #ccc;
+        padding-top: 1rem;
+      }
+      .example pre {
+        background: #f5f5f5;
+        padding: 0.75rem;
+        overflow-x: auto;
+        font-size: 13px;
+      }
+      .example ul {
+        padding-left: 1.2rem;
+      }
+      .example code {
+        background: #f5f5f5;
+        padding: 0 0.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>maptoy-ff-ext</h1>
+    <div class="row">
+      <label><input type="checkbox" id="enabled" /> Extension enabled</label>
+      <label><input type="checkbox" id="logging" /> Log POSTs to console</label>
+      <label>
+        Maximum response bytes:
+        <input id="max-response-bytes" type="number" min="1" step="1" />
+      </label>
+    </div>
+    <div><b>Rules:</b></div>
+    <textarea id="rules" spellcheck="false"></textarea>
+    <div class="row">
+      <button id="save" type="button">Save</button>
+      <button id="export" type="button">Export</button>
+      <label>Import <input type="file" id="import" accept="application/json" /></label>
+      <span id="status" class="status"></span>
+    </div>
+    <div id="error" class="error"></div>
+
+    <section class="example">
+      <h2>Example config</h2>
+      <p>Two real-world rules, forwarding to a local <code>maptoy</code> API:</p>
+      <ul>
+        <li><code>MapTiler</code> tiles (<code>mapset</code> name mapped to an internal map-set id via <code>lookups</code>)</li>
+        <li><code>OpenTopoMap</code> tiles (no <code>lookups</code>, fixed target map-set).</li>
+      </ul>
+      <p>Settings:</p>
+      <ul>
+        <li><code>enabled</code> (global &amp; per rule) is optional, defaults to <code>true</code>.</li>
+        <li><code>logging</code> (global) optional, defaults to <code>false</code>, toggles POST requests logs in browser console.</li>
+        <li><code>maxResponseBytes</code> sets the global memory limit; blank or <code>null</code> disables it.</li>
+        <li><code>match</code>: regex with named groups, e.g. <code>(?&lt;mapset&gt;...)</code>.</li>
+        <li><code>target</code>: target URL template, references named groups as <code>${name}</code>.</li>
+        <li><code>lookups</code>: optional, per rule and per named group. Maps the captured value to another value. Groups (or whole rules) without a lookup table are passed through as-is.</li>
+        <li><code>maxResponseBytes</code> and <code>responseStatusCodes</code> can override response handling per rule.</li>
+        <li>If multiple rules match the same URL, or a lookup entry is missing &rarr; error, no POST.</li>
+      </ul>
+      <pre id="example-json">loading…</pre>
+    </section>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

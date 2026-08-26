@@ -39,12 +39,13 @@ SDK compatibility uses semantic versioning. Contract tests cover manifest checki
 validation, migrations, lifecycle cleanup, interactive handles, and server rendering.
 The track and image plugins are the reference implementations for v1.
 
-## Spike evidence
+## Historical spike evidence
 
-The rendering spike registers track and image hooks behind the same small server
-contract. It renders a GeoJSON track, an EXIF-oriented GPS image, and a bounds image
-without giving those hooks arbitrary filesystem access. Managed fixture paths are
-checked before hook execution.
+The completed rendering spike registered track and image hooks behind the same small
+server contract. It rendered a GeoJSON track, an EXIF-oriented GPS image, and a
+bounds image without giving those hooks arbitrary filesystem access. Managed fixture
+paths were checked before hook execution. The prototype was removed after its
+decisions were accepted and remains available in the repository history.
 
 ## Consequences
 

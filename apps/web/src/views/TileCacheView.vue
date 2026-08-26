@@ -536,7 +536,7 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
         <p v-else-if="selectedMapSet">
           <RouterLink class="overview-link" to="/cache">All Map Sets</RouterLink>
           <span aria-hidden="true"> / </span>{{ selectedMapSet.name }}
-          <span class="meta-dot" aria-hidden="true">●</span>{{ selectedMapSet.tileSize }} px
+          <span class="meta-dot" aria-hidden="true">●</span>{{ selectedMapSet.tileSize }}
           <span class="meta-dot" aria-hidden="true">●</span>{{ formatTileFormat(selectedMapSet.tileFormat) }}
           <span class="meta-dot" aria-hidden="true">●</span>{{ formatCacheAgeLimit(selectedMapSet) }}
         </p>

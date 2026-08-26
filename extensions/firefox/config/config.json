@@ -1,0 +1,55 @@
+{
+  "enabled": true,
+  "logging": true,
+  "maxResponseBytes": 10485760,
+  "rules": [
+    {
+      "id": "MapBox",
+      "enabled": true,
+      "match": "^https://api\\.mapbox\\.com/styles/v1/mapbox/(?<mapset>[^/]+)/tiles/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.webp(?:\\?.*)?$",
+      "target": "http://localhost:4004/api/map-sets/${mapset}/tiles/${z}/${x}/${y}",
+      "lookups": {
+        "mapset": {
+          "dark-v11": "1b19c49e-c4cf-49f7-9277-5f5573a6e6b3",
+          "light-v11": "1a16f18d-3ad4-4a5d-ba06-b317c8894061",
+          "navigation-day-v1": "bf767137-14be-4d4a-9796-c0294942855f",
+          "outdoors-v12": "04efcfd9-98c2-4b59-8768-5b0f3adb0707",
+          "satellite-v9": "d16fc3ad-68c6-4824-9bf7-c28702f51e76",
+          "satellite-streets-v12": "ba8fe46c-4769-418a-8632-8dece693c842",
+          "streets-v12": "c07d3e75-8e0c-4c93-a149-82a566068277"
+        }
+      }
+    },
+    {
+      "id": "MapTiler",
+      "enabled": true,
+      "match": "^https://api\\.maptiler\\.com/maps/(?<mapset>[^/]+)/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.png(?:\\?.*)?$",
+      "target": "http://localhost:4004/api/map-sets/${mapset}/tiles/${z}/${x}/${y}",
+      "lookups": {
+        "mapset": {
+          "backdrop-v4": "32dfdb54-14f7-448b-95f5-0d24522b4039",
+          "base-v4": "b82a4011-1a37-40a9-94da-55a06b8dd617",
+          "streets-v4": "5d9af840-0eee-4c54-920a-0ad76d8f552c"
+        }
+      }
+    },
+    {
+      "id": "HistoricPlace",
+      "enabled": true,
+      "match": "^https://tiles\\.historic\\.place/World/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.png(?:\\?.*)?$",
+      "target": "http://localhost:4004/api/map-sets/32646db2-81a2-4cb5-9a0d-7228301d948c/tiles/${z}/${x}/${y}"
+    },
+    {
+      "id": "OpenStreetMap",
+      "enabled": true,
+      "match": "^https://.*tile\\.openstreetmap\\.org/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.png(?:\\?.*)?$",
+      "target": "http://localhost:4004/api/map-sets/e2a0347f-556f-4689-8726-5357ea699d80/tiles/${z}/${x}/${y}"
+    },
+    {
+      "id": "OpenTopoMap",
+      "enabled": true,
+      "match": "^https://.*tile\\.opentopomap\\.org/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.png(?:\\?.*)?$",
+      "target": "http://localhost:4004/api/map-sets/5593630f-4af2-44e4-a6bb-c1db36d5a625/tiles/${z}/${x}/${y}"
+    }
+  ]
+}

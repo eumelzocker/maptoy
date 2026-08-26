@@ -58,21 +58,16 @@ poorly and consumes more memory. GDAL is about 3.4 to 3.9 times faster in those 
 The very small pixel differences are consistent with edge and resampling details;
 visual comparison showed aligned tiles and plugin layers.
 
-Reproduce the evidence with:
-
-```sh
-direnv exec . pnpm --dir spikes/rendering install --frozen-lockfile
-direnv exec . pnpm --dir spikes/rendering test
-direnv exec . pnpm --dir spikes/rendering check
-direnv exec . pnpm --dir spikes/rendering spike
-```
-
-Machine-readable results and images are generated below
-`spikes/rendering/.artifacts/output/`.
+The standalone implementation that produced these measurements was removed after
+the Phase 0 decision was accepted. It remains available in the repository history.
+The table is the retained decision record; Phase 7 must produce fresh,
+machine-readable measurements and images from the production export pipeline rather
+than treating the prototype as a permanent benchmark harness.
 
 ## Consequences
 
 The production container will be larger and its Nix/Docker builds must include GDAL
 and projection data. In return, maptoy avoids maintaining a custom raster warper and
-gets established CRS, resampling, nodata, and output-grid behavior. The standalone
-Node implementation remains spike evidence, not production code.
+gets established CRS, resampling, nodata, and output-grid behavior. The rejected
+standalone Node implementation remains historical evidence in the repository
+history, not maintained production code.

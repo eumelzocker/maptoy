@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Stilisiertes Textblatt-Icon">
+  <!-- Transparent canvas -->
+  <g fill="none" stroke="#000" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Corner frame marks -->
+    <path d="M14 34V16h18"/>
+    <path d="M94 16h18v18"/>
+    <path d="M114 94v18H96"/>
+    <path d="M34 114H16V96"/>
+
+    <!-- Main document outline -->
+    <path d="M42 26h34l18 18v58H34V34h8z" fill="#fff"/>
+
+    <!-- Fold/top transition accent -->
+    <path d="M76 26v18h18"/>
+
+    <!-- Small side/top/bottom markers -->
+    <path d="M64 22v8"/>
+    <path d="M64 98v8"/>
+    <path d="M26 64h8"/>
+    <path d="M94 64h8"/>
+  </g>
+
+  <!-- Text lines inside document -->
+  <g stroke="#000" stroke-width="10" stroke-linecap="round">
+    <path d="M54 48h20"/>
+    <path d="M50 64h24"/>
+    <path d="M50 80h24"/>
+  </g>
+</svg>

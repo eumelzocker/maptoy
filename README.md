@@ -7,6 +7,12 @@
 > available now. Batch downloads, additional layers, and exports will be added in
 > later versions.
 
+The repository also contains the independently versioned
+[maptoy Firefox extension](./extensions/firefox/README.md). It can forward matching
+browser responses unchanged to configurable HTTP endpoints, including maptoy's Tile
+seeding API. The extension has its own build and test commands and is not included in
+the Docker image.
+
 ## Start with Docker Compose
 
 Requirements: Docker with the Compose plugin.

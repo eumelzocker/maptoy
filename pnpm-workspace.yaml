@@ -3,6 +3,7 @@ packages:
   - packages/*
   - adapters/*
   - plugins/*
+  - extensions/*
 
 injectWorkspacePackages: true
 

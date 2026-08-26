@@ -11,6 +11,8 @@ result-*
 
 # Production builds
 dist/
+dist-test/
+web-ext-artifacts/
 
 # Logs
 logs/
@@ -40,9 +42,6 @@ tmp/
 
 # Test coverage
 coverage/
-
-# Generated rendering-spike fixtures and reports
-/spikes/rendering/.artifacts/
 
 # Bruno test output
 /tests/bruno/json/

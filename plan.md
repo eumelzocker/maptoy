@@ -23,6 +23,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Zusatzlayer verwenden eine allgemeine Plugin-Architektur. Track- und Bildlayer sind die Referenzimplementierungen und verwenden dieselben fachlichen Daten in interaktiver Karte und Bitmapexport.
 - v1.0 lädt ausschließlich vertrauenswürdige Layer-Plugins, die beim Build beziehungsweise Deployment registriert werden. Installation oder Upload beliebigen ausführbaren Plugin-Codes über die Weboberfläche ist nicht vorgesehen.
 - Das Backend dient gleichzeitig als API, Tile-Proxy und statischer Webserver für das gebaute Frontend.
+- Eine optionale, generische Firefox-Erweiterung kann passende Browserantworten unverändert an frei konfigurierte HTTP-Ziele weiterleiten. Sie ist ein eigenständig versioniertes Workspace-Paket mit eigenen Build- und Testabläufen und wird weder im maptoy-Container gebaut noch ausgeliefert.
 - Länger laufende Downloads und Exporte werden als persistente Jobs ausgeführt, sodass Status, Fortschritt, Abbruch und Fehler nachvollziehbar sind.
 - Die Dokumentationsquellen liegen versioniert im Repository, werden beim Frontend-Build validiert und zusammen mit der Anwendung ausgeliefert. Sie benötigen zur Anzeige keine externe Dokumentationsplattform.
 - Englisch ist die obligatorische und vollständige Dokumentationssprache. Jede veröffentlichte Seite besitzt eine stabile sprachunabhängige ID; Deutsch, Thai und optionale weitere Sprachen können seitenweise auf die englische Fassung zurückfallen.
@@ -117,6 +118,8 @@ maptoy/
 ├── plugins/
 │   ├── track-layer/         # GPX-/GeoJSON-Referenz-Plugin
 │   └── image-layer/         # GPS-/Bounds-Bild-Referenz-Plugin
+├── extensions/
+│   └── firefox/             # generische, separat versionierte Response-Weiterleitung
 ├── docs/
 │   ├── en/                  # vollständige, obligatorische Dokumentation
 │   ├── de/                  # deutsche Lokalisierung mit Englisch-Fallback
@@ -617,7 +620,7 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Health-/Readiness-Endpunkte und strukturiertes Logging ergänzen
 - Bruno Collection mit lokaler Beispielumgebung und ersten Health-/Readiness-Requests anlegen
 - mehrstufiges Dockerfile und Compose-Beispiel mit explizitem Host-Bind-Mount für das Anwendungsdatenverzeichnis erstellen
-- gemeinsame semantische Versionierung aller auslieferungsrelevanten Paketmanifeste und einen Changelog einführen; Spikes werden unabhängig und nur bei eigenen Änderungen versioniert
+- gemeinsame semantische Versionierung aller auslieferungsrelevanten maptoy-Anwendungspakete und einen Changelog einführen; Spikes und die optionale Firefox-Erweiterung werden unabhängig und nur bei eigenen Änderungen versioniert
 
 **Ergebnis/Akzeptanz**
 
@@ -627,7 +630,7 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Die vollständige englische Startseite sowie deutsche und thailändische Routen mit funktionierendem Englisch-Fallback sind über die Hauptnavigation erreichbar.
 - Ein automatisierter Test bestätigt den Betrieb hinter einem Präfix-entfernenden Proxy-Unterpfad.
 - Der Abschluss der Phase 1 ist als gemeinsame Version `0.0.1` in allen Paketmanifesten und im Changelog nachvollziehbar.
-- Ein automatisierter Test verhindert voneinander abweichende Versionen in den auslieferungsrelevanten Paketmanifesten; Spike-Manifeste sind davon ausgenommen.
+- Ein automatisierter Test verhindert voneinander abweichende Versionen in den auslieferungsrelevanten maptoy-Anwendungsmanifesten; Spike-Manifeste und die Firefox-Erweiterung sind davon ausgenommen. Ein eigener Test hält Paket- und Firefox-Manifest der Erweiterung untereinander konsistent.
 
 ### Phase 2: Map Sets und interaktive Karte
 
@@ -837,7 +840,7 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 
 ## 13. Release- und Versionsplanung
 
-Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhöhen. Eine Phase darf deshalb mehrere `0.0.x`-Releases umfassen; umgekehrt muss ein Release keine vollständige Phase markieren. Maßgeblich für tatsächlich veröffentlichte Inhalte ist das [`CHANGELOG.md`](./CHANGELOG.md), nicht eine vorab reservierte Versionsnummer.
+Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhöhen. Eine Phase darf deshalb mehrere `0.0.x`-Releases umfassen; umgekehrt muss ein Release keine vollständige Phase markieren. Maßgeblich für tatsächlich veröffentlichte Inhalte ist das [`CHANGELOG.md`](./CHANGELOG.md), nicht eine vorab reservierte Versionsnummer. Die optionale Firefox-Erweiterung besitzt mit `1.0.0` einen davon unabhängigen Versionszyklus; ihr Paketmanifest und ihr Firefox-Manifest bleiben untereinander synchron.
 
 ### 13.1 Versionsstand
 
@@ -849,7 +852,8 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.0.4`–`0.0.5` | phasenübergreifende UI-, Cache- und Dokumentationsverbesserungen |
 | `0.0.6` | Traffic-Logs, Schema-Baseline 4 und Betriebsverbesserungen |
 | `0.0.7` | Phase 3a: externes Tile-Seeding über die API und nachvollziehbare Revisionsherkunft |
-| `0.0.8` | aktueller veröffentlichter Stand mit Kartenwerkzeugen, Menü- und Anzeigeverbesserungen sowie Cache-Abdeckungsstatistik und Bereinigung nicht mehr unterstützter Zoomstufen |
+| `0.0.8` | Kartenwerkzeuge, Menü- und Anzeigeverbesserungen sowie Cache-Abdeckungsstatistik und Bereinigung nicht mehr unterstützter Zoomstufen |
+| `0.1.0` | aktueller veröffentlichter Stand mit eigenständig versionierter Firefox-Erweiterung, bereinigtem Rendering-Spike und kleineren Metadatenkorrekturen |
 
 ### 13.2 Weitere Releases
 

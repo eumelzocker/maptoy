@@ -411,7 +411,7 @@ function openTileCalculator(): void {
               <div><dt>Renderer</dt><dd>{{ selected.rendererId }}</dd></div>
               <div><dt>Projection</dt><dd>{{ selected.sourceProjection }}</dd></div>
               <div><dt>Source zoom</dt><dd>{{ selected.minZoom }}–{{ selected.maxZoom }}</dd></div>
-              <div><dt>Tiles</dt><dd>{{ selected.tileSize }} px · {{ selected.tileFormat.toUpperCase() }}</dd></div>
+              <div><dt>Tiles</dt><dd>{{ selected.tileSize }} · {{ selected.tileFormat.toUpperCase() }}</dd></div>
             </dl>
             <button type="button" class="map-set-reset" @click="resetToInitialViewport">
               <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>

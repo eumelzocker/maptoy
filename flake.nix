@@ -19,13 +19,12 @@
             nodejs_24
             pnpm
 
-            # Native build and inspection tools used by the rendering spike.
+            # Native image, metadata, projection, and export tooling.
             pkg-config
             vips
             proj
             gdal
             exiftool
-            time
           ];
 
           PROJ_DATA = "${pkgs.proj}/share/proj";

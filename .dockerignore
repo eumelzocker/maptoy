@@ -5,8 +5,8 @@
 **/dist
 **/node_modules
 coverage
+extensions/firefox
 playwright-report
 result
 result-*
 test-results
-spikes/rendering/.artifacts

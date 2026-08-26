@@ -313,7 +313,7 @@ async function test(mapSet: MapSet): Promise<void> {
               <p class="source-template">{{ item.mapSet.urlTemplate }}</p>
               <p class="metadata">
                 Zoom {{ item.mapSet.minZoom }}–{{ item.mapSet.maxZoom }} ·
-                {{ item.mapSet.tileSize }} px · {{ item.mapSet.rendererId }} ·
+                {{ item.mapSet.tileSize }} · {{ item.mapSet.rendererId }} ·
                 {{ item.mapSet.logicalTileCount }} cached tiles
               </p>
               <ul class="capabilities" aria-label="Enabled capabilities">

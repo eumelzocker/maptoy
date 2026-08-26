@@ -1,6 +1,6 @@
 # Phase 0 technical spike
 
-Status: accepted working specification
+Status: completed historical specification
 
 ## Purpose
 

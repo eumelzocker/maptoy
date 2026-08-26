@@ -4,6 +4,32 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-26
+
+### Added
+
+- Independently versioned `maptoy-ff-ext` 1.0.0 workspace with configurable,
+  generic response forwarding, bounded buffering, source-status filtering,
+  retry-safe session deduplication, dedicated build/test/lint commands, and
+  preserved local Map Set configurations. The Firefox extension is excluded
+  from the maptoy Docker build and runtime image.
+
+### Changed
+
+- Simplified Tile-size metadata in the Map Set overview, Map information panel,
+  and Tile Cache detail header by removing the redundant `px` suffix.
+- Removed the completed standalone rendering-spike implementation and its separate
+  toolchain after retaining the accepted decisions and benchmark results in the
+  internal ADRs and repository history. Future export measurements will use the
+  production pipeline.
+
+### Fixed
+
+- Made the Firefox extension wait for stored rules before processing the request
+  that wakes its Manifest V3 background context, persist successful session
+  deduplication across background suspension, and honor an explicit global `null`
+  response-size limit.
+
 ## [0.0.8] - 2026-08-25
 
 ### Added
