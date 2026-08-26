@@ -33,12 +33,16 @@ const router = createRouter({
       component: MapView,
     },
     {
-      path: "/map-sets",
+      path: "/map-sets/:mapSetId?",
       component: MapSetsView,
     },
     {
       path: "/cache/:mapSetId?",
       component: TileCacheView,
+    },
+    {
+      path: "/coverage/:mapSetId?",
+      component: () => import("./views/CoverageView.vue"),
     },
     {
       path: "/docs",

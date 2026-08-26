@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MaptoyConfig } from "@maptoy/config";
 import { createDefaultMapSetInput } from "@maptoy/contracts";
+import { xyzTileBounds } from "@maptoy/map-core";
 import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderClient } from "./providerClient.js";
@@ -61,6 +62,71 @@ afterEach(async () => {
 });
 
 describe("maptoy server", () => {
+  it("serves bounded Coverage for current, Snapshot, and time selections", async () => {
+    const server = await buildServer({
+      config: await testConfig(),
+      providerClient,
+      serveWeb: false,
+    });
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: createDefaultMapSetInput(),
+    });
+    const mapSetId = created.json().id as string;
+    await server.inject({
+      method: "GET",
+      url: `/api/map-sets/${mapSetId}/tiles/3/4/2?refresh=force`,
+    });
+    const snapshot = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/snapshots`,
+      payload: { name: "Coverage API" },
+    });
+    expect(snapshot.statusCode, snapshot.body).toBe(201);
+    expect(snapshot.json()).toHaveProperty("id");
+    const bounds = xyzTileBounds({ zoom: 3, x: 4, y: 2 });
+    const coverage = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/coverage/query`,
+      payload: {
+        bounds,
+        zoom: 3,
+        selection: { kind: "current" },
+        compareTo: { kind: "snapshot", snapshotId: snapshot.json().id },
+      },
+    });
+
+    expect(coverage.statusCode, coverage.body).toBe(200);
+    expect(coverage.json()).toMatchObject({
+      mapSetId,
+      sourceZoom: 3,
+      aggregationZoom: 3,
+      totals: {
+        tileCount: 1,
+        revisionCount: 1,
+        statuses: { available: 1, stale: 0, missing: 0, inProgress: 0 },
+        comparison: { identical: 1, changed: 0, added: 0, missing: 0 },
+      },
+      cells: [{ id: "3/4/2", tileCount: 1 }],
+    });
+
+    const invalidTime = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/coverage/query`,
+      payload: {
+        bounds,
+        zoom: 3,
+        selection: { kind: "asOf", timestamp: "not-a-date" },
+      },
+    });
+    expect(invalidTime).toMatchObject({ statusCode: 400 });
+    expect(invalidTime.json()).toMatchObject({
+      error: { code: "COVERAGE_QUERY_INVALID" },
+    });
+    await server.close();
+  });
+
   it("writes separate redacted API and provider traffic logs", async () => {
     const config = await testConfig();
     const server = await buildServer({

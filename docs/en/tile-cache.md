@@ -114,6 +114,27 @@ identical, changed, added, and missing tiles. Deleting a snapshot removes only t
 references, not Tile Revisions. Comparison counters are aggregated in SQLite rather
 than loading every Tile hash into server memory.
 
+## Coverage map
+
+Open **Coverage** to inspect a bounded part of the Tile Archive on a map. Choose a
+Map Set, source Zoom, and one of the current state, an immutable Snapshot, or an
+ISO-8601 point in time. The map classifies the selected area as available, stale,
+missing, or in progress. The in-progress state is part of the stable response
+contract and remains zero until the download worker is introduced.
+
+Enable **Compare with** to compare any two supported states. Green cells are
+identical, orange cells contain changed Tiles, blue cells contain Tiles added in
+the comparison state, and red cells contain Tiles missing from it. Select a cell
+for Tile count, Revision count, selected byte size, and validation times. Aggregated
+cells can be opened repeatedly until individual changed Tiles are visible.
+
+Coverage requests are limited to the visible geographic bounds and never return
+more than 4,096 cells. The default UI asks for at most 1,024. SQLite aggregates
+stored Revision metadata before sending the response; the browser does not receive
+every Tile row from a large cache. Missing counts are derived from the complete XYZ
+coordinate range inside the requested bounds, so inspecting Coverage never contacts
+the provider or creates cache entries.
+
 ## Statistics and deletion
 
 The management view loads database totals and per-zoom summaries without walking

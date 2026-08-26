@@ -711,6 +711,8 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 
 ### Phase 4: Cache-Abdeckung
 
+**Status:** umgesetzt und veröffentlicht mit `0.1.1` am 27. August 2026
+
 **Aufgaben**
 
 - effiziente Abdeckungsabfrage und Aggregation entwickeln
@@ -853,18 +855,20 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.0.6` | Traffic-Logs, Schema-Baseline 4 und Betriebsverbesserungen |
 | `0.0.7` | Phase 3a: externes Tile-Seeding über die API und nachvollziehbare Revisionsherkunft |
 | `0.0.8` | Kartenwerkzeuge, Menü- und Anzeigeverbesserungen sowie Cache-Abdeckungsstatistik und Bereinigung nicht mehr unterstützter Zoomstufen |
-| `0.1.0` | aktueller veröffentlichter Stand mit eigenständig versionierter Firefox-Erweiterung, bereinigtem Rendering-Spike und kleineren Metadatenkorrekturen |
+| `0.1.0` | eigenständig versionierte Firefox-Erweiterung, bereinigter Rendering-Spike und kleinere Metadatenkorrekturen |
+| `0.1.1` | Phase 4: aggregierte Cache-Abdeckung, Zustandsvergleiche, Drill-down und Coverage-Kartenansicht |
 
 ### 13.2 Weitere Releases
 
-Die ausstehenden Phasen bestimmen die fachliche Reihenfolge, erhalten aber erst beim tatsächlichen Release eine konkrete Patchnummer:
+Mit `0.1.1` ist Phase 4 abgeschlossen. Die danach ausstehenden Phasen bestimmen
+die fachliche Reihenfolge, erhalten aber erst beim tatsächlichen Release eine
+konkrete Patchnummer:
 
-1. Phase 4: Cache-Snapshots, Zeitstände, Vergleiche und Coverage
-2. Phase 5: Layer-Plugin-System, Track-/Bild-Referenzen und Asset-Upload
-3. Phase 6: Jobs, kontrollierter Batch-Download und Limits
-4. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
-5. Phase 8: vollständige Dokumentation und lokalisierte Suche
-6. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
+1. Phase 5: Layer-Plugin-System, Track-/Bild-Referenzen und Asset-Upload
+2. Phase 6: Jobs, kontrollierter Batch-Download und Limits
+3. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
+4. Phase 8: vollständige Dokumentation und lokalisierte Suche
+5. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
 
 Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als eigene Versionen erscheinen.
 
@@ -959,7 +963,7 @@ geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
 
 | Spätestens vor | Entscheidung | Benötigtes Ergebnis |
 | --- | --- | --- |
-| Phase 4/6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_MAX_TILE_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
+| Phase 6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? Die Coverage-Antwort ist unabhängig davon bereits auf standardmäßig 1.024 und maximal 4.096 aggregierte Zellen begrenzt. | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_MAX_TILE_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
 | Phase 6/7 | Wie lange bleiben abgeschlossene Jobs, begrenzte Fehlerhistorien und fertige Exportdateien erhalten? | Standardfristen, konfigurierbare Aufbewahrung, Schutz laufender Downloads und ein nachvollziehbarer manueller beziehungsweise automatischer Bereinigungsweg. |
 | Phase 8 | Ist eine ausreichend gute Thai-Suche mit vertretbarem Aufwand möglich? | Entweder getestete Thai-Segmentierung und Suche oder eine bewusst deaktivierte Thai-Suche mit sichtbarem Verweis auf die englische Suche. |
 

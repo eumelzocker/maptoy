@@ -3,6 +3,9 @@ import {
   type CacheSnapshotCreateInput,
   CacheSnapshotListResponseSchema,
   CacheSnapshotSchema,
+  type CoverageQuery,
+  CoverageQuerySchema,
+  CoverageResponseSchema,
   ErrorResponseSchema,
   type MapSet,
   type MapSetInput,
@@ -360,6 +363,25 @@ export function registerMapSetRoutes(
     async (request) => {
       service.get(request.params.id);
       return tileArchive.stats(request.params.id);
+    },
+  );
+
+  server.post<{ Params: { id: string }; Body: CoverageQuery }>(
+    "/api/map-sets/:id/coverage/query",
+    {
+      schema: {
+        params: idParametersSchema,
+        body: CoverageQuerySchema,
+        response: {
+          200: CoverageResponseSchema,
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const mapSet = service.get(request.params.id);
+      return tileArchive.coverage(mapSet, request.body);
     },
   );
 

@@ -428,6 +428,119 @@ export const TileCacheComparisonSchema = Type.Object(
 
 export type TileCacheComparison = Static<typeof TileCacheComparisonSchema>;
 
+export const CoverageBoundsSchema = Type.Object(
+  {
+    west: Type.Number({ minimum: -180, maximum: 180 }),
+    south: Type.Number({ minimum: -85.05112878, maximum: 85.05112878 }),
+    east: Type.Number({ minimum: -180, maximum: 180 }),
+    north: Type.Number({ minimum: -85.05112878, maximum: 85.05112878 }),
+  },
+  { additionalProperties: false },
+);
+
+export type CoverageBounds = Static<typeof CoverageBoundsSchema>;
+
+export const CoverageSelectionSchema = Type.Object(
+  {
+    kind: Type.Union([
+      Type.Literal("current"),
+      Type.Literal("snapshot"),
+      Type.Literal("asOf"),
+    ]),
+    snapshotId: Type.Optional(Type.String({ minLength: 1 })),
+    timestamp: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+  },
+  { additionalProperties: false },
+);
+
+export type CoverageSelection = Static<typeof CoverageSelectionSchema>;
+
+export const CoverageQuerySchema = Type.Object(
+  {
+    bounds: CoverageBoundsSchema,
+    zoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    selection: CoverageSelectionSchema,
+    compareTo: Type.Optional(CoverageSelectionSchema),
+    maximumCells: Type.Optional(
+      Type.Integer({ minimum: 1, maximum: 4096, default: 1024 }),
+    ),
+  },
+  { additionalProperties: false, $id: "CoverageQuery" },
+);
+
+export type CoverageQuery = Static<typeof CoverageQuerySchema>;
+
+export const CoverageStatusCountsSchema = Type.Object(
+  {
+    available: Type.Integer({ minimum: 0 }),
+    missing: Type.Integer({ minimum: 0 }),
+    stale: Type.Integer({ minimum: 0 }),
+    inProgress: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false },
+);
+
+export type CoverageStatusCounts = Static<typeof CoverageStatusCountsSchema>;
+
+export const CoverageComparisonCountsSchema = Type.Object(
+  {
+    identical: Type.Integer({ minimum: 0 }),
+    changed: Type.Integer({ minimum: 0 }),
+    added: Type.Integer({ minimum: 0 }),
+    missing: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false },
+);
+
+export type CoverageComparisonCounts = Static<
+  typeof CoverageComparisonCountsSchema
+>;
+
+export const CoverageCellSchema = Type.Object(
+  {
+    id: Type.String(),
+    zoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    x: Type.Integer({ minimum: 0 }),
+    y: Type.Integer({ minimum: 0 }),
+    bounds: CoverageBoundsSchema,
+    tileCount: Type.Integer({ minimum: 0 }),
+    revisionCount: Type.Integer({ minimum: 0 }),
+    byteLength: Type.Integer({ minimum: 0 }),
+    newestValidatedAt: Type.Union([Type.String(), Type.Null()]),
+    oldestValidatedAt: Type.Union([Type.String(), Type.Null()]),
+    statuses: CoverageStatusCountsSchema,
+    comparison: Type.Union([CoverageComparisonCountsSchema, Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+
+export type CoverageCell = Static<typeof CoverageCellSchema>;
+
+export const CoverageResponseSchema = Type.Object(
+  {
+    mapSetId: Type.String(),
+    sourceZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    aggregationZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    bounds: CoverageBoundsSchema,
+    selection: CoverageSelectionSchema,
+    compareTo: Type.Union([CoverageSelectionSchema, Type.Null()]),
+    totals: Type.Object(
+      {
+        tileCount: Type.Integer({ minimum: 0 }),
+        revisionCount: Type.Integer({ minimum: 0 }),
+        byteLength: Type.Integer({ minimum: 0 }),
+        statuses: CoverageStatusCountsSchema,
+        comparison: Type.Union([CoverageComparisonCountsSchema, Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    cells: Type.Array(CoverageCellSchema, { maxItems: 4096 }),
+  },
+  { additionalProperties: false, $id: "CoverageResponse" },
+);
+
+export type CoverageResponse = Static<typeof CoverageResponseSchema>;
+
 export const ErrorResponseSchema = Type.Object(
   {
     error: Type.Object(

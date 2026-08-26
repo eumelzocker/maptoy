@@ -4,6 +4,35 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-27
+
+### Added
+
+- Phase 4 Cache Coverage API and map view with bounded SQLite aggregation,
+  current, Snapshot, and point-in-time selection, freshness classes, state
+  comparison, recursive drill-down to individual Tiles, and a future-compatible
+  `inProgress` status.
+- Neutral rectangle-grid renderer data and Leaflet rendering for interactive,
+  adapter-independent Coverage overlays.
+- Dedicated Coverage navigation, independent source and preview Zoom controls,
+  browser-local view settings, five-step status scales, Map Set metadata, and
+  direct Cache and editor links.
+- Optional fractional Zoom indicator for Coverage and Shift-click integer Zoom
+  stepping in both Coverage and the standard Map view.
+
+### Changed
+
+- Added direct Map Set editor links to every Cache overview row and Cache detail
+  page.
+- Displayed exact quarter-Zoom values in the standard Map view status overlay.
+
+### Fixed
+
+- Serialized Coverage renderer initialization across reloads and rapid Map Set
+  changes to prevent duplicate Leaflet container initialization.
+- Kept source and preview Zoom independent while constraining the preview below
+  the source Zoom and respecting Map Set minimum Zoom and 512-pixel Tile offsets.
+
 ## [0.1.0] - 2026-08-26
 
 ### Added

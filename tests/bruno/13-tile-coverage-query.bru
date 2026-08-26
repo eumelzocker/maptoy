@@ -1,0 +1,58 @@
+meta {
+  name: Tile Coverage - Query visible area (read only)
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/coverage/query
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "bounds": {
+      "west": 13.25,
+      "south": 52.4,
+      "east": 13.65,
+      "north": 52.65
+    },
+    "zoom": 10,
+    "selection": { "kind": "current" },
+    "maximumCells": 256
+  }
+}
+
+docs {
+  Returns bounded, aggregated Tile Coverage without contacting the provider.
+
+  ## Input
+
+  - Path variable: `mapSetId` — existing Map Set UUID.
+  - `bounds` — non-empty WGS84 rectangle; `west > east` represents an antimeridian crossing.
+  - `zoom` — source Zoom inside the Map Set's configured range.
+  - `selection` — `current`, `snapshot` with `snapshotId`, or `asOf` with an ISO-8601 `timestamp`.
+  - Optional `compareTo` uses the same selection forms.
+  - Optional `maximumCells` = 1–4096; lower values produce coarser aggregate cells.
+
+  ## Response
+
+  - `200 OK`: source and aggregation Zoom, totals, and bounded geographic cells.
+  - Statuses: `available`, `stale`, `missing`, and future-compatible `inProgress`.
+  - Optional comparison: `identical`, `changed`, `added`, and `missing`.
+
+  ## Errors
+
+  - `400 COVERAGE_QUERY_INVALID`: invalid bounds, Zoom, time, or selection details.
+  - `404 MAP_SET_NOT_FOUND` or `SNAPSHOT_NOT_FOUND`.
+}
+
+tests {
+  test("returns bounded Coverage cells", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.cells).to.be.an("array");
+    expect(res.body.cells.length).to.be.at.most(256);
+    expect(res.body.totals.statuses.inProgress).to.equal(0);
+  });
+}

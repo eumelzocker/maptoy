@@ -23,6 +23,7 @@ const showHeader = computed(
         <RouterLink to="/"><i class="mdi mdi-map-outline" aria-hidden="true"></i>Map</RouterLink>
         <RouterLink to="/map-sets"><i class="mdi mdi-layers-outline" aria-hidden="true"></i>Map Sets</RouterLink>
         <RouterLink to="/cache"><i class="mdi mdi-database-outline" aria-hidden="true"></i>Cache</RouterLink>
+        <RouterLink to="/coverage"><i class="mdi mdi-grid" aria-hidden="true"></i>Coverage</RouterLink>
         <RouterLink to="/docs"><i class="mdi mdi-book-open-page-variant-outline" aria-hidden="true"></i>Docs</RouterLink>
       </nav>
     </header>

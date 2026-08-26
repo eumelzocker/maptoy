@@ -122,6 +122,29 @@ Beim Löschen eines Snapshots verschwinden nur diese Referenzen, nicht die
 Tile-Revisionen. SQLite aggregiert die Vergleichszähler, ohne sämtliche Tile-Hashes
 in den Arbeitsspeicher des Servers zu laden.
 
+## Coverage-Karte
+
+Unter **Coverage** lässt sich ein begrenzter Ausschnitt des Tile-Archivs auf einer
+Karte untersuchen. Wähle Map Set, Quellzoom und entweder den aktuellen Stand, einen
+unveränderlichen Snapshot oder einen ISO-8601-Zeitpunkt. Die Karte unterscheidet
+verfügbare, veraltete, fehlende und laufend bearbeitete Bereiche. Der Zustand
+`laufend` ist bereits Teil des stabilen Vertrags und bleibt bis zur Einführung des
+Download-Workers bei null.
+
+Mit **Compare with** können zwei dieser Stände verglichen werden. Grüne Zellen sind
+identisch, orangefarbene enthalten geänderte Tiles, blaue im Vergleichsstand
+hinzugekommene Tiles und rote dort fehlende Tiles. Eine ausgewählte Zelle zeigt
+Tile- und Revisionszahl, Byte-Größe sowie Validierungszeitpunkte. Aggregierte Zellen
+lassen sich wiederholt öffnen, bis einzelne geänderte Tiles sichtbar sind.
+
+Coverage-Requests sind auf den sichtbaren geografischen Ausschnitt begrenzt und
+liefern nie mehr als 4.096 Zellen; die Oberfläche fordert standardmäßig höchstens
+1.024 an. SQLite aggregiert die Revisionsmetadaten vor der Antwort, sodass der
+Browser nicht sämtliche Tile-Zeilen eines großen Caches erhält. Fehlende Tiles
+werden aus dem vollständigen XYZ-Koordinatenbereich innerhalb des Ausschnitts
+berechnet. Eine Coverage-Abfrage kontaktiert daher keinen Provider und erzeugt keine
+Cache-Einträge.
+
 ## Statistik und Löschung
 
 Die Verwaltungsansicht lädt DB-Summen und Zusammenfassungen je Zoomstufe, ohne das

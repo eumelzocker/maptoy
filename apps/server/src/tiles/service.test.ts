@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createDefaultMapSetInput, type MapSet } from "@maptoy/contracts";
+import { xyzTileBounds } from "@maptoy/map-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openDatabase, type MaptoyDatabase } from "../database.js";
 import { MapSetRepository } from "../mapSets/repository.js";
@@ -89,6 +90,77 @@ afterEach(async () => {
 });
 
 describe("TileArchiveService", () => {
+  it("aggregates bounded Coverage states, freshness, history, and comparisons", async () => {
+    let now = new Date("2026-08-26T08:00:00.000Z");
+    const { mapSet, service } = await fixture(() => now);
+    const first = { zoom: 3, x: 4, y: 2 };
+    const second = { zoom: 3, x: 5, y: 2 };
+    await service.upload(mapSet, first, {
+      body: png("coverage-first-a"),
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+    });
+    await service.upload(mapSet, second, {
+      body: png("coverage-second"),
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+    });
+    const snapshot = service.createSnapshot(mapSet.id, "coverage-before");
+
+    now = new Date("2026-08-26T08:00:20.000Z");
+    await service.upload(mapSet, first, {
+      body: png("coverage-first-b"),
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+    });
+    const firstBounds = xyzTileBounds(first);
+    const thirdBounds = xyzTileBounds({ zoom: 3, x: 6, y: 2 });
+    const result = service.coverage(mapSet, {
+      bounds: {
+        west: firstBounds.west,
+        south: firstBounds.south,
+        east: thirdBounds.east,
+        north: firstBounds.north,
+      },
+      zoom: 3,
+      selection: { kind: "current" },
+      compareTo: { kind: "snapshot", snapshotId: snapshot.id },
+      maximumCells: 16,
+    });
+
+    expect(result).toMatchObject({
+      sourceZoom: 3,
+      aggregationZoom: 3,
+      totals: {
+        tileCount: 3,
+        revisionCount: 3,
+        statuses: { available: 1, stale: 1, missing: 1, inProgress: 0 },
+        comparison: { identical: 1, changed: 1, added: 0, missing: 0 },
+      },
+    });
+    expect(result.cells).toHaveLength(3);
+    expect(result.cells.find(({ x }) => x === 6)).toMatchObject({
+      tileCount: 1,
+      revisionCount: 0,
+      statuses: { available: 0, stale: 0, missing: 1, inProgress: 0 },
+    });
+
+    const aggregated = service.coverage(mapSet, {
+      bounds: result.bounds,
+      zoom: 3,
+      selection: { kind: "asOf", timestamp: "2026-08-26T08:00:00.000Z" },
+      maximumCells: 1,
+    });
+    expect(aggregated.cells).toHaveLength(1);
+    expect(aggregated).toMatchObject({
+      aggregationZoom: 1,
+      totals: {
+        tileCount: 3,
+        statuses: { available: 0, stale: 2, missing: 1, inProgress: 0 },
+      },
+    });
+  });
+
   it("seeds immutable upload revisions and serves them without a provider request", async () => {
     let now = new Date("2026-08-24T08:00:00.000Z");
     const { mapSet, repository, service } = await fixture(() => now);

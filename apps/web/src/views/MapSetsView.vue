@@ -6,8 +6,15 @@ import {
   type MapSetTestResponse,
   type TileCacheStats,
 } from "@maptoy/contracts";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
+import { onBeforeRouteLeave, useRoute } from "vue-router";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetForm from "../components/MapSetForm.vue";
 import { apiRequest } from "../api.js";
@@ -16,6 +23,7 @@ import { mapSetInput } from "../mapSetModels.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
 const store = useMapSetsStore();
+const route = useRoute();
 const editorMode = ref<"closed" | "create" | "edit">("closed");
 const editorKey = ref("closed");
 const draft = ref<MapSetInput>(createDefaultMapSetInput());
@@ -33,6 +41,7 @@ const mapSetGroups = computed(() =>
   groupMapSetsByFirstNameSegment(store.items),
 );
 const collapsedGroupKeys = ref<Set<string>>(new Set());
+let routeReady = false;
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function isGroupCollapsed(key: string): boolean {
@@ -59,6 +68,8 @@ onMounted(async () => {
   window.addEventListener("beforeunload", guardBeforeUnload);
   try {
     await store.load();
+    routeReady = true;
+    await openRequestedEditor();
   } catch {
     error.value = store.error;
   }
@@ -86,6 +97,13 @@ function guardBeforeUnload(event: BeforeUnloadEvent): void {
 }
 
 onBeforeRouteLeave(() => confirmDiscardChanges());
+
+watch(
+  () => route.params.mapSetId,
+  () => {
+    if (routeReady) void openRequestedEditor();
+  },
+);
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function newMapSet(): void {
@@ -116,7 +134,6 @@ function openEditor(mapSet: MapSet, locked: boolean): void {
   testResult.value = null;
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function edit(mapSet: MapSet): Promise<void> {
   if (!confirmDiscardChanges()) {
     return;
@@ -137,6 +154,21 @@ async function edit(mapSet: MapSet): Promise<void> {
   } finally {
     busy.value = false;
   }
+}
+
+async function openRequestedEditor(): Promise<void> {
+  const parameter = route.params.mapSetId;
+  if (typeof parameter !== "string" || parameter === "") return;
+  const mapSet = store.items.find(({ id }) => id === parameter);
+  if (mapSet === undefined) {
+    error.value = "The requested Map Set does not exist.";
+    return;
+  }
+  if (editingId.value === mapSet.id) {
+    await scrollEditorIntoView();
+    return;
+  }
+  await edit(mapSet);
 }
 
 function closeEditor(): void {

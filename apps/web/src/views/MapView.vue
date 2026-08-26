@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
+import {
+  formatLeafletZoomLevel,
+  leafletXyzZoomOptions,
+} from "@maptoy/leaflet-xyz";
 import type {
   GeographicCoordinate,
   MapRendererInstance,
@@ -94,6 +97,10 @@ const showTitleBar = computed({
   set: (value) => uiPreferences.setShowTitleBar(value),
 });
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const displayedZoom = computed(() =>
+  zoom.value === null ? null : formatLeafletZoomLevel(zoom.value),
+);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const mapContextMenuItems = computed(() =>
   createMapContextMenuItems({
     mapSets: store.items,
@@ -187,6 +194,7 @@ async function renderSelectedMap(): Promise<void> {
         minZoom: mapSet.minZoom,
         maxZoom: mapSet.maxZoom,
         tileSize: mapSet.tileSize,
+        shiftClickIntegerZoom: true,
       },
     });
     if (generation !== renderGeneration) {
@@ -284,6 +292,10 @@ function selectMapContextMenuItem(item: MenuItem): void {
     void router.push("/map-sets");
   } else if (item.id === mapContextMenuIds.tileCache) {
     void router.push("/cache");
+  } else if (item.id === mapContextMenuIds.coverage) {
+    void router.push(
+      selectedId.value === null ? "/coverage" : `/coverage/${selectedId.value}`,
+    );
   } else if (item.id.startsWith(mapContextMenuIds.documentationPrefix)) {
     const pageId = item.id.slice(mapContextMenuIds.documentationPrefix.length);
     void router.push(`/docs/${documentationLanguage}/${pageId}`);
@@ -483,7 +495,7 @@ function openTileCalculator(): void {
           :style="{ visibility: showCoordinates ? 'visible' : 'hidden' }"
           aria-label="Map viewport status"
         >
-          <span v-if="zoom !== null">Zoom {{ Math.round(zoom) }}</span>
+          <span v-if="displayedZoom !== null">Zoom {{ displayedZoom }}</span>
           <span v-if="pointer" class="coordinates">
             {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
           </span>

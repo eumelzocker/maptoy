@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type {
   CacheSnapshot,
+  CoverageComparisonCounts,
+  CoverageStatusCounts,
   TileCacheMapSetSummary,
   TileCacheOverviewStats,
   TileCacheStats,
@@ -57,6 +59,25 @@ export interface UnsupportedZoomDeletion {
   removedRevisionCount: number;
   removedIndexedStorageBytes: number;
   filePaths: string[];
+}
+
+export interface CoverageAggregateRow {
+  x: number;
+  y: number;
+  revisionCount: number;
+  byteLength: number;
+  newestValidatedAt: string | null;
+  oldestValidatedAt: string | null;
+  statuses: Omit<CoverageStatusCounts, "missing" | "inProgress">;
+  primaryCount: number;
+  comparison: CoverageComparisonCounts | null;
+}
+
+export interface CoverageTileRange {
+  minimumX: number;
+  maximumX: number;
+  minimumY: number;
+  maximumY: number;
 }
 
 interface SnapshotRow {
@@ -1076,6 +1097,184 @@ export class TileArchiveRepository {
       added: number;
       missing: number;
     };
+  }
+
+  coverageAggregates(input: {
+    mapSetId: string;
+    zoom: number;
+    aggregationZoom: number;
+    ranges: readonly CoverageTileRange[];
+    selection: Exclude<TileSelection, { kind: "revision" }>;
+    compareTo: Exclude<TileSelection, { kind: "revision" }> | null;
+    staleBefore: string;
+  }): CoverageAggregateRow[] {
+    const rangeFilter = input.ranges
+      .map(() => "(lt.tile_x BETWEEN ? AND ? AND lt.tile_y BETWEEN ? AND ?)")
+      .join(" OR ");
+    const rangeParameters = input.ranges.flatMap((range) => [
+      range.minimumX,
+      range.maximumX,
+      range.minimumY,
+      range.maximumY,
+    ]);
+    const state = (
+      selection: Exclude<TileSelection, { kind: "revision" }>,
+    ): { sql: string; parameters: Array<string | number> } => {
+      const columns = `lt.id AS logical_tile_id, lt.tile_x, lt.tile_y,
+                       tr.content_hash, tr.byte_length, tr.last_validated_at`;
+      if (selection.kind === "snapshot") {
+        return {
+          sql: `SELECT ${columns}
+                  FROM cache_snapshots snapshot
+                  JOIN cache_snapshot_tiles item ON item.snapshot_id = snapshot.id
+                  JOIN tile_revisions tr ON tr.id = item.tile_revision_id
+                  JOIN logical_tiles lt ON lt.id = tr.logical_tile_id
+                 WHERE snapshot.map_set_id = ? AND snapshot.id = ? AND lt.zoom = ?
+                   AND (${rangeFilter})`,
+          parameters: [
+            input.mapSetId,
+            selection.snapshotId,
+            input.zoom,
+            ...rangeParameters,
+          ],
+        };
+      }
+      if (selection.kind === "as-of") {
+        return {
+          sql: `SELECT ${columns}
+                  FROM logical_tiles lt
+                  JOIN tile_revisions tr ON tr.logical_tile_id = lt.id
+                 WHERE lt.map_set_id = ? AND lt.zoom = ? AND (${rangeFilter})
+                   AND tr.selected_from <= ?
+                   AND (tr.selected_until IS NULL OR ? < tr.selected_until)`,
+          parameters: [
+            input.mapSetId,
+            input.zoom,
+            ...rangeParameters,
+            selection.timestamp,
+            selection.timestamp,
+          ],
+        };
+      }
+      return {
+        sql: `SELECT ${columns}
+                FROM logical_tiles lt
+                JOIN tile_revisions tr ON tr.id = lt.current_revision_id
+               WHERE lt.map_set_id = ? AND lt.zoom = ? AND (${rangeFilter})`,
+        parameters: [input.mapSetId, input.zoom, ...rangeParameters],
+      };
+    };
+    const selected = state(input.selection);
+    const compared = input.compareTo === null ? null : state(input.compareTo);
+    const factor = 2 ** (input.zoom - input.aggregationZoom);
+    const comparisonCtes =
+      compared === null
+        ? `compare_state AS MATERIALIZED (
+             SELECT NULL AS logical_tile_id, NULL AS tile_x, NULL AS tile_y,
+                    NULL AS content_hash, NULL AS byte_length,
+                    NULL AS last_validated_at WHERE FALSE
+           )`
+        : `compare_state AS MATERIALIZED (${compared.sql})`;
+    const rows = this.database
+      .prepare(
+        // These states are referenced by several joins. Explicit materialization
+        // prevents SQLite from re-running the bounded Tile lookup per aggregate
+        // row (8.3 s versus 72 ms for 10,000 Tiles in the Phase 4 benchmark).
+        `WITH selected_state AS MATERIALIZED (${selected.sql}),
+              ${comparisonCtes},
+              coordinates AS MATERIALIZED (
+                SELECT tile_x, tile_y FROM selected_state
+                UNION
+                SELECT tile_x, tile_y FROM compare_state
+              ),
+              revision_counts AS MATERIALIZED (
+                SELECT tr.logical_tile_id, COUNT(*) AS revision_count
+                  FROM tile_revisions tr
+                  JOIN selected_state selected
+                    ON selected.logical_tile_id = tr.logical_tile_id
+                 GROUP BY tr.logical_tile_id
+              )
+         SELECT CAST(coordinate.tile_x / ? AS INTEGER) AS cell_x,
+                CAST(coordinate.tile_y / ? AS INTEGER) AS cell_y,
+                COALESCE(SUM(revision.revision_count), 0) AS revision_count,
+                COALESCE(SUM(selected.byte_length), 0) AS byte_length,
+                MAX(selected.last_validated_at) AS newest_validated_at,
+                MIN(selected.last_validated_at) AS oldest_validated_at,
+                COALESCE(SUM(CASE WHEN selected.content_hash IS NOT NULL
+                                       AND selected.last_validated_at >= ? THEN 1 ELSE 0 END), 0)
+                  AS available_count,
+                COALESCE(SUM(CASE WHEN selected.content_hash IS NOT NULL
+                                       AND selected.last_validated_at < ? THEN 1 ELSE 0 END), 0)
+                  AS stale_count,
+                COALESCE(SUM(CASE WHEN selected.content_hash IS NOT NULL THEN 1 ELSE 0 END), 0)
+                  AS primary_count,
+                COALESCE(SUM(CASE WHEN selected.content_hash = compared.content_hash
+                                  THEN 1 ELSE 0 END), 0) AS identical_count,
+                COALESCE(SUM(CASE WHEN selected.content_hash IS NOT NULL
+                                       AND compared.content_hash IS NOT NULL
+                                       AND selected.content_hash <> compared.content_hash
+                                  THEN 1 ELSE 0 END), 0) AS changed_count,
+                COALESCE(SUM(CASE WHEN selected.content_hash IS NULL
+                                       AND compared.content_hash IS NOT NULL
+                                  THEN 1 ELSE 0 END), 0) AS added_count,
+                COALESCE(SUM(CASE WHEN selected.content_hash IS NOT NULL
+                                       AND compared.content_hash IS NULL
+                                  THEN 1 ELSE 0 END), 0) AS missing_count
+           FROM coordinates coordinate
+           LEFT JOIN selected_state selected
+             ON selected.tile_x = coordinate.tile_x
+            AND selected.tile_y = coordinate.tile_y
+           LEFT JOIN compare_state compared
+             ON compared.tile_x = coordinate.tile_x
+            AND compared.tile_y = coordinate.tile_y
+           LEFT JOIN revision_counts revision
+             ON revision.logical_tile_id = selected.logical_tile_id
+          GROUP BY cell_x, cell_y`,
+      )
+      .all(
+        ...selected.parameters,
+        ...(compared?.parameters ?? []),
+        factor,
+        factor,
+        input.staleBefore,
+        input.staleBefore,
+      ) as unknown as Array<{
+      cell_x: number;
+      cell_y: number;
+      revision_count: number;
+      byte_length: number;
+      newest_validated_at: string | null;
+      oldest_validated_at: string | null;
+      available_count: number;
+      stale_count: number;
+      primary_count: number;
+      identical_count: number;
+      changed_count: number;
+      added_count: number;
+      missing_count: number;
+    }>;
+    return rows.map((row) => ({
+      x: row.cell_x,
+      y: row.cell_y,
+      revisionCount: row.revision_count,
+      byteLength: row.byte_length,
+      newestValidatedAt: row.newest_validated_at,
+      oldestValidatedAt: row.oldest_validated_at,
+      statuses: {
+        available: row.available_count,
+        stale: row.stale_count,
+      },
+      primaryCount: row.primary_count,
+      comparison:
+        compared === null
+          ? null
+          : {
+              identical: row.identical_count,
+              changed: row.changed_count,
+              added: row.added_count,
+              missing: row.missing_count,
+            },
+    }));
   }
 
   hasTileRevisions(mapSetId: string): boolean {

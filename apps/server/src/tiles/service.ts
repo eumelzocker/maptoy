@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import type {
   CacheSnapshot,
+  CoverageCell,
+  CoverageQuery,
+  CoverageResponse,
+  CoverageSelection,
   MapSet,
   TileCacheAuditResult,
   TileCacheComparison,
@@ -17,6 +21,11 @@ import type {
   TileRevisionOrigin,
   TileUploadResponse,
 } from "@maptoy/contracts";
+import {
+  type XyzTileRange,
+  wgs84BoundsToXyzTileRanges,
+  xyzTileBounds,
+} from "@maptoy/map-core";
 import sharp from "sharp";
 import type { ProviderResponse } from "../providerClient.js";
 import type {
@@ -39,7 +48,8 @@ export class TileArchiveError extends Error {
       | "SNAPSHOT_NOT_FOUND"
       | "SNAPSHOT_NAME_CONFLICT"
       | "TILE_REVISION_NOT_FOUND"
-      | "TILE_REVISION_PROTECTED",
+      | "TILE_REVISION_PROTECTED"
+      | "COVERAGE_QUERY_INVALID",
     message: string,
     readonly statusCode: number,
   ) {
@@ -535,6 +545,131 @@ export class TileArchiveService {
     };
   }
 
+  coverage(mapSet: MapSet, query: CoverageQuery): CoverageResponse {
+    if (query.zoom < mapSet.minZoom || query.zoom > mapSet.maxZoom) {
+      throw new TileArchiveError(
+        "COVERAGE_QUERY_INVALID",
+        `Coverage zoom must be between ${mapSet.minZoom} and ${mapSet.maxZoom}.`,
+        400,
+      );
+    }
+    if (query.bounds.south >= query.bounds.north) {
+      throw new TileArchiveError(
+        "COVERAGE_QUERY_INVALID",
+        "Coverage north must be greater than south.",
+        400,
+      );
+    }
+    if (query.bounds.west === query.bounds.east) {
+      throw new TileArchiveError(
+        "COVERAGE_QUERY_INVALID",
+        "Coverage west and east must describe a non-empty longitude range.",
+        400,
+      );
+    }
+    const selection = this.coverageSelection(mapSet.id, query.selection);
+    const compareTo =
+      query.compareTo === undefined
+        ? null
+        : this.coverageSelection(mapSet.id, query.compareTo);
+    const ranges = wgs84BoundsToXyzTileRanges(query.bounds, query.zoom);
+    const maximumCells = query.maximumCells ?? 1024;
+    const aggregationZoom = this.coverageAggregationZoom(
+      ranges,
+      query.zoom,
+      maximumCells,
+    );
+    const cells = this.coverageCells(ranges, query.zoom, aggregationZoom);
+    const staleBefore = new Date(
+      this.clock().getTime() - mapSet.cachePolicy.maximumAgeSeconds * 1000,
+    ).toISOString();
+    const aggregates = this.repository.coverageAggregates({
+      mapSetId: mapSet.id,
+      zoom: query.zoom,
+      aggregationZoom,
+      ranges,
+      selection,
+      compareTo,
+      staleBefore,
+    });
+    const aggregatesById = new Map(
+      aggregates.map((aggregate) => [
+        `${aggregationZoom}/${aggregate.x}/${aggregate.y}`,
+        aggregate,
+      ]),
+    );
+    const responseCells: CoverageCell[] = cells.map((cell) => {
+      const aggregate = aggregatesById.get(cell.id);
+      return {
+        ...cell,
+        revisionCount: aggregate?.revisionCount ?? 0,
+        byteLength: aggregate?.byteLength ?? 0,
+        newestValidatedAt: aggregate?.newestValidatedAt ?? null,
+        oldestValidatedAt: aggregate?.oldestValidatedAt ?? null,
+        statuses: {
+          available: aggregate?.statuses.available ?? 0,
+          stale: aggregate?.statuses.stale ?? 0,
+          missing: cell.tileCount - (aggregate?.primaryCount ?? 0),
+          // Phase 6 can populate this contract without changing Coverage clients.
+          inProgress: 0,
+        },
+        comparison:
+          aggregate?.comparison ??
+          (compareTo === null
+            ? null
+            : {
+                identical: 0,
+                changed: 0,
+                added: 0,
+                missing: 0,
+              }),
+      };
+    });
+    const totals = responseCells.reduce(
+      (result, cell) => ({
+        tileCount: result.tileCount + cell.tileCount,
+        revisionCount: result.revisionCount + cell.revisionCount,
+        byteLength: result.byteLength + cell.byteLength,
+        statuses: {
+          available: result.statuses.available + cell.statuses.available,
+          missing: result.statuses.missing + cell.statuses.missing,
+          stale: result.statuses.stale + cell.statuses.stale,
+          inProgress: result.statuses.inProgress + cell.statuses.inProgress,
+        },
+        comparison:
+          result.comparison === null || cell.comparison === null
+            ? null
+            : {
+                identical:
+                  result.comparison.identical + cell.comparison.identical,
+                changed: result.comparison.changed + cell.comparison.changed,
+                added: result.comparison.added + cell.comparison.added,
+                missing: result.comparison.missing + cell.comparison.missing,
+              },
+      }),
+      {
+        tileCount: 0,
+        revisionCount: 0,
+        byteLength: 0,
+        statuses: { available: 0, missing: 0, stale: 0, inProgress: 0 },
+        comparison:
+          compareTo === null
+            ? null
+            : { identical: 0, changed: 0, added: 0, missing: 0 },
+      } satisfies CoverageResponse["totals"],
+    );
+    return {
+      mapSetId: mapSet.id,
+      sourceZoom: query.zoom,
+      aggregationZoom,
+      bounds: query.bounds,
+      selection: query.selection,
+      compareTo: query.compareTo ?? null,
+      totals,
+      cells: responseCells,
+    };
+  }
+
   async deleteRevision(mapSetId: string, revisionId: string): Promise<void> {
     const protection = this.repository.revisionProtection(mapSetId, revisionId);
     if (protection === undefined) {
@@ -762,6 +897,123 @@ export class TileArchiveService {
       "SNAPSHOT_NOT_FOUND",
       "Cache comparisons accept current or snapshot:<id> selectors.",
       400,
+    );
+  }
+
+  private coverageSelection(
+    mapSetId: string,
+    selection: CoverageSelection,
+  ): Exclude<TileSelection, { kind: "revision" }> {
+    if (selection.kind === "current") {
+      return { kind: "current" };
+    }
+    if (selection.kind === "snapshot") {
+      if (selection.snapshotId === undefined) {
+        throw new TileArchiveError(
+          "COVERAGE_QUERY_INVALID",
+          "Coverage Snapshot selection requires snapshotId.",
+          400,
+        );
+      }
+      const snapshot = this.repository.snapshotById(selection.snapshotId);
+      if (snapshot?.mapSetId !== mapSetId) {
+        throw new TileArchiveError(
+          "SNAPSHOT_NOT_FOUND",
+          "The requested Cache Snapshot does not exist.",
+          404,
+        );
+      }
+      return { kind: "snapshot", snapshotId: selection.snapshotId };
+    }
+    if (selection.timestamp === undefined) {
+      throw new TileArchiveError(
+        "COVERAGE_QUERY_INVALID",
+        "Coverage time selection requires timestamp.",
+        400,
+      );
+    }
+    const timestamp = new Date(selection.timestamp);
+    if (Number.isNaN(timestamp.getTime())) {
+      throw new TileArchiveError(
+        "COVERAGE_QUERY_INVALID",
+        "Coverage asOf must be a valid timestamp.",
+        400,
+      );
+    }
+    return { kind: "as-of", timestamp: timestamp.toISOString() };
+  }
+
+  private coverageAggregationZoom(
+    ranges: readonly XyzTileRange[],
+    sourceZoom: number,
+    maximumCells: number,
+  ): number {
+    for (let zoom = sourceZoom; zoom >= 0; zoom -= 1) {
+      const factor = 2 ** (sourceZoom - zoom);
+      const cellCount = ranges.reduce(
+        (total, range) =>
+          total +
+          (Math.floor(range.maximumX / factor) -
+            Math.floor(range.minimumX / factor) +
+            1) *
+            (Math.floor(range.maximumY / factor) -
+              Math.floor(range.minimumY / factor) +
+              1),
+        0,
+      );
+      if (cellCount <= maximumCells || zoom === 0) {
+        return zoom;
+      }
+    }
+    return 0;
+  }
+
+  private coverageCells(
+    ranges: readonly XyzTileRange[],
+    sourceZoom: number,
+    aggregationZoom: number,
+  ): Array<
+    Pick<CoverageCell, "id" | "zoom" | "x" | "y" | "bounds" | "tileCount">
+  > {
+    const factor = 2 ** (sourceZoom - aggregationZoom);
+    const cells = new Map<
+      string,
+      Pick<CoverageCell, "id" | "zoom" | "x" | "y" | "bounds" | "tileCount">
+    >();
+    for (const range of ranges) {
+      const minimumCellX = Math.floor(range.minimumX / factor);
+      const maximumCellX = Math.floor(range.maximumX / factor);
+      const minimumCellY = Math.floor(range.minimumY / factor);
+      const maximumCellY = Math.floor(range.maximumY / factor);
+      for (let y = minimumCellY; y <= maximumCellY; y += 1) {
+        for (let x = minimumCellX; x <= maximumCellX; x += 1) {
+          const id = `${aggregationZoom}/${x}/${y}`;
+          const width =
+            Math.min(range.maximumX, (x + 1) * factor - 1) -
+            Math.max(range.minimumX, x * factor) +
+            1;
+          const height =
+            Math.min(range.maximumY, (y + 1) * factor - 1) -
+            Math.max(range.minimumY, y * factor) +
+            1;
+          const existing = cells.get(id);
+          if (existing !== undefined) {
+            existing.tileCount += width * height;
+          } else {
+            cells.set(id, {
+              id,
+              zoom: aggregationZoom,
+              x,
+              y,
+              bounds: xyzTileBounds({ zoom: aggregationZoom, x, y }),
+              tileCount: width * height,
+            });
+          }
+        }
+      }
+    }
+    return [...cells.values()].sort((left, right) =>
+      left.y === right.y ? left.x - right.x : left.y - right.y,
     );
   }
 

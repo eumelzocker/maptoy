@@ -53,6 +53,24 @@ return `200` and `created: false`. Both include the same revision ID in
 | `415` | `TILE_MEDIA_TYPE_INVALID` | Content-Type is missing, unsupported, or mismatched. |
 | `507` | `TILE_STORAGE_LIMIT` | The Map Set storage limit would be exceeded. |
 
+## Coverage query
+
+`POST api/map-sets/:id/coverage/query` returns an aggregated, read-only Coverage
+grid. The JSON body contains WGS84 `bounds`, one source `zoom`, a `selection`, an
+optional `compareTo`, and an optional `maximumCells` between 1 and 4,096. A
+selection is `{"kind":"current"}`, `{"kind":"snapshot","snapshotId":"..."}`,
+or `{"kind":"asOf","timestamp":"..."}`.
+
+The response reports the chosen `aggregationZoom`, total Tile, Revision, byte,
+freshness, and comparison counts, followed by bounded geographic cells with the
+same metadata. Status counts contain `available`, `stale`, `missing`, and the
+future-compatible `inProgress`. Comparison counts contain `identical`, `changed`,
+`added`, and `missing`. The endpoint reads SQLite metadata only and never contacts
+a provider.
+
+Invalid bounds, Zooms, or timestamps return `400 COVERAGE_QUERY_INVALID`; an
+unknown Snapshot returns `404 SNAPSHOT_NOT_FOUND`.
+
 ## Security boundary
 
 maptoy v1 does not authenticate API requests. The Tile upload is a write operation

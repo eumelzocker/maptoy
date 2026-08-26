@@ -53,7 +53,18 @@ describe("Map context menu items", () => {
       { id: `${mapContextMenuIds.zoomPrefix}3`, label: "3", selected: true },
       { id: `${mapContextMenuIds.zoomPrefix}4`, label: "4", selected: false },
     ]);
-    expect(items[2]?.children?.[2]?.children).toMatchObject([
+    expect(items[2]?.children?.map(({ id }) => id)).toEqual([
+      mapContextMenuIds.mapSets,
+      mapContextMenuIds.tileCache,
+      mapContextMenuIds.coverage,
+      "goto-documentation",
+    ]);
+    expect(items[2]?.children?.[2]).toMatchObject({
+      id: mapContextMenuIds.coverage,
+      label: "Coverage",
+      icon: "mdi-grid",
+    });
+    expect(items[2]?.children?.[3]?.children).toMatchObject([
       {
         id: `${mapContextMenuIds.documentationPrefix}home`,
         label: "Introduction",

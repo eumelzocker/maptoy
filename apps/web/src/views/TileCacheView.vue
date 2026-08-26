@@ -539,6 +539,14 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
           <span class="meta-dot" aria-hidden="true">●</span>{{ selectedMapSet.tileSize }}
           <span class="meta-dot" aria-hidden="true">●</span>{{ formatTileFormat(selectedMapSet.tileFormat) }}
           <span class="meta-dot" aria-hidden="true">●</span>{{ formatCacheAgeLimit(selectedMapSet) }}
+          <RouterLink
+            class="map-set-edit-link"
+            :to="`/map-sets/${selectedMapSet.id}`"
+            title="Edit Map Set"
+            aria-label="Edit Map Set"
+          >
+            <i class="mdi mdi-pencil-outline" aria-hidden="true"></i>
+          </RouterLink>
         </p>
       </div>
       <div class="map-set-picker">
@@ -610,9 +618,19 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
           <tbody>
             <tr v-for="row in overviewRows" :key="row.mapSet.id">
               <td>
-                <RouterLink class="detail-link" :to="`/cache/${row.mapSet.id}`">
-                  {{ row.mapSet.name }}
-                </RouterLink>
+                <span class="map-set-name">
+                  <RouterLink class="detail-link" :to="`/cache/${row.mapSet.id}`">
+                    {{ row.mapSet.name }}
+                  </RouterLink>
+                  <RouterLink
+                    class="map-set-edit-link"
+                    :to="`/map-sets/${row.mapSet.id}`"
+                    title="Edit Map Set"
+                    :aria-label="`Edit ${row.mapSet.name}`"
+                  >
+                    <i class="mdi mdi-pencil-outline" aria-hidden="true"></i>
+                  </RouterLink>
+                </span>
               </td>
               <td class="numeric">{{ row.summary.logicalTileCount }}</td>
               <td class="numeric">{{ row.summary.currentRevisionCount }}</td>
@@ -910,6 +928,10 @@ h2, p { margin-top: 0; }
 .overview-link, .detail-link { color: #17453c; font-weight: 700; }
 .meta-dot { margin: 0 0.5rem; color: #a3b8ae; font-size: 0.6rem; vertical-align: middle; }
 .detail-link { display: inline-flex; align-items: center; text-decoration: none; }
+.map-set-name { display: inline-flex; align-items: center; gap: 0.25rem; }
+.map-set-edit-link { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; border-radius: 0.25rem; color: #17453c; text-decoration: none; vertical-align: middle; }
+.map-set-edit-link:hover { color: #2f7563; }
+.map-set-edit-link:focus-visible { outline: 2px solid #68877b; outline-offset: 1px; }
 .map-set-picker, .snapshot-form label, .revision-filters label { display: grid; gap: 0.35rem; font-weight: 700; }
 .map-set-picker .map-set-select { min-width: 18rem; }
 input, select, button { min-height: 2.4rem; padding: 0.5rem 0.7rem; border: 1px solid #9eb1a7; border-radius: 0.45rem; color: #142c28; background: #fff; font: inherit; }

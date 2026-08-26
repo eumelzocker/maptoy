@@ -29,6 +29,7 @@ export const mapContextMenuIds = {
   zoomPrefix: "select-zoom:",
   mapSets: "goto-map-sets",
   tileCache: "goto-tile-cache",
+  coverage: "goto-coverage",
   documentationPrefix: "goto-documentation:",
   gotoCoordinates: "tool-goto-coordinates",
   tileCalculator: "tool-tile-calculator",
@@ -106,6 +107,11 @@ export function createMapContextMenuItems(
           id: mapContextMenuIds.tileCache,
           label: "Tile Cache",
           icon: "mdi-database-outline",
+        },
+        {
+          id: mapContextMenuIds.coverage,
+          label: "Coverage",
+          icon: "mdi-grid",
         },
         {
           id: "goto-documentation",

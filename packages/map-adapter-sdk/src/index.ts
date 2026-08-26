@@ -17,6 +17,11 @@ export interface MapViewport {
   zoom: number;
 }
 
+export interface MapZoomRange {
+  minimum: number;
+  maximum: number;
+}
+
 export interface MapRendererCapabilities {
   interactive: boolean;
   layerRendering: boolean;
@@ -42,6 +47,40 @@ export interface MapLayerDescriptor {
   data: unknown;
 }
 
+export interface MapGeographicBounds {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
+}
+
+export interface MapRectangleFeature {
+  id: string;
+  bounds: MapGeographicBounds;
+  fillColor: string;
+  strokeColor: string;
+  fillOpacity: number;
+  label?: string;
+}
+
+export interface MapRectangleLayerData {
+  kind: "rectangle-grid";
+  features: readonly MapRectangleFeature[];
+}
+
+export function isMapRectangleLayerData(
+  value: unknown,
+): value is MapRectangleLayerData {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    value.kind === "rectangle-grid" &&
+    "features" in value &&
+    Array.isArray(value.features)
+  );
+}
+
 export type MapRendererEvent = "pointer" | "selection" | "viewport";
 export type MapRendererEventListener = (payload: unknown) => void;
 export type Unsubscribe = () => void;
@@ -49,6 +88,7 @@ export type Unsubscribe = () => void;
 export interface MapRendererInstance {
   getViewport: () => MapViewport;
   setViewport: (viewport: MapViewport) => MaybePromise<void>;
+  setZoomRange?: (range: MapZoomRange) => MaybePromise<void>;
   subscribe: (
     event: MapRendererEvent,
     listener: MapRendererEventListener,
@@ -118,11 +158,32 @@ export function createFakeMapRendererFactory(): MapRendererFactory {
     },
     create(options): MapRendererInstance {
       let viewport: MapViewport = options.initialViewport;
+      let zoomRange: MapZoomRange | null = null;
       const layers = new Map<string, MapLayerDescriptor>();
       return {
         getViewport: () => viewport,
         setViewport: (value) => {
-          viewport = value;
+          viewport = {
+            ...value,
+            zoom:
+              zoomRange === null
+                ? value.zoom
+                : Math.min(
+                    zoomRange.maximum,
+                    Math.max(zoomRange.minimum, value.zoom),
+                  ),
+          };
+        },
+        setZoomRange: (value) => {
+          invariant(value.minimum <= value.maximum, "invalid zoom range");
+          zoomRange = value;
+          viewport = {
+            ...viewport,
+            zoom: Math.min(
+              value.maximum,
+              Math.max(value.minimum, viewport.zoom),
+            ),
+          };
         },
         subscribe: () => () => undefined,
         attachLayer: (layer) => {
