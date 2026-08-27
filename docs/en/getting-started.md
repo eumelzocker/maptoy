@@ -6,10 +6,10 @@ language: en
 
 # Getting started
 
-maptoy can store XYZ Map Sets and display them through its Leaflet renderer. No
+*maptoy* can store XYZ Map Sets and display them through its Leaflet renderer. No
 public tile provider is configured automatically: open **Map Sets** to add a source,
 then select it on **Map**. Provider URLs remain on the server side and browser tile
-requests use relative maptoy API URLs.
+requests use relative *maptoy* API URLs.
 
 ## Development commands
 
@@ -37,11 +37,11 @@ docker compose up --build
 
 Compose bind-mounts that host directory to `/data` in the container. The SQLite
 database is stored as `maptoy.sqlite` in it; future tile archives and exports use
-the same host-controlled directory. maptoy does not use a Docker-managed named or
+the same host-controlled directory. *maptoy* does not use a Docker-managed named or
 anonymous volume for persistent application data. The directory must be writable
 by UID `1000`, which is the non-root user running the container.
 
-SQLite schema version 4 is maptoy's production baseline. New installations first
+SQLite schema version 4 is *maptoy*'s production baseline. New installations first
 create that baseline and then apply every numbered migration, including version 5's
 Tile Revision origin. Versions 1 through 3 were development-only schemas and are
 not supported upgrade sources; no production database predates version 4.
@@ -52,7 +52,7 @@ size of Map Set JSON or unrelated API requests.
 
 ## Traffic logs
 
-maptoy keeps client/API traffic and backend/tile-provider traffic in separate
+*maptoy* keeps client/API traffic and backend/tile-provider traffic in separate
 JSON Lines logs. Compose bind-mounts the directories configured by
 `MAPTOY_API_TRAFFIC_LOG_DIR` and `MAPTOY_PROVIDER_TRAFFIC_LOG_DIR`; their defaults
 are below `MAPTOY_DATA_DIR`, but either path can point elsewhere on the host. The

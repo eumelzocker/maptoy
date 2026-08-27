@@ -2,11 +2,15 @@
 import { documentation } from "virtual:maptoy-docs";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import maptoyIconUrl from "../assets/favicon.svg";
 import { decorateClipCopyCallouts } from "../documentationClipCopy.js";
 import { saveDocumentationLanguage } from "../documentationLanguage.js";
 import { decorateExternalDocumentationLinks } from "../documentationLinks.js";
 import {
   englishOnlyDocumentationLabel,
+  // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+  isMaptoyApplicationDocumentationPage,
   sortDocumentationPages,
 } from "../documentationNavigation.js";
 import { documentationPageId } from "../documentationRoute.js";
@@ -85,6 +89,13 @@ watch(requestedLanguage, saveDocumentationLanguage, { immediate: true });
             class="mdi mdi-map-legend docs-nav-icon"
             aria-hidden="true"
           ></i>
+          <img
+            v-else-if="isMaptoyApplicationDocumentationPage(link.id)"
+            :src="maptoyIconUrl"
+            class="docs-nav-app-icon"
+            alt="maptoy application documentation"
+            title="maptoy application documentation"
+          />
           <span>{{ link.title }}</span>
           <i
             v-if="link.id === requestedPageId"

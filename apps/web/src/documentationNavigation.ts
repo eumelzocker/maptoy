@@ -9,6 +9,18 @@ const englishOnlyLabels: Readonly<Record<string, string>> = {
   th: "มีเฉพาะภาษาอังกฤษ",
 };
 
+const maptoyApplicationDocumentationPageIds = new Set([
+  "api-reference",
+  "changelog",
+  "getting-started",
+  "map-sets",
+  "tile-cache",
+]);
+
+export function isMaptoyApplicationDocumentationPage(id: string): boolean {
+  return maptoyApplicationDocumentationPageIds.has(id);
+}
+
 export function englishOnlyDocumentationLabel(language: string): string {
   return englishOnlyLabels[language] ?? englishOnlyLabels.en ?? "English only";
 }

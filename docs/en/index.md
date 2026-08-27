@@ -6,7 +6,7 @@ language: en
 
 # maptoy
 
-maptoy is a self-hosted workshop for viewing, archiving, and exporting raster maps.
+*maptoy* is a self-hosted workshop for viewing, archiving, and exporting raster maps.
 The application keeps map configuration and cached revisions under your control and
 serves its user interface and API from one HTTP port.
 

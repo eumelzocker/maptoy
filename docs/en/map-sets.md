@@ -6,7 +6,7 @@ language: en
 
 # Map Sets
 
-A Map Set connects an XYZ raster source to maptoy's renderer, initial viewport,
+A Map Set connects an XYZ raster source to *maptoy*'s renderer, initial viewport,
 technical capabilities, cache policy, and download limits. No public provider is
 configured automatically. Before adding a source, review its current terms,
 attribution rules, request limits, and permissions for proxying or storage. See the
@@ -24,7 +24,7 @@ Open **Map Sets**, choose **New Map Set**, and complete these essential fields:
   The markup is stored and rendered unchanged, so only administrators should edit
   Map Set configuration.
 - **Provider terms URL**, **Terms last reviewed**, and **Notes** record what you
-  checked; they do not constitute legal approval by maptoy.
+  checked; they do not constitute legal approval by *maptoy*.
 - **Minimum**, **maximum**, and **default zoom** must describe the source's actual
   range. The default zoom must fall inside that range.
 - **Default longitude and latitude** determine the first viewport.
@@ -32,7 +32,7 @@ Open **Map Sets**, choose **New Map Set**, and complete these essential fields:
 
 Zoom values describe the provider's `{z}` coordinate. A 512-pixel Tile at provider
 zoom `z` is displayed at Leaflet zoom `z + 1`, as it contains the detail of a
-256-pixel Tile from that level. maptoy applies this offset automatically; API and
+256-pixel Tile from that level. *maptoy* applies this offset automatically; API and
 cache coordinates continue to use the provider zoom.
 
 The initial implementation supports the `xyz-raster` source type in Web Mercator
@@ -41,12 +41,12 @@ The initial implementation supports the `xyz-raster` source type in Web Mercator
 The Map view remembers one shared centre and zoom in the browser's local storage.
 Reloading the page restores that viewport, and switching Map Sets keeps the same
 area visible so sources can be compared directly. If the new Map Set has a narrower
-zoom range, maptoy clamps the shared zoom to its nearest limit. The configured
+zoom range, *maptoy* clamps the shared zoom to its nearest limit. The configured
 default viewport is used when no valid stored value exists.
 
 ## Source settings after caching
 
-Once a Map Set contains its first cached Tile Revision, maptoy locks the fields that
+Once a Map Set contains its first cached Tile Revision, *maptoy* locks the fields that
 define the source: source type, URL template, request headers, subdomains, tile size,
 format, and source projection. Metadata, viewport, zoom limits, capabilities, and
 cache or download policies remain editable.
@@ -76,11 +76,11 @@ diagnostics, and the web interface therefore never need the secret itself.
 
 Request headers use one `Name: value` line each. Hop-by-hop headers, `Host`,
 `Cookie`, and `Content-Length` cannot be configured. If a provider redirects to a
-different origin, maptoy removes configured headers before following it.
+different origin, *maptoy* removes configured headers before following it.
 
 ## Provider test
 
-Save the Map Set and choose **Test tile**. maptoy requests the tile containing the
+Save the Map Set and choose **Test tile**. *maptoy* requests the tile containing the
 configured default centre at the default zoom and reports:
 
 - XYZ coordinate and provider HTTP status;
@@ -106,11 +106,11 @@ Provider responses have a configurable timeout and byte limit. The defaults are
 
 ## Capabilities and current scope
 
-Capability switches describe technical behavior, not provider permission. maptoy
+Capability switches describe technical behavior, not provider permission. *maptoy*
 combines them with the selected renderer's capabilities. A disabled interactive
 capability prevents the Map Set from opening in the Map view.
 
-During Phase 2, the Map view loads every tile through the relative maptoy endpoint
+During Phase 2, the Map view loads every tile through the relative *maptoy* endpoint
 `api/map-sets/:id/tiles/:z/:x/:y`; the browser never receives the external provider
 URL or resolved secrets. Persistent Tile Revisions, refresh modes, snapshots, and
 cache-state comparisons are described in the [Tile Cache](docs/en/tile-cache)

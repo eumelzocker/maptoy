@@ -6,7 +6,7 @@ language: de
 
 # Map Sets
 
-Ein Map Set verbindet eine XYZ-Rasterquelle mit maptoys Renderer,
+Ein Map Set verbindet eine XYZ-Rasterquelle mit *maptoy*s Renderer,
 Startkartenausschnitt, technischen Fähigkeiten, Cache-Regeln und Download-Limits.
 Es ist kein öffentlicher Provider vorkonfiguriert. Prüfe vor dem Anlegen einer
 Quelle deren aktuelle Bedingungen, Attributionsregeln, Abruflimits und Vorgaben für
@@ -27,7 +27,7 @@ als technische Orientierung.
   gespeichert und dargestellt; deshalb sollte nur der Administrator Map Sets
   bearbeiten.
 - **Provider terms URL**, **Terms last reviewed** und **Notes** halten deine Prüfung
-  fest; daraus leitet maptoy keine rechtliche Freigabe ab.
+  fest; daraus leitet *maptoy* keine rechtliche Freigabe ab.
 - **Minimum**, **Maximum** und **Default zoom** müssen zum tatsächlichen Zoombereich
   der Quelle passen. Der Standardzoom muss innerhalb dieses Bereichs liegen.
 - **Default longitude** und **Default latitude** bestimmen den ersten Ausschnitt.
@@ -35,7 +35,7 @@ als technische Orientierung.
 
 Zoomwerte beschreiben die `{z}`-Koordinate des Providers. Ein 512-Pixel-Tile mit
 Provider-Zoom `z` wird bei Leaflet-Zoom `z + 1` dargestellt, da es die Details eines
-256-Pixel-Tiles dieser Stufe enthält. maptoy wendet diesen Versatz automatisch an;
+256-Pixel-Tiles dieser Stufe enthält. *maptoy* wendet diesen Versatz automatisch an;
 API und Cache verwenden weiterhin den Provider-Zoom.
 
 Die erste Implementierung unterstützt ausschließlich den Quelltyp `xyz-raster` in
@@ -44,13 +44,13 @@ Web Mercator (`EPSG:3857`) und den Renderer `leaflet-xyz`.
 Die Kartenansicht merkt sich einen gemeinsamen Mittelpunkt und Zoom im lokalen
 Browserspeicher. Beim Neuladen wird dieser Ausschnitt wiederhergestellt; beim Wechsel
 des Map Sets bleibt dasselbe Gebiet sichtbar, damit sich Quellen direkt vergleichen
-lassen. Hat das neue Map Set engere Zoomgrenzen, begrenzt maptoy den gemeinsamen Zoom
+lassen. Hat das neue Map Set engere Zoomgrenzen, begrenzt *maptoy* den gemeinsamen Zoom
 auf die nächstgelegene erlaubte Stufe. Der konfigurierte Startausschnitt gilt, wenn
 kein gültiger gespeicherter Wert vorhanden ist.
 
 ## Quelle nach dem ersten Cache-Eintrag
 
-Sobald ein Map Set seine erste Tile-Revision im Cache enthält, sperrt maptoy die
+Sobald ein Map Set seine erste Tile-Revision im Cache enthält, sperrt *maptoy* die
 Felder, welche die Quelle festlegen: Quelltyp, URL-Template, Request-Header,
 Subdomains, Tile-Größe, Format und Quellprojektion. Metadaten, Startausschnitt,
 Zoomgrenzen, Capabilities sowie Cache- und Download-Regeln bleiben editierbar.
@@ -82,12 +82,12 @@ daher nicht.
 
 Request-Header werden zeilenweise als `Name: Wert` eingetragen. Hop-by-Hop-Header,
 `Host`, `Cookie` und `Content-Length` sind nicht konfigurierbar. Leitet ein Provider
-auf einen anderen Origin um, entfernt maptoy vor dem Folgeabruf alle konfigurierten
+auf einen anderen Origin um, entfernt *maptoy* vor dem Folgeabruf alle konfigurierten
 Header.
 
 ## Provider testen
 
-Speichere das Map Set und wähle **Test tile**. maptoy ruft das Tile auf, das den
+Speichere das Map Set und wähle **Test tile**. *maptoy* ruft das Tile auf, das den
 konfigurierten Standardmittelpunkt bei Standardzoom enthält, und zeigt:
 
 - XYZ-Koordinate und HTTP-Status des Providers,
@@ -115,11 +115,11 @@ Standardwerte betragen 10 Sekunden und 10 MiB pro Tile. Sie lassen sich mit
 ## Fähigkeiten und aktueller Umfang
 
 Capability-Schalter beschreiben technische Funktionen und keine Erlaubnis des
-Providers. maptoy verknüpft sie mit den Fähigkeiten des gewählten Renderers. Eine
+Providers. *maptoy* verknüpft sie mit den Fähigkeiten des gewählten Renderers. Eine
 deaktivierte interaktive Fähigkeit verhindert das Öffnen des Map Sets in der
 Kartenansicht.
 
-In Phase 2 lädt die Kartenansicht jedes Tile über den relativen maptoy-Endpunkt
+In Phase 2 lädt die Kartenansicht jedes Tile über den relativen *maptoy*-Endpunkt
 `api/map-sets/:id/tiles/:z/:x/:y`; der Browser erhält weder die externe
 Provider-URL noch aufgelöste Secrets. Dauerhafte Tile-Revisionen,
 Aktualisierungsmodi, Snapshots und Vergleiche von Cache-Ständen beschreibt die

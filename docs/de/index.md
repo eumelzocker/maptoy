@@ -6,7 +6,7 @@ language: de
 
 # maptoy
 
-maptoy ist eine selbst gehostete App zum Anzeigen, Archivieren und Exportieren von
+*maptoy* ist eine selbst gehostete App zum Anzeigen, Archivieren und Exportieren von
 Rasterkarten. Konfigurationen und historische Kachelstände bleiben unter deiner
 Kontrolle; Weboberfläche und API werden über denselben HTTP-Port ausgeliefert.
 

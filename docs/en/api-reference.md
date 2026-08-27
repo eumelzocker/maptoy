@@ -6,7 +6,7 @@ language: en
 
 # API reference
 
-All API paths are relative to maptoy's public entry URL and start with `api/`. API
+All API paths are relative to *maptoy*'s public entry URL and start with `api/`. API
 clients must preserve a configured reverse-proxy prefix. Error responses use
 `{ "error": { "code": "...", "message": "..." } }`.
 
@@ -72,7 +72,7 @@ unknown Snapshot returns `404 SNAPSHOT_NOT_FOUND`.
 
 ## Security boundary
 
-maptoy v1 does not authenticate API requests. The Tile upload is a write operation
+*maptoy* v1 does not authenticate API requests. The Tile upload is a write operation
 that can replace the current map state and consume storage. Run it only in a trusted
 private environment, or require authentication and authorization at the reverse
 proxy before allowing access from an untrusted network.

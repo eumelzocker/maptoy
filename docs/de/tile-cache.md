@@ -6,7 +6,7 @@ language: de
 
 # Tile-Cache
 
-maptoy speichert erfolgreich geprüfte Raster-Tiles als unveränderliche Revisionen
+*maptoy* speichert erfolgreich geprüfte Raster-Tiles als unveränderliche Revisionen
 unterhalb von `MAPTOY_DATA_DIR/tiles`. SQLite enthält Revisionshistorie und aktuelle
 Zeiger; die Bilddateien bleiben direkt im Datenverzeichnis des Hosts zugänglich.
 
@@ -14,14 +14,14 @@ Zeiger; die Bilddateien bleiben direkt im Datenverzeichnis des Hosts zugänglich
 
 Normale Kartenaufrufe verwenden `auto`: Eine aktuelle Revision wird ausgeliefert,
 bis ihr konfiguriertes Höchstalter überschritten ist. Ein veraltetes oder fehlendes
-Tile wird beim Provider angefragt. Wenn möglich, sendet maptoy `If-None-Match` oder
+Tile wird beim Provider angefragt. Wenn möglich, sendet *maptoy* `If-None-Match` oder
 `If-Modified-Since`; eine `304`-Antwort aktualisiert ausschließlich die
 Validierungszeitpunkte.
 
 - `auto` verwendet eine frische Cache-Revision und validiert veraltete Inhalte.
 - `force` kontaktiert den Provider unabhängig vom konfigurierten Höchstalter.
 - `cache-only` kontaktiert den Provider nie. Fehlt das ausgewählte Tile, liefert
-  maptoy ein diagonal schraffiertes `no_cache`-PNG in der konfigurierten Tile-Größe
+  *maptoy* ein diagonal schraffiertes `no_cache`-PNG in der konfigurierten Tile-Größe
   mit seinen `z`-, `x`- und `y`-Koordinaten sowie `X-Maptoy-Cache: miss` aus.
 
 Die API erhält den Modus als `?refresh=auto`, `?refresh=force` oder
@@ -72,8 +72,8 @@ Für Uploadfehler gelten folgende Verträge:
   `MAPTOY_MAX_TILE_BYTES`.
 - `507 TILE_STORAGE_LIMIT`, wenn das Speicherlimit des Map Sets überschritten würde.
 
-maptoy v1 besitzt keine Anwendungsauthentifizierung. Dieser schreibende Endpunkt ist
-nur für vertrauenswürdige private Clients vorgesehen. Ist maptoy über ein nicht
+*maptoy* v1 besitzt keine Anwendungsauthentifizierung. Dieser schreibende Endpunkt ist
+nur für vertrauenswürdige private Clients vorgesehen. Ist *maptoy* über ein nicht
 vertrauenswürdiges Netz erreichbar, muss der Reverse Proxy den Zugriff authentifizieren
 und autorisieren; veröffentliche die Uploadroute nicht ungeschützt. Der Betreiber ist
 selbst dafür verantwortlich, dass die eingespielten Bytes zur konfigurierten Quelle
@@ -83,7 +83,7 @@ gehören und gespeichert werden dürfen.
 
 Neue Bytes erzeugen eine über ihren SHA-256-Hash adressierte Revision. Frühere
 Revisionen werden nicht überschrieben. Ändert sich der Providerinhalt von A zu B und
-später zurück zu A, zeichnet maptoy drei zeitliche Revisionen auf, verwendet aber
+später zurück zu A, zeichnet *maptoy* drei zeitliche Revisionen auf, verwendet aber
 die ursprüngliche A-Datei erneut.
 Jede Revision hält außerdem fest, ob ihre erzeugenden Bytes vom `provider` oder aus
 einem API-`upload` stammen.

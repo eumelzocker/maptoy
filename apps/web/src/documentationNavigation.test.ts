@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   englishOnlyDocumentationLabel,
+  isMaptoyApplicationDocumentationPage,
   sortDocumentationPages,
 } from "./documentationNavigation.js";
 
@@ -42,5 +43,19 @@ describe("documentation navigation", () => {
     expect(englishOnlyDocumentationLabel("unknown")).toBe(
       "Available only in English",
     );
+  });
+
+  it("identifies maptoy application documentation pages", () => {
+    expect(
+      [
+        "changelog",
+        "map-sets",
+        "tile-cache",
+        "getting-started",
+        "api-reference",
+      ].every(isMaptoyApplicationDocumentationPage),
+    ).toBe(true);
+    expect(isMaptoyApplicationDocumentationPage("home")).toBe(false);
+    expect(isMaptoyApplicationDocumentationPage("tile-providers")).toBe(false);
   });
 });

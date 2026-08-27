@@ -6,10 +6,10 @@ language: de
 
 # Erste Schritte
 
-maptoy kann XYZ-Map-Sets speichern und über den Leaflet-Renderer anzeigen. Es ist
+*maptoy* kann XYZ-Map-Sets speichern und über den Leaflet-Renderer anzeigen. Es ist
 absichtlich kein öffentlicher Tile-Provider vorkonfiguriert: Lege unter **Map Sets**
 eine Quelle an und wähle sie anschließend unter **Map** aus. Provider-URLs bleiben
-serverseitig; der Browser lädt Tiles über relative maptoy-API-URLs.
+serverseitig; der Browser lädt Tiles über relative *maptoy*-API-URLs.
 
 ## Docker-Datenverzeichnis
 
@@ -24,12 +24,12 @@ docker compose up --build
 
 Compose bind-mountet dieses Hostverzeichnis im Container nach `/data`. Darin liegt
 die SQLite-Datenbank als `maptoy.sqlite`; spätere Tile-Archive und Exporte verwenden
-dasselbe vom Host kontrollierte Verzeichnis. maptoy verwendet für persistente
+dasselbe vom Host kontrollierte Verzeichnis. *maptoy* verwendet für persistente
 Anwendungsdaten kein von Docker verwaltetes benanntes oder anonymes Volume. Das
 Verzeichnis muss für UID `1000`, den nicht privilegierten Containerbenutzer,
 beschreibbar sein.
 
-SQLite-Schema-Version 4 ist die produktive Baseline von maptoy. Neue Installationen
+SQLite-Schema-Version 4 ist die produktive Baseline von *maptoy*. Neue Installationen
 legen zuerst diese Baseline an und wenden danach jede nummerierte Migration an,
 einschließlich der Revisionsherkunft aus Version 5. Die Versionen 1 bis 3 waren
 ausschließlich Entwicklungsschemas und sind keine unterstützten Upgradequellen;
@@ -69,7 +69,7 @@ Führe in der Entwicklungs-Shell einmal `pnpm install` aus. `pnpm start` baut un
 startet die Anwendung; `pnpm check` führt Formatierung, Linting, Builds, Typprüfung
 und Tests aus.
 
-Der Server verwendet standardmäßig Port `4004`. Ein Reverse Proxy kann maptoy
+Der Server verwendet standardmäßig Port `4004`. Ein Reverse Proxy kann *maptoy*
 unter einem Unterpfad veröffentlichen, wenn er diesen Präfix vor dem Weiterleiten
 entfernt. Anwendungsrouten, Assets, die generierte HTML-Basis und API-Aufrufe bleiben
 relativ zur öffentlichen Einstiegs-URL.

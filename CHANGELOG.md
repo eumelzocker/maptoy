@@ -19,6 +19,8 @@ All notable changes to maptoy are documented in this file.
   into the shared Zoom control.
 - Planned active-download visualization now uses separate Coverage map chip
   overlays instead of overloading Coverage cell statuses and colors.
+- Marked app-specific pages in the integrated Documentation table of contents
+  with the maptoy icon.
 
 ### Removed
 

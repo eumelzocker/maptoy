@@ -13,28 +13,28 @@ guarantee that a provider permits a particular use. Provider terms, plans, URLs,
 limits, and attribution requirements can change. Check the linked official
 documentation and terms before creating or rechecking a Map Set.
 
-maptoy is a server-side tile proxy with persistent revision history, snapshots,
+*maptoy* is a server-side tile proxy with persistent revision history, snapshots,
 batch downloads, and exports. Those features go beyond ordinary browser caching.
 A technically valid XYZ URL therefore does not mean that the provider permits
-maptoy's archive features. Unless an applicable agreement explicitly permits them,
+*maptoy*'s archive features. Unless an applicable agreement explicitly permits them,
 disable batch downloads and do not assume that permanent storage, snapshots,
 exports, or redistribution are allowed.
 
 Catalog placeholders such as `{style}` and `{mapId}` must be replaced with a fixed
-value before saving a Map Set. maptoy itself resolves only tile placeholders such as
+value before saving a Map Set. *maptoy* itself resolves only tile placeholders such as
 `{z}`, `{x}`, `{y}`, and optional `{s}`. Keep credentials in environment variables;
 the examples below use `${MAPTOY_*}` references rather than real secrets.
 
 | Provider | Raster XYZ fit for v1 | Archive and batch policy |
 | --- | --- | --- |
 | [OpenStreetMap Standard](https://openstreetmap.org/) | Direct | Bulk download and prefetch are prohibited; only policy-compliant interactive use and caching. [Wiki](https://wiki.openstreetmap.org/) |
-| [OpenTopoMap](https://opentopomap.org/) | Direct; maptoy's manual development example | Credential-free low-volume development with attribution; avoid mass downloads and contact the project before larger use. |
+| [OpenTopoMap](https://opentopomap.org/) | Direct; *maptoy*'s manual development example | Credential-free low-volume development with attribution; avoid mass downloads and contact the project before larger use. |
 | [MapTiler Cloud](https://www.maptiler.com/) | Direct | Server-side proxy/cache, export, and bulk download require a custom agreement. |
 | [Mapbox](https://www.mapbox.com/) | Direct through Static Tiles API | Do not infer archival rights from HTTP cache headers; verify the current agreement for proxying, storage, export, and offline use. |
 | [Stadia Maps](https://stadiamaps.com/) | Direct | Standard terms prohibit server-side proxying/caching and general bulk download. |
 | [Thunderforest](https://www.thunderforest.com/maps/) | Direct | Standard terms allow limited client/device caching but prohibit caching proxies and redistribution. |
 | [ArcGIS Location](https://location.arcgis.com/) | Direct with `{z}/{y}/{x}` path order | Account-, service-, and agreement-dependent; no general archival permission is implied. |
-| [Google Maps](https://maps.google.com/) | Not directly | Session creation, dynamic attribution, and caching restrictions conflict with maptoy's current static Map Set and archive model. |
+| [Google Maps](https://maps.google.com/) | Not directly | Session creation, dynamic attribution, and caching restrictions conflict with *maptoy*'s current static Map Set and archive model. |
 
 ## OpenStreetMap Standard
 
@@ -53,7 +53,7 @@ services with their own operators and policies.
 **Policy notes:** Visible `© OpenStreetMap contributors` attribution is required.
 Honor HTTP caching headers, or cache for at least seven days when those headers
 cannot be read. Bulk download, offline prefetch, and bypassing the cache are
-prohibited. The service is best-effort and can block abusive use. maptoy's batch
+prohibited. The service is best-effort and can block abusive use. *maptoy*'s batch
 download must not be enabled for this endpoint.
 
 **Official information:** [Tile usage policy](https://operations.osmfoundation.org/policies/tiles/),
@@ -73,14 +73,14 @@ coverage and maximum useful zoom vary.
 **Parameters and headers:** No API key. Provide the required OpenTopoMap and data
 attribution.
 
-**Development use:** This is maptoy's documented source for manual development,
+**Development use:** This is *maptoy*'s documented source for manual development,
 smoke checks, screenshots, and demonstrations that need real Tiles. Configure it
 explicitly; automated tests never access public Tile services. The published usage
 notes make the map available under CC-BY-SA with attribution, so controlled
 low-volume development fits this profile without credentials.
 
 **Policy notes:** Availability is not guaranteed. Avoid mass downloads, broad
-pre-seeding, and load tests; contact the project before larger use. Keep maptoy batch
+pre-seeding, and load tests; contact the project before larger use. Keep *maptoy* batch
 download disabled unless the operator has agreed to the intended load and retention.
 The development profile is not a general legal review or an unlimited-use guarantee.
 
@@ -145,7 +145,7 @@ optional `@2x`, and an access token with the required scope. Requests are billed
 rate-limited under the active plan.
 
 **Policy notes:** The API publishes HTTP cache lifetimes, but those values describe
-freshness and do not by themselves grant rights to maintain maptoy's permanent
+freshness and do not by themselves grant rights to maintain *maptoy*'s permanent
 revision archive, proxy content, export it, or prefetch it. Check the current Mapbox
 agreement and product terms for the exact account and use case before enabling any
 archive function. Preserve all required Mapbox and data attribution.
@@ -176,7 +176,7 @@ or `api_key`. A self-hosted server request normally needs an API key rather than
 browser-domain authentication.
 
 **Policy notes:** Stadia's standard terms prohibit server-side proxying and caching,
-with narrow exceptions that do not cover maptoy's general tile archive. General bulk
+with narrow exceptions that do not cover *maptoy*'s general tile archive. General bulk
 download is prohibited; limited mobile-device offline caching is separately capped
 and conditioned. Required attribution varies by style and can include Stadia Maps,
 Stamen Design, OpenMapTiles, OpenStreetMap, and other data providers.
@@ -206,7 +206,7 @@ required `apikey`. Send an honest `Referer` and/or `User-Agent`.
 
 **Policy notes:** Registration and attribution to Thunderforest and the underlying
 data sources are required. Standard terms permit browser/on-device caching, even for
-offline use, but prohibit caching proxies and other redistribution. maptoy's
+offline use, but prohibit caching proxies and other redistribution. *maptoy*'s
 server-side archive therefore needs separate permission. Respect the account plan,
 quota, and any provider response limiting the request rate.
 
@@ -228,7 +228,7 @@ Navigation, Streets, Hybrid Detail, Light Gray, and Dark Gray.
 
 Replace `{styleFamily}` and `{styleName}` with fixed values such as
 `arcgis/navigation`. Note the documented path order `{z}/{y}/{x}`, which differs
-from the usual textual order but can be represented by a maptoy template.
+from the usual textual order but can be represented by a *maptoy* template.
 
 **Parameters and headers:** Fixed style family and style name, optional `language`
 and `worldview`, and an access token with the
@@ -240,7 +240,7 @@ Set.
 account and can incur tile-usage charges. Attribution can vary by style and
 underlying data provider. Offline use, caching, redistribution, and export depend on
 the applicable Esri agreement, service terms, and data-specific terms; the presence
-of a static tile endpoint is not general permission for maptoy's archive.
+of a static tile endpoint is not general permission for *maptoy*'s archive.
 
 **Official information:** [Static Basemap Tiles introduction](https://developers.arcgis.com/documentation/mapping-and-location-services/mapping/basemaps/introduction-static-basemap-tiles-service/),
 [service self-description](https://developers.arcgis.com/rest/static-basemap-tiles/service-self-get/),
@@ -262,11 +262,11 @@ The token must first be created with a POST request containing `mapType`, `langu
 and `region`, plus optional scale, layer, and style settings. A viewport request is
 also needed to obtain current coverage and attribution for the displayed area.
 
-**Policy and compatibility notes:** maptoy v1.0 intentionally has no Google Maps
+**Policy and compatibility notes:** *maptoy* v1.0 intentionally has no Google Maps
 adapter. A static XYZ Map Set cannot create or renew sessions or maintain the
 required viewport-dependent attribution. Google also restricts prefetching,
 caching, storage, non-visualization analysis, and offline use. For these technical
-and policy reasons, do not configure the reference URL as a maptoy v1 Map Set. A
+and policy reasons, do not configure the reference URL as a *maptoy* v1 Map Set. A
 future dedicated adapter would still need to disable incompatible archive features
 and implement Google's complete session and attribution workflow.
 
@@ -276,7 +276,7 @@ and implement Google's complete session and attribution workflow.
 [Map Tiles policies](https://developers.google.com/maps/documentation/tile/policies),
 and [Google Maps Platform terms](https://cloud.google.com/maps-platform/terms/).
 
-## Choosing a provider for maptoy archives
+## Choosing a provider for *maptoy* archives
 
 For unrestricted revision history, batch downloads, snapshots, and exports, prefer
 a tile service you operate yourself from data whose licence permits the intended use,

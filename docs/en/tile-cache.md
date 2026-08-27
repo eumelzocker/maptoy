@@ -6,7 +6,7 @@ language: en
 
 # Tile Cache
 
-maptoy stores successfully validated raster tiles as immutable revisions below
+*maptoy* stores successfully validated raster tiles as immutable revisions below
 `MAPTOY_DATA_DIR/tiles`. SQLite contains the revision history and current pointers;
 the image bytes remain directly accessible in the host data directory.
 
@@ -14,13 +14,13 @@ the image bytes remain directly accessible in the host data directory.
 
 Normal map requests use `auto`: a current revision is returned until its configured
 maximum age expires. A stale or missing tile is requested from the provider. Where
-available, maptoy sends `If-None-Match` or `If-Modified-Since`; a `304` response only
+available, *maptoy* sends `If-None-Match` or `If-Modified-Since`; a `304` response only
 updates validation timestamps.
 
 - `auto` uses a fresh cached revision and validates stale content.
 - `force` contacts the provider regardless of the configured maximum age.
 - `cache-only` never contacts the provider. When the selected tile is unavailable,
-  maptoy returns a diagonally striped `no_cache` PNG in the configured Tile size
+  *maptoy* returns a diagonally striped `no_cache` PNG in the configured Tile size
   with its `z`, `x`, and `y` coordinates and `X-Maptoy-Cache: miss`.
 
 The API accepts the mode as `?refresh=auto`, `?refresh=force`, or
@@ -68,8 +68,8 @@ Upload errors use these contracts:
   exceeded.
 - `507 TILE_STORAGE_LIMIT` when the Map Set's storage limit would be exceeded.
 
-maptoy v1 has no application authentication. This write endpoint is intended only
-for trusted private clients. If maptoy is reachable over an untrusted network, the
+*maptoy* v1 has no application authentication. This write endpoint is intended only
+for trusted private clients. If *maptoy* is reachable over an untrusted network, the
 reverse proxy must authenticate and authorize access; do not publish the upload
 route without such protection. The operator remains responsible for ensuring that
 seeded bytes belong to the configured source and may lawfully be stored.
@@ -78,7 +78,7 @@ seeded bytes belong to the configured source and may lawfully be stored.
 
 New bytes create a revision addressed by their SHA-256 hash. Earlier revisions are
 not overwritten. If provider content changes from A to B and later back to A,
-maptoy records three temporal revisions while reusing the original A file.
+*maptoy* records three temporal revisions while reusing the original A file.
 Each revision also records whether its creating bytes came from the `provider` or
 an API `upload`.
 
