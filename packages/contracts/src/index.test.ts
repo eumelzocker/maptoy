@@ -98,7 +98,7 @@ describe("Map Set contracts", () => {
           revisionCount: 1,
           byteLength: 100,
           statuses: {
-            available: 1,
+            fresh: 1,
             missing: 14,
             stale: 1,
           },

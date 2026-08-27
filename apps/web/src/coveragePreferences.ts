@@ -11,10 +11,8 @@ export interface CoveragePagePreferences {
   selectionMode: CoverageSelection["kind"];
   selectionSnapshotId: string;
   selectionTimestamp: string;
-  compareEnabled: boolean;
-  comparisonMode: CoverageSelection["kind"];
-  comparisonSnapshotId: string;
-  comparisonTimestamp: string;
+  showGrid: boolean;
+  dimmed: boolean;
 }
 
 const storageKey = "maptoy:coverage";
@@ -91,21 +89,12 @@ export function loadCoveragePagePreferences(
       typeof stored.selectionTimestamp === "string"
         ? stored.selectionTimestamp
         : fallback.selectionTimestamp,
-    compareEnabled:
-      typeof stored.compareEnabled === "boolean"
-        ? stored.compareEnabled
-        : fallback.compareEnabled,
-    comparisonMode: isSelectionKind(stored.comparisonMode)
-      ? stored.comparisonMode
-      : fallback.comparisonMode,
-    comparisonSnapshotId:
-      typeof stored.comparisonSnapshotId === "string"
-        ? stored.comparisonSnapshotId
-        : fallback.comparisonSnapshotId,
-    comparisonTimestamp:
-      typeof stored.comparisonTimestamp === "string"
-        ? stored.comparisonTimestamp
-        : fallback.comparisonTimestamp,
+    showGrid:
+      typeof stored.showGrid === "boolean"
+        ? stored.showGrid
+        : fallback.showGrid,
+    dimmed:
+      typeof stored.dimmed === "boolean" ? stored.dimmed : fallback.dimmed,
   };
 }
 

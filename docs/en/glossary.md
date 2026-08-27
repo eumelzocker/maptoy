@@ -49,7 +49,7 @@ supported coordinate reference systems with EPSG codes.
 ## Coverage
 
 A summary of which tiles exist for an area and zoom range. Coverage distinguishes
-states such as available, missing, stale, or currently being downloaded.
+states such as fresh, stale, or missing.
 
 ## GeoJSON
 

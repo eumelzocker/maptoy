@@ -716,16 +716,16 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 **Aufgaben**
 
 - effiziente Abdeckungsabfrage und Aggregation entwickeln
-- Zoomfilter und Statusklassen für vorhanden, fehlend und veraltet implementieren
+- Zoomfilter und Statusklassen für frisch, fehlend und veraltet implementieren
 - Coverage-Layer über die neutrale Adapter-Schnittstelle bauen
-- Auswahl von aktuellem Stand, Snapshot und Zeitpunkt sowie Vergleichsdarstellung ergänzen
-- Detailansicht mit Tile-Zahl, Revisionen, Änderungen, Größe und Aktualität ergänzen
+- Auswahl von aktuellem Stand, Snapshot und Zeitpunkt ergänzen
+- Detailansicht mit Tile-Zahl, Revisionen, Größe und Aktualität ergänzen
 - Performance für große Caches messen und bei Bedarf Indizes oder vorberechnete Aggregate ergänzen
 
 **Ergebnis/Akzeptanz**
 
 - Die Abdeckung eines typischen Caches wird ohne Übertragung sämtlicher Tile-Datensätze flüssig dargestellt.
-- Zwei ausgewählte Stände lassen sich aggregiert vergleichen und bis zu einzelnen geänderten Tiles untersuchen.
+- Aktueller Stand, Snapshots und Zeitstände lassen sich in aggregierten Rasterzellen untersuchen.
 - Die Anzeige stimmt in Stichproben mit dem Dateisystem und den Cache-Metadaten überein.
 
 ### Phase 5: Layer-Plugin-System
@@ -856,6 +856,7 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.0.8` | Kartenwerkzeuge, Menü- und Anzeigeverbesserungen sowie Cache-Abdeckungsstatistik und Bereinigung nicht mehr unterstützter Zoomstufen |
 | `0.1.0` | eigenständig versionierte Firefox-Erweiterung, bereinigter Rendering-Spike und kleinere Metadatenkorrekturen |
 | `0.1.1` | Phase 4: aggregierte Cache-Abdeckung, Zustandsvergleiche, Drill-down und Coverage-Kartenansicht |
+| `0.1.2` | Coverage-Ansicht bereinigt und präzisiert, gemeinsame Zoom-Steuerung sowie Dokumentationsverbesserungen |
 
 ### 13.2 Weitere Releases
 

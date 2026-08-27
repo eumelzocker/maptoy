@@ -39,7 +39,7 @@ docs {
   ## Response
 
   - `200 OK`: source and aggregation Zoom, totals, and bounded geographic cells.
-  - Statuses: `available`, `stale`, `missing`, and future-compatible `inProgress`.
+  - Statuses: `fresh`, `stale`, and `missing`.
   - Optional comparison: `identical`, `changed`, `added`, and `missing`.
 
   ## Errors
@@ -53,6 +53,6 @@ tests {
     expect(res.status).to.equal(200);
     expect(res.body.cells).to.be.an("array");
     expect(res.body.cells.length).to.be.at.most(256);
-    expect(res.body.totals.statuses.inProgress).to.equal(0);
+    expect(res.body.totals.statuses.fresh).to.be.a("number");
   });
 }

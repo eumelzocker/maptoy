@@ -105,7 +105,7 @@ describe("maptoy server", () => {
       totals: {
         tileCount: 1,
         revisionCount: 1,
-        statuses: { available: 1, stale: 0, missing: 0 },
+        statuses: { fresh: 1, stale: 0, missing: 0 },
         comparison: { identical: 1, changed: 0, added: 0, missing: 0 },
       },
       cells: [{ id: "3/4/2", tileCount: 1 }],

@@ -21,6 +21,8 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { apiRequest } from "../api.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import HtmlTooltip from "../components/HtmlTooltip.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapZoomControl from "../components/MapZoomControl.vue";
@@ -36,6 +38,8 @@ import {
   type CoveragePreviewViewport,
   constrainedCoveragePreviewViewport,
   constrainedCoverageSourceZoom,
+  coverageCellIsColored,
+  coverageGridCellTileCapacity,
   coverageGridZoom,
   coverageLayer,
   coveragePreviewZoomRange,
@@ -64,6 +68,7 @@ const selected = computed(
   () => store.items.find((mapSet) => mapSet.id === selectedId.value) ?? null,
 );
 const mapHost = ref<HTMLElement | null>(null);
+const cellDetail = ref<HTMLElement | null>(null);
 const snapshots = ref<CacheSnapshot[]>([]);
 const sourceZoom = ref(0);
 const previewZoom = ref<number | null>(null);
@@ -71,15 +76,12 @@ const previewViewport = ref<CoveragePreviewViewport | null>(null);
 const selectionMode = ref<CoverageSelection["kind"]>("current");
 const selectionSnapshotId = ref("");
 const selectionTimestamp = ref(new Date().toISOString().slice(0, 16));
-const compareEnabled = ref(false);
-const comparisonMode = ref<CoverageSelection["kind"]>("snapshot");
-const comparisonSnapshotId = ref("");
-const comparisonTimestamp = ref(new Date().toISOString().slice(0, 16));
+const showGrid = ref(true);
+const dimmed = ref(true);
 const response = ref<CoverageResponse | null>(null);
 const selectedCell = ref<CoverageCell | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
-const inspectingCell = ref(false);
 const rendererReady = ref(false);
 let renderer: MapRendererInstance | null = null;
 let layerAttached = false;
@@ -88,28 +90,46 @@ let snapshotLoadGeneration = 0;
 let queryGeneration = 0;
 let refreshTimer: number | null = null;
 let mounted = false;
-let suppressViewportQuery = false;
 let adjustingPreviewZoom = false;
+let mapSetChangesInFlight = 0;
 let preferencesReady = false;
 let rendererTransition: Promise<void> = Promise.resolve();
 
-const selectionsReady = computed(
+const selectionReady = computed(
   () =>
     (selectionMode.value !== "snapshot" || selectionSnapshotId.value !== "") &&
-    (!compareEnabled.value ||
-      comparisonMode.value !== "snapshot" ||
-      comparisonSnapshotId.value !== ""),
+    (selectionMode.value !== "asOf" ||
+      validTimestampInput(selectionTimestamp.value)),
 );
 const canQuery = computed(
   () =>
     selected.value?.capabilities.tileArchive &&
     rendererReady.value &&
-    selectionsReady.value,
+    selectionReady.value,
+);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const aggregationGridTileCapacity = computed(() =>
+  response.value === null
+    ? null
+    : coverageGridCellTileCapacity(
+        response.value.sourceZoom,
+        response.value.aggregationZoom,
+      ),
 );
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function formatNumber(value: number): string {
   return new Intl.NumberFormat().format(value);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function formatCoverageShare(cached: number, total: number): string {
+  if (total <= 0 || cached <= 0) return "0%";
+  const percentage = (cached / total) * 100;
+  if (percentage < 0.00001) {
+    return `${percentage.toExponential(2).replace("e", "E")}%`;
+  }
+  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(percentage)}%`;
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
@@ -165,10 +185,8 @@ function defaultCoveragePreferences(
     selectionMode: "current",
     selectionSnapshotId: "",
     selectionTimestamp: fallbackTimestamp,
-    compareEnabled: false,
-    comparisonMode: "snapshot",
-    comparisonSnapshotId: "",
-    comparisonTimestamp: fallbackTimestamp,
+    showGrid: true,
+    dimmed: true,
   };
 }
 
@@ -178,14 +196,10 @@ function applyCoveragePreferences(stored: CoveragePagePreferences): void {
   previewViewport.value = stored.previewViewport;
   selectionMode.value = stored.selectionMode;
   selectionSnapshotId.value = stored.selectionSnapshotId;
+  showGrid.value = stored.showGrid;
+  dimmed.value = stored.dimmed;
   selectionTimestamp.value = validTimestampInput(stored.selectionTimestamp)
     ? stored.selectionTimestamp
-    : fallbackTimestamp;
-  compareEnabled.value = stored.compareEnabled;
-  comparisonMode.value = stored.comparisonMode;
-  comparisonSnapshotId.value = stored.comparisonSnapshotId;
-  comparisonTimestamp.value = validTimestampInput(stored.comparisonTimestamp)
-    ? stored.comparisonTimestamp
     : fallbackTimestamp;
 }
 
@@ -207,10 +221,8 @@ function saveCurrentCoveragePreferences(): void {
       selectionMode: selectionMode.value,
       selectionSnapshotId: selectionSnapshotId.value,
       selectionTimestamp: selectionTimestamp.value,
-      compareEnabled: compareEnabled.value,
-      comparisonMode: comparisonMode.value,
-      comparisonSnapshotId: comparisonSnapshotId.value,
-      comparisonTimestamp: comparisonTimestamp.value,
+      showGrid: showGrid.value,
+      dimmed: dimmed.value,
     },
     browserStorage,
   );
@@ -239,14 +251,12 @@ function updatePreviewViewport(
   return gridZoom;
 }
 
-function activeComparison(): CoverageSelection | undefined {
-  return compareEnabled.value
-    ? coverageSelection(
-        comparisonMode.value,
-        comparisonSnapshotId.value,
-        comparisonTimestamp.value,
-      )
-    : undefined;
+async function showCellDetails(featureId: string): Promise<void> {
+  selectedCell.value =
+    response.value?.cells.find(({ id }) => id === featureId) ?? null;
+  if (selectedCell.value === null) return;
+  await nextTick();
+  cellDetail.value?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function destroyRenderer(): Promise<void> {
@@ -280,9 +290,6 @@ async function loadSnapshots(): Promise<boolean> {
     result.items.some((snapshot) => snapshot.id === id);
   if (!hasSnapshot(selectionSnapshotId.value)) {
     selectionSnapshotId.value = firstSnapshotId;
-  }
-  if (!hasSnapshot(comparisonSnapshotId.value)) {
-    comparisonSnapshotId.value = firstSnapshotId;
   }
   return true;
 }
@@ -350,7 +357,7 @@ async function renderMapGeneration(generation: number): Promise<void> {
       configuration: {
         tileUrl: mapTileUrl({
           mapSetId: mapSet.id,
-          cachedTilesOnly: true,
+          cachedTilesOnly: false,
           displayGeneration: generation,
         }),
         attribution: mapSet.attribution,
@@ -378,9 +385,15 @@ async function renderMapGeneration(generation: number): Promise<void> {
         "featureId" in payload &&
         typeof payload.featureId === "string"
       ) {
-        selectedCell.value =
-          response.value?.cells.find(({ id }) => id === payload.featureId) ??
-          null;
+        const cell = response.value?.cells.find(
+          ({ id }) => id === payload.featureId,
+        );
+        if (
+          (showGrid.value && dimmed.value) ||
+          (cell !== undefined && coverageCellIsColored(cell))
+        ) {
+          void showCellDetails(payload.featureId);
+        }
       }
     });
     await queryVisibleCoverage();
@@ -413,11 +426,6 @@ function onViewportChanged(): void {
     }
   }
   if (adjustingPreviewZoom) return;
-  if (suppressViewportQuery) {
-    suppressViewportQuery = false;
-    return;
-  }
-  inspectingCell.value = false;
   if (refreshTimer !== null) window.clearTimeout(refreshTimer);
   refreshTimer = window.setTimeout(() => void queryVisibleCoverage(), 250);
 }
@@ -466,10 +474,7 @@ async function applyPreviewMapZoom(gridZoom: number): Promise<void> {
   }
 }
 
-async function executeQuery(
-  bounds: CoverageResponse["bounds"],
-  maximumCells = 1024,
-): Promise<void> {
+async function executeQuery(bounds: CoverageResponse["bounds"]): Promise<void> {
   const mapSet = selected.value;
   const activeRenderer = renderer;
   if (mapSet === null || activeRenderer === null) return;
@@ -477,7 +482,6 @@ async function executeQuery(
   loading.value = true;
   error.value = null;
   try {
-    const compareTo = activeComparison();
     const result = await apiRequest<CoverageResponse>(
       `api/map-sets/${mapSet.id}/coverage/query`,
       {
@@ -486,15 +490,17 @@ async function executeQuery(
           bounds,
           zoom: sourceZoom.value,
           selection: activeSelection(),
-          ...(compareTo === undefined ? {} : { compareTo }),
-          maximumCells,
+          maximumCells: 1024,
         }),
       },
     );
     if (generation !== queryGeneration || renderer !== activeRenderer) return;
     response.value = result;
     selectedCell.value = null;
-    const layer = coverageLayer(result);
+    const layer = coverageLayer(result, {
+      showGrid: showGrid.value,
+      dimmed: dimmed.value,
+    });
     if (layerAttached) {
       await activeRenderer.updateLayer(layer);
     } else {
@@ -512,7 +518,6 @@ async function executeQuery(
 }
 
 async function queryVisibleCoverage(): Promise<void> {
-  inspectingCell.value = false;
   if (!canQuery.value || renderer === null || mapHost.value === null) return;
   await executeQuery(
     visibleCoverageBounds(
@@ -544,45 +549,37 @@ async function onSourceZoomChanged(value: number): Promise<void> {
   await queryVisibleCoverage();
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-async function inspectTiles(cell: CoverageCell): Promise<void> {
-  if (renderer === null || selected.value === null) return;
-  inspectingCell.value = true;
-  const center = {
-    longitude: (cell.bounds.west + cell.bounds.east) / 2,
-    latitude: (cell.bounds.south + cell.bounds.north) / 2,
-  };
-  const zoomOptions = leafletXyzZoomOptions(selected.value);
-  const range = coveragePreviewZoomRange(
-    sourceZoom.value,
-    selected.value.minZoom + 1,
-    zoomOptions.zoomOffset,
-  );
-  suppressViewportQuery = true;
-  await renderer.setViewport({
-    center,
-    zoom: range.maximum,
-  });
-  updatePreviewViewport(renderer, selected.value);
-  suppressViewportQuery = false;
-  await executeQuery(cell.bounds, 4096);
-}
-
 async function onMapSetChanged(): Promise<void> {
   if (!mounted) return;
+  mapSetChangesInFlight += 1;
   const id = selectedId.value;
-  await router.replace(id === null ? "/coverage" : `/coverage/${id}`);
   try {
+    await router.replace(id === null ? "/coverage" : `/coverage/${id}`);
     if (!(await loadSnapshots())) return;
     await renderMap();
   } catch (cause) {
     error.value =
       cause instanceof Error ? cause.message : "Coverage could not be loaded.";
+  } finally {
+    mapSetChangesInFlight -= 1;
   }
+}
+
+function onSelectionChanged(): void {
+  if (!mounted || mapSetChangesInFlight > 0) return;
+  if (!selectionReady.value) {
+    clearCoverageResult();
+    return;
+  }
+  void queryVisibleCoverage();
 }
 
 watch(selectedId, onMapSetChanged);
 watch(sourceZoom, (value) => void onSourceZoomChanged(value));
+watch(
+  [selectionMode, selectionSnapshotId, selectionTimestamp],
+  onSelectionChanged,
+);
 watch(
   [
     selectedId,
@@ -591,13 +588,29 @@ watch(
     selectionMode,
     selectionSnapshotId,
     selectionTimestamp,
-    compareEnabled,
-    comparisonMode,
-    comparisonSnapshotId,
-    comparisonTimestamp,
+    showGrid,
+    dimmed,
   ],
   saveCurrentCoveragePreferences,
 );
+
+watch([showGrid, dimmed], ([showGridValue, dimmedValue]) => {
+  if (
+    (!showGridValue || !dimmedValue) &&
+    selectedCell.value !== null &&
+    !coverageCellIsColored(selectedCell.value)
+  ) {
+    selectedCell.value = null;
+  }
+  if (response.value !== null && renderer !== null && layerAttached) {
+    void renderer.updateLayer(
+      coverageLayer(response.value, {
+        showGrid: showGridValue,
+        dimmed: dimmedValue,
+      }),
+    );
+  }
+});
 
 onMounted(async () => {
   try {
@@ -687,57 +700,41 @@ onBeforeUnmount(destroyRenderer);
         <input v-model.number="sourceZoom" type="number" :min="selected.minZoom + 1" :max="selected.maxZoom" />
       </label>
 
-      <fieldset>
-        <legend>Cache state</legend>
-        <label class="field">
-          <span>Selection</span>
-          <select v-model="selectionMode">
-            <option value="current">Current</option>
-            <option value="snapshot" :disabled="snapshots.length === 0">Snapshot</option>
-            <option value="asOf">Point in time</option>
-          </select>
-        </label>
-        <label v-if="selectionMode === 'snapshot'" class="field">
-          <span>Snapshot</span>
-          <select v-model="selectionSnapshotId">
-            <option v-for="snapshot in snapshots" :key="snapshot.id" :value="snapshot.id">{{ snapshot.name }}</option>
-          </select>
-        </label>
-        <label v-if="selectionMode === 'asOf'" class="field">
-          <span>At</span>
-          <input v-model="selectionTimestamp" type="datetime-local" />
-        </label>
-      </fieldset>
-
-      <fieldset>
-        <legend><label class="check-field"><input v-model="compareEnabled" type="checkbox" /> Compare with</label></legend>
-        <template v-if="compareEnabled">
+      <details class="cache-state" open>
+        <summary>Cache state</summary>
+        <div class="cache-state-fields">
           <label class="field">
-            <span>Comparison state</span>
-            <select v-model="comparisonMode">
+            <span>Selection</span>
+            <select v-model="selectionMode">
               <option value="current">Current</option>
               <option value="snapshot" :disabled="snapshots.length === 0">Snapshot</option>
               <option value="asOf">Point in time</option>
             </select>
           </label>
-          <label v-if="comparisonMode === 'snapshot'" class="field">
+          <label v-if="selectionMode === 'snapshot'" class="field">
             <span>Snapshot</span>
-            <select v-model="comparisonSnapshotId">
+            <select v-model="selectionSnapshotId">
               <option v-for="snapshot in snapshots" :key="snapshot.id" :value="snapshot.id">{{ snapshot.name }}</option>
             </select>
           </label>
-          <label v-if="comparisonMode === 'asOf'" class="field">
+          <label v-if="selectionMode === 'asOf'" class="field">
             <span>At</span>
-            <input v-model="comparisonTimestamp" type="datetime-local" />
+            <input v-model="selectionTimestamp" type="datetime-local" />
           </label>
-        </template>
-      </fieldset>
-
-      <button class="primary-button" type="button" :disabled="loading || !canQuery" @click="queryVisibleCoverage">
-        {{ loading ? "Querying…" : "Apply to visible area" }}
-      </button>
+        </div>
+      </details>
 
       <section class="legend" aria-label="Coverage legend">
+        <div class="legend-options">
+          <label>
+          <input v-model="showGrid" type="checkbox" />
+          <span>Show grid</span>
+          </label>
+          <label>
+            <input v-model="dimmed" type="checkbox" />
+            <span>Dimmed</span>
+          </label>
+        </div>
         <div
           v-for="scale in COVERAGE_STATUS_SCALES"
           :key="scale.label"
@@ -753,51 +750,58 @@ onBeforeUnmount(destroyRenderer);
             ></i>
           </span>
         </div>
-        <template v-if="compareEnabled">
-          <span><i class="changed"></i>Changed</span>
-          <span><i class="added"></i>Added</span>
-          <span><i class="removed"></i>Removed</span>
-        </template>
       </section>
 
       <section v-if="response" class="summary" aria-label="Coverage summary">
         <header>
           <strong>Visible result</strong>
-          <span>source z{{ response.sourceZoom }} → grid z{{ formatZoom(previewZoom) }}</span>
+          <span>source z{{ response.sourceZoom }} → map z{{ formatZoom(previewZoom) }}</span>
         </header>
         <dl>
           <div><dt>Tiles</dt><dd>{{ formatNumber(response.totals.tileCount) }}</dd></div>
-          <div><dt>Aggregation</dt><dd>z{{ response.aggregationZoom }}</dd></div>
-          <div><dt>Available</dt><dd>{{ formatNumber(response.totals.statuses.available) }}</dd></div>
+          <div>
+            <dt class="summary-label">
+              Aggregation-Grid
+              <HtmlTooltip
+                v-if="aggregationGridTileCapacity !== null"
+                label="About the Aggregation Grid"
+                fixed
+                unstyled-trigger
+              >
+                <i class="mdi mdi-information-outline" aria-hidden="true"></i>
+                {{ formatNumber(aggregationGridTileCapacity) }} source
+                {{ aggregationGridTileCapacity === 1 ? "tile" : "tiles" }} at z{{ response.sourceZoom }} per grid cell.
+              </HtmlTooltip>
+            </dt>
+            <dd>z{{ response.aggregationZoom }}</dd>
+          </div>
+          <div><dt>Fresh</dt><dd>{{ formatNumber(response.totals.statuses.fresh) }}</dd></div>
           <div><dt>Stale</dt><dd>{{ formatNumber(response.totals.statuses.stale) }}</dd></div>
           <div><dt>Missing</dt><dd>{{ formatNumber(response.totals.statuses.missing) }}</dd></div>
           <div><dt>Revisions</dt><dd>{{ formatNumber(response.totals.revisionCount) }}</dd></div>
           <div><dt>Selected bytes</dt><dd>{{ formatBytes(response.totals.byteLength) }}</dd></div>
-          <template v-if="response.totals.comparison">
-            <div><dt>Changed</dt><dd>{{ formatNumber(response.totals.comparison.changed) }}</dd></div>
-            <div><dt>Added</dt><dd>{{ formatNumber(response.totals.comparison.added) }}</dd></div>
-            <div><dt>Removed</dt><dd>{{ formatNumber(response.totals.comparison.missing) }}</dd></div>
-          </template>
         </dl>
       </section>
 
-      <section v-if="selectedCell" class="cell-detail">
-        <header><strong>{{ selectedCell.id }}</strong><span>{{ formatNumber(selectedCell.tileCount) }} tiles</span></header>
+      <section v-if="selectedCell" ref="cellDetail" class="cell-detail">
+        <header><strong>{{ selectedCell.id }}</strong><span>grid z{{ selectedCell.zoom }}</span></header>
         <dl>
+          <div>
+            <dt>Tiles</dt>
+            <dd>
+              {{ formatNumber(selectedCell.statuses.fresh + selectedCell.statuses.stale) }} /
+              {{ formatNumber(selectedCell.tileCount) }} :
+              {{ formatCoverageShare(selectedCell.statuses.fresh + selectedCell.statuses.stale, selectedCell.tileCount) }}
+            </dd>
+          </div>
           <div><dt>Revisions</dt><dd>{{ formatNumber(selectedCell.revisionCount) }}</dd></div>
           <div><dt>Bytes</dt><dd>{{ formatBytes(selectedCell.byteLength) }}</dd></div>
           <div><dt>Oldest validation</dt><dd>{{ formatDate(selectedCell.oldestValidatedAt) }}</dd></div>
           <div><dt>Newest validation</dt><dd>{{ formatDate(selectedCell.newestValidatedAt) }}</dd></div>
         </dl>
-        <button
-          v-if="response && response.aggregationZoom < response.sourceZoom"
-          type="button"
-          @click="inspectTiles(selectedCell)"
-        >Inspect individual tiles</button>
       </section>
 
       <p v-if="error" class="error-message" role="alert">{{ error }}</p>
-      <p v-if="inspectingCell" class="muted">Showing a drilled-down aggregate cell. Move the map or refresh to return to the visible area.</p>
     </aside>
 
     <section class="coverage-map" aria-label="Cache Coverage map">
@@ -830,24 +834,27 @@ onBeforeUnmount(destroyRenderer);
 .map-set-meta-button:focus-visible { outline: 2px solid #68877b; outline-offset: 1px; }
 .map-set-meta-details { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; min-width: 0; }
 .field input, .field select { width: 100%; min-height: 2.35rem; padding: 0.45rem 0.55rem; border: 1px solid #9db0a6; border-radius: 0.4rem; background: white; font: inherit; }
-fieldset { margin: 1rem 0 0; padding: 0 0.8rem 0.8rem; border: 1px solid #c8d4cd; border-radius: 0.55rem; }
-legend { padding: 0 0.35rem; color: #314f47; font-weight: 800; }
-.check-field { display: inline-flex; gap: 0.4rem; align-items: center; }
-.primary-button { width: 100%; margin-top: 1rem; padding: 0.7rem 1rem; border: 0; border-radius: 0.45rem; color: white; background: #17453c; font: inherit; font-weight: 800; cursor: pointer; }
+.cache-state { margin-top: 1rem; border: 1px solid #c8d4cd; border-radius: 0.55rem; }
+.cache-state > summary { padding: 0.55rem 0.8rem; color: #314f47; font-weight: 800; cursor: pointer; }
+.cache-state[open] > summary { padding-bottom: 0; }
+.cache-state-fields { padding: 0 0.8rem 0.8rem; }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
 .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1rem; font-size: 0.78rem; }
+.legend .legend-options { display: flex; grid-column: 1 / -1; gap: 0.9rem; align-items: center; }
+.legend .legend-options label { display: inline-flex; gap: 0.4rem; align-items: center; }
+.legend .legend-options input { margin: 0; }
 .legend span { display: flex; gap: 0.4rem; align-items: center; }
 .legend i { width: 0.75rem; height: 0.75rem; border-radius: 0.15rem; background: #4e9b79; }
 .legend .status-scale { display: grid; grid-column: 1 / -1; grid-template-columns: 4.5rem 1fr; gap: 0.55rem; align-items: center; }
 .legend .status-scale-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; width: min(100%, 10rem); height: 0.75rem; overflow: hidden; border: 1px solid #9db0a6; border-radius: 0.2rem; }
 .legend .status-scale-bar i { width: auto; height: 100%; border-radius: 0; cursor: help; }
-.legend .changed { background: #d8792d; } .legend .added { background: #3188a8; } .legend .removed { background: #c94d46; }
 .summary, .cell-detail { margin-top: 1rem; padding: 0.85rem; border: 1px solid #c8d4cd; border-radius: 0.55rem; background: white; }
-.summary header span, .cell-detail header span, .muted { color: #617870; font-size: 0.78rem; }
+.cell-detail { scroll-margin-block: 1rem; }
+.summary header span, .cell-detail header span { color: #617870; font-size: 0.78rem; }
+.summary-label { display: inline-flex; gap: 0.3rem; align-items: center; }
 dl { display: grid; gap: 0.35rem; margin: 0.75rem 0 0; }
 dl div { display: flex; justify-content: space-between; gap: 0.75rem; }
 dt { color: #617870; } dd { margin: 0; font-weight: 750; text-align: right; }
-.cell-detail button { margin-top: 0.75rem; padding: 0.45rem 0.65rem; border: 1px solid #8da398; border-radius: 0.4rem; color: #17453c; background: #eef4f0; font: inherit; font-weight: 700; cursor: pointer; }
 .error-message { padding: 0.65rem; border-left: 0.2rem solid #b64030; color: #812d25; background: #ffe9e5; }
 .coverage-map { position: relative; min-width: 0; min-height: 0; background: #a6c4b5; }
 .map-host { width: 100%; height: 100%; }

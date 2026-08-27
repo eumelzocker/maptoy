@@ -607,7 +607,7 @@ export class TileArchiveService {
         newestValidatedAt: aggregate?.newestValidatedAt ?? null,
         oldestValidatedAt: aggregate?.oldestValidatedAt ?? null,
         statuses: {
-          available: aggregate?.statuses.available ?? 0,
+          fresh: aggregate?.statuses.fresh ?? 0,
           stale: aggregate?.statuses.stale ?? 0,
           missing: cell.tileCount - (aggregate?.primaryCount ?? 0),
         },
@@ -629,7 +629,7 @@ export class TileArchiveService {
         revisionCount: result.revisionCount + cell.revisionCount,
         byteLength: result.byteLength + cell.byteLength,
         statuses: {
-          available: result.statuses.available + cell.statuses.available,
+          fresh: result.statuses.fresh + cell.statuses.fresh,
           missing: result.statuses.missing + cell.statuses.missing,
           stale: result.statuses.stale + cell.statuses.stale,
         },
@@ -648,7 +648,7 @@ export class TileArchiveService {
         tileCount: 0,
         revisionCount: 0,
         byteLength: 0,
-        statuses: { available: 0, missing: 0, stale: 0 },
+        statuses: { fresh: 0, missing: 0, stale: 0 },
         comparison:
           compareTo === null
             ? null

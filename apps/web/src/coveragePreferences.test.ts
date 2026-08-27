@@ -20,10 +20,8 @@ const fallback: CoveragePagePreferences = {
   selectionMode: "current",
   selectionSnapshotId: "",
   selectionTimestamp: "2026-08-26T12:00",
-  compareEnabled: false,
-  comparisonMode: "snapshot",
-  comparisonSnapshotId: "",
-  comparisonTimestamp: "2026-08-26T12:00",
+  showGrid: true,
+  dimmed: true,
 };
 
 describe("Coverage page preferences", () => {
@@ -45,8 +43,8 @@ describe("Coverage page preferences", () => {
       sourceZoom: 8,
       selectionMode: "snapshot",
       selectionSnapshotId: "snapshot-a",
-      compareEnabled: true,
-      comparisonMode: "asOf",
+      showGrid: false,
+      dimmed: false,
     };
     saveCoveragePagePreferences(preferences, storage);
 
@@ -59,15 +57,10 @@ describe("Coverage page preferences", () => {
         JSON.stringify({
           sourceZoom: 4.5,
           selectionMode: "invalid",
-          compareEnabled: "yes",
-          comparisonMode: "current",
         }),
       setItem: () => undefined,
     };
 
-    expect(loadCoveragePagePreferences(fallback, storage)).toEqual({
-      ...fallback,
-      comparisonMode: "current",
-    });
+    expect(loadCoveragePagePreferences(fallback, storage)).toEqual(fallback);
   });
 });

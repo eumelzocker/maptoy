@@ -118,21 +118,23 @@ than loading every Tile hash into server memory.
 
 Open **Coverage** to inspect a bounded part of the Tile Archive on a map. Choose a
 Map Set, source Zoom, and one of the current state, an immutable Snapshot, or an
-ISO-8601 point in time. The map classifies the selected area as available, stale,
-or missing.
+ISO-8601 point in time. The map classifies the selected area as fresh, stale,
+or missing. The **Cache state** controls can be collapsed when they are not needed.
 
-Enable **Compare with** to compare any two supported states. Green cells are
-identical, orange cells contain changed Tiles, blue cells contain Tiles added in
-the comparison state, and red cells contain Tiles missing from it. Select a cell
-for Tile count, Revision count, selected byte size, and validation times. Aggregated
-cells can be opened repeatedly until individual changed Tiles are visible.
+Select a cell for Revision count, selected byte size, and validation times. The
+sidebar scrolls the cell details into view. The **Aggregation-Grid** information
+tooltip shows how many source Tiles each grid cell represents. The legend also
+provides a persisted **Show grid** toggle; when disabled, grid boundaries are
+hidden and only colored cells can be selected.
 
 Coverage requests are limited to the visible geographic bounds and never return
 more than 4,096 cells. The default UI asks for at most 1,024. SQLite aggregates
 stored Revision metadata before sending the response; the browser does not receive
 every Tile row from a large cache. Missing counts are derived from the complete XYZ
 coordinate range inside the requested bounds, so inspecting Coverage never contacts
-the provider or creates cache entries.
+the provider or creates cache entries. The background map is separate from that
+read-only query: it uses the normal `auto` Tile mode and may fetch, validate, and
+cache background Tiles through the configured provider.
 
 ## Statistics and deletion
 

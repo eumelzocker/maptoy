@@ -127,13 +127,15 @@ in den Arbeitsspeicher des Servers zu laden.
 Unter **Coverage** lässt sich ein begrenzter Ausschnitt des Tile-Archivs auf einer
 Karte untersuchen. Wähle Map Set, Quellzoom und entweder den aktuellen Stand, einen
 unveränderlichen Snapshot oder einen ISO-8601-Zeitpunkt. Die Karte unterscheidet
-verfügbare, veraltete und fehlende Bereiche.
+frische, veraltete und fehlende Bereiche. Die Auswahl **Cache state** lässt sich
+einklappen, wenn sie nicht benötigt wird.
 
-Mit **Compare with** können zwei dieser Stände verglichen werden. Grüne Zellen sind
-identisch, orangefarbene enthalten geänderte Tiles, blaue im Vergleichsstand
-hinzugekommene Tiles und rote dort fehlende Tiles. Eine ausgewählte Zelle zeigt
-Tile- und Revisionszahl, Byte-Größe sowie Validierungszeitpunkte. Aggregierte Zellen
-lassen sich wiederholt öffnen, bis einzelne geänderte Tiles sichtbar sind.
+Eine ausgewählte Zelle zeigt Revisionszahl, Byte-Größe sowie Validierungszeitpunkte.
+Die Seitenleiste scrollt die Zellendetails in den sichtbaren Bereich. Der
+Info-Tooltip am **Aggregation-Grid** zeigt, wie viele Quell-Tiles jede Rasterzelle
+repräsentiert. Die Coverage-Legende enthält außerdem die dauerhaft gespeicherte
+Option **Show grid**. Wenn sie deaktiviert ist, verschwinden die Rastergrenzen und
+nur eingefärbte Zellen können ausgewählt werden.
 
 Coverage-Requests sind auf den sichtbaren geografischen Ausschnitt begrenzt und
 liefern nie mehr als 4.096 Zellen; die Oberfläche fordert standardmäßig höchstens
@@ -141,7 +143,9 @@ liefern nie mehr als 4.096 Zellen; die Oberfläche fordert standardmäßig höch
 Browser nicht sämtliche Tile-Zeilen eines großen Caches erhält. Fehlende Tiles
 werden aus dem vollständigen XYZ-Koordinatenbereich innerhalb des Ausschnitts
 berechnet. Eine Coverage-Abfrage kontaktiert daher keinen Provider und erzeugt keine
-Cache-Einträge.
+Cache-Einträge. Die Hintergrundkarte ist davon getrennt: Sie verwendet den normalen
+Tile-Modus `auto` und kann Hintergrund-Tiles über den konfigurierten Provider laden,
+validieren und cachen.
 
 ## Statistik und Löschung
 

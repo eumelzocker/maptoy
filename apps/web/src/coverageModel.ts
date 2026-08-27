@@ -12,24 +12,24 @@ import type {
 
 export const COVERAGE_LAYER_ID = "cache-coverage";
 
-export const AVAILABLE_COVERAGE_STEPS = [
-  { minimumPercent: 0, color: "#d8eadf", label: "0.0001–24.9999% available" },
-  { minimumPercent: 25, color: "#a8d2b8", label: "25–49.9999% available" },
-  { minimumPercent: 50, color: "#72b58e", label: "50–74.9999% available" },
-  { minimumPercent: 75, color: "#3f936a", label: "75–99.9999% available" },
-  { minimumPercent: 100, color: "#176443", label: "100% available" },
+export const FRESH_COVERAGE_STEPS = [
+  { minimumPercent: 0, color: "#b8ddc5", label: ">0–<25%" },
+  { minimumPercent: 25, color: "#a8d2b8", label: "25–<50%" },
+  { minimumPercent: 50, color: "#72b58e", label: "50–<75%" },
+  { minimumPercent: 75, color: "#3f936a", label: "75–<100%" },
+  { minimumPercent: 100, color: "#176443", label: "completely fresh" },
 ] as const;
 
 export const STALE_COVERAGE_STEPS = [
-  { minimumPercent: 0, color: "#f6e5bd", label: "0.0001–24.9999% stale" },
-  { minimumPercent: 25, color: "#efcb7a", label: "25–49.9999% stale" },
-  { minimumPercent: 50, color: "#e3ad42", label: "50–74.9999% stale" },
-  { minimumPercent: 75, color: "#ca8423", label: "75–99.9999% stale" },
-  { minimumPercent: 100, color: "#965511", label: "100% stale" },
+  { minimumPercent: 0, color: "#e8d09f", label: ">0–<25%" },
+  { minimumPercent: 25, color: "#dfb964", label: "25–<50%" },
+  { minimumPercent: 50, color: "#d59a2d", label: "50–<75%" },
+  { minimumPercent: 75, color: "#b86f18", label: "75–<100%" },
+  { minimumPercent: 100, color: "#81470d", label: "completely stale" },
 ] as const;
 
 export const COVERAGE_STATUS_SCALES = [
-  { label: "Available", steps: AVAILABLE_COVERAGE_STEPS },
+  { label: "Fresh", steps: FRESH_COVERAGE_STEPS },
   { label: "Stale", steps: STALE_COVERAGE_STEPS },
 ] as const;
 
@@ -98,6 +98,13 @@ export function coveragePreviewZoomRange(
   };
 }
 
+export function coverageGridCellTileCapacity(
+  sourceZoom: number,
+  gridZoom: number,
+): number {
+  return 4 ** Math.max(0, sourceZoom - gridZoom);
+}
+
 interface ScreenProjection {
   screenToGeographic(point: ScreenPoint): GeographicCoordinate;
 }
@@ -156,47 +163,23 @@ function cellColors(cell: CoverageCell): {
   fillColor: string;
   strokeColor: string;
 } {
-  if (cell.comparison !== null) {
-    if (cell.comparison.changed > 0) {
-      return { fillColor: "#d8792d", strokeColor: "#7a3414" };
-    }
-    if (cell.comparison.added > 0) {
-      return { fillColor: "#3188a8", strokeColor: "#16506b" };
-    }
-    if (cell.comparison.missing > 0) {
-      return { fillColor: "#c94d46", strokeColor: "#7f2624" };
-    }
-    if (cell.comparison.identical > 0) {
-      return { fillColor: "#4e9b79", strokeColor: "#235c47" };
-    }
-  }
   if (cell.statuses.stale > 0) {
     return {
       fillColor: staleCoverageColor(cell.statuses.stale, cell.tileCount),
       strokeColor: "#765113",
     };
   }
-  if (cell.statuses.available > 0) {
+  if (cell.statuses.fresh > 0) {
     return {
-      fillColor: availableCoverageColor(
-        cell.statuses.available,
-        cell.tileCount,
-      ),
+      fillColor: freshCoverageColor(cell.statuses.fresh, cell.tileCount),
       strokeColor: "#235c47",
     };
   }
   return { fillColor: "#d9dedb", strokeColor: "#738079" };
 }
 
-export function availableCoverageColor(
-  available: number,
-  tileCount: number,
-): string {
-  return coveragePercentageColor(
-    available,
-    tileCount,
-    AVAILABLE_COVERAGE_STEPS,
-  );
+export function freshCoverageColor(fresh: number, tileCount: number): string {
+  return coveragePercentageColor(fresh, tileCount, FRESH_COVERAGE_STEPS);
 }
 
 export function staleCoverageColor(stale: number, tileCount: number): string {
@@ -219,21 +202,35 @@ function coveragePercentageColor(
 }
 
 function cellLabel(cell: CoverageCell): string {
-  const status = `${cell.statuses.available} available · ${cell.statuses.stale} stale · ${cell.statuses.missing} missing`;
-  if (cell.comparison === null) {
-    return `${cell.id} · ${status}`;
-  }
-  return `${cell.id} · ${status} · ${cell.comparison.changed} changed · ${cell.comparison.added} added · ${cell.comparison.missing} removed`;
+  return `${cell.id} · ${cell.statuses.fresh} fresh · ${cell.statuses.stale} stale · ${cell.statuses.missing} missing`;
 }
 
-export function coverageLayer(response: CoverageResponse): MapLayerDescriptor {
-  const features: MapRectangleFeature[] = response.cells.map((cell) => ({
-    id: cell.id,
-    bounds: cell.bounds,
-    ...cellColors(cell),
-    fillOpacity: cell.statuses.missing === cell.tileCount ? 0.58 : 0.76,
-    label: cellLabel(cell),
-  }));
+export function coverageCellIsColored(cell: CoverageCell): boolean {
+  return cell.statuses.fresh > 0 || cell.statuses.stale > 0;
+}
+
+export function coverageLayer(
+  response: CoverageResponse,
+  options: { showGrid?: boolean; dimmed?: boolean } = {},
+): MapLayerDescriptor {
+  const showGrid = options.showGrid ?? true;
+  const dimmed = options.dimmed ?? true;
+  const features: MapRectangleFeature[] = response.cells.map((cell) => {
+    const colors = cellColors(cell);
+    return {
+      id: cell.id,
+      bounds: cell.bounds,
+      ...colors,
+      strokeColor: showGrid ? colors.strokeColor : "transparent",
+      fillOpacity:
+        !dimmed && !coverageCellIsColored(cell)
+          ? 0
+          : cell.statuses.missing === cell.tileCount
+            ? 0.58
+            : 0.76,
+      label: cellLabel(cell),
+    };
+  });
   return {
     id: COVERAGE_LAYER_ID,
     type: "rectangle-grid",

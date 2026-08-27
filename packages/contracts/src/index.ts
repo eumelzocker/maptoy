@@ -472,7 +472,7 @@ export type CoverageQuery = Static<typeof CoverageQuerySchema>;
 
 export const CoverageStatusCountsSchema = Type.Object(
   {
-    available: Type.Integer({ minimum: 0 }),
+    fresh: Type.Integer({ minimum: 0 }),
     missing: Type.Integer({ minimum: 0 }),
     stale: Type.Integer({ minimum: 0 }),
   },

@@ -1,34 +1,36 @@
 import type { CoverageResponse } from "@maptoy/contracts";
 import { describe, expect, it } from "vitest";
 import {
-  AVAILABLE_COVERAGE_STEPS,
-  availableCoverageColor,
+  FRESH_COVERAGE_STEPS,
   constrainedCoverageSourceZoom,
   constrainedCoveragePreviewViewport,
+  coverageGridCellTileCapacity,
   coverageGridZoom,
+  coverageCellIsColored,
   coverageLayer,
   coveragePreviewZoomRange,
   coverageSelection,
   coverageViewportZoom,
+  freshCoverageColor,
   hasCoveragePreviewZoomRange,
   staleCoverageColor,
   visibleCoverageBounds,
 } from "./coverageModel.js";
 
 describe("Coverage view model", () => {
-  it("maps available coverage to five discrete green steps", () => {
-    expect(AVAILABLE_COVERAGE_STEPS).toHaveLength(5);
-    expect(availableCoverageColor(1, 10_000)).toBe("#d8eadf");
-    expect(availableCoverageColor(1, 4)).toBe("#a8d2b8");
-    expect(availableCoverageColor(1, 2)).toBe("#72b58e");
-    expect(availableCoverageColor(3, 4)).toBe("#3f936a");
-    expect(availableCoverageColor(4, 4)).toBe("#176443");
+  it("maps fresh coverage to five discrete green steps", () => {
+    expect(FRESH_COVERAGE_STEPS).toHaveLength(5);
+    expect(freshCoverageColor(1, 10_000)).toBe("#b8ddc5");
+    expect(freshCoverageColor(1, 4)).toBe("#a8d2b8");
+    expect(freshCoverageColor(1, 2)).toBe("#72b58e");
+    expect(freshCoverageColor(3, 4)).toBe("#3f936a");
+    expect(freshCoverageColor(4, 4)).toBe("#176443");
   });
 
   it("maps stale shares to their status scale", () => {
-    expect(staleCoverageColor(1, 10)).toBe("#f6e5bd");
-    expect(staleCoverageColor(3, 4)).toBe("#ca8423");
-    expect(staleCoverageColor(10, 10)).toBe("#965511");
+    expect(staleCoverageColor(1, 10)).toBe("#e8d09f");
+    expect(staleCoverageColor(3, 4)).toBe("#b86f18");
+    expect(staleCoverageColor(10, 10)).toBe("#81470d");
   });
 
   it("keeps grid zoom at least one level below source zoom", () => {
@@ -46,6 +48,12 @@ describe("Coverage view model", () => {
     });
     expect(coverageGridZoom(8, -1)).toBe(7);
     expect(coverageViewportZoom(7, -1)).toBe(8);
+  });
+
+  it("calculates the source Tiles represented by one grid cell", () => {
+    expect(coverageGridCellTileCapacity(8, 8)).toBe(1);
+    expect(coverageGridCellTileCapacity(8, 7)).toBe(4);
+    expect(coverageGridCellTileCapacity(8, 4)).toBe(256);
   });
 
   it("rejects Map Sets with only one configured source zoom", () => {
@@ -102,20 +110,20 @@ describe("Coverage view model", () => {
     });
   });
 
-  it("creates a neutral rectangle layer with comparison priority", () => {
+  it("creates a neutral rectangle layer from Coverage status", () => {
     const response = {
       mapSetId: "map-set",
       sourceZoom: 4,
       aggregationZoom: 4,
       bounds: { west: 0, south: 0, east: 1, north: 1 },
       selection: { kind: "current" },
-      compareTo: { kind: "snapshot", snapshotId: "snapshot" },
+      compareTo: null,
       totals: {
         tileCount: 1,
         revisionCount: 2,
         byteLength: 10,
-        statuses: { available: 1, stale: 0, missing: 0 },
-        comparison: { identical: 0, changed: 1, added: 0, missing: 0 },
+        statuses: { fresh: 1, stale: 0, missing: 0 },
+        comparison: null,
       },
       cells: [
         {
@@ -129,8 +137,8 @@ describe("Coverage view model", () => {
           byteLength: 10,
           newestValidatedAt: "2026-08-26T10:00:00.000Z",
           oldestValidatedAt: "2026-08-26T09:00:00.000Z",
-          statuses: { available: 1, stale: 0, missing: 0 },
-          comparison: { identical: 0, changed: 1, added: 0, missing: 0 },
+          statuses: { fresh: 1, stale: 0, missing: 0 },
+          comparison: null,
         },
       ],
     } satisfies CoverageResponse;
@@ -139,8 +147,28 @@ describe("Coverage view model", () => {
       type: "rectangle-grid",
       data: {
         kind: "rectangle-grid",
-        features: [{ id: "4/8/7", fillColor: "#d8792d" }],
+        features: [{ id: "4/8/7", fillColor: "#176443" }],
       },
+    });
+    const firstCell = response.cells[0];
+    if (firstCell === undefined) throw new Error("expected a coverage cell");
+    expect(coverageCellIsColored(firstCell)).toBe(true);
+    expect(coverageLayer(response, { showGrid: false })).toMatchObject({
+      data: { features: [{ strokeColor: "transparent" }] },
+    });
+    const missingResponse = {
+      ...response,
+      cells: [
+        {
+          ...firstCell,
+          statuses: { fresh: 0, stale: 0, missing: firstCell.tileCount },
+        },
+      ],
+    } satisfies CoverageResponse;
+    expect(
+      coverageLayer(missingResponse, { showGrid: true, dimmed: false }),
+    ).toMatchObject({
+      data: { features: [{ fillOpacity: 0 }] },
     });
   });
 });

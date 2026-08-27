@@ -63,7 +63,7 @@ or `{"kind":"asOf","timestamp":"..."}`.
 
 The response reports the chosen `aggregationZoom`, total Tile, Revision, byte,
 freshness, and comparison counts, followed by bounded geographic cells with the
-same metadata. Status counts contain `available`, `stale`, and `missing`.
+same metadata. Status counts contain `fresh`, `stale`, and `missing`.
 Comparison counts contain `identical`, `changed`, `added`, and `missing`. The
 endpoint reads SQLite metadata only and never contacts a provider.
 

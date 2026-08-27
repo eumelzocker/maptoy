@@ -4,6 +4,8 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-27
+
 ### Added
 
 - Reusable renderer-neutral Map Zoom control shared by the standard Map and
@@ -17,6 +19,20 @@ All notable changes to maptoy are documented in this file.
 
 - Moved the standard Map view's Zoom value out of the coordinates overlay and
   into the shared Zoom control.
+- Coverage refreshes automatically when the selected Cache state changes.
+- Made Coverage's Cache-state controls collapsible, scroll selected grid-cell
+  details into view, and show the Zoom-derived source-Tile capacity in a compact
+  Aggregation-Grid tooltip.
+- Clarified that the Coverage result header shows the current map Zoom, while
+  the separately reported aggregation Zoom defines the visible grid.
+- Renamed the Coverage status `available` to `fresh` across the UI and API so
+  stale but present Tiles are not described as unavailable.
+- Added a persistent Coverage **Show grid** toggle; disabling the grid keeps the
+  status colors visible and makes only colored cells selectable.
+- Added a persistent **Dimmed** toggle.
+- Increased the contrast of coverage colors.
+- Switched the Coverage background map from `cache-only` to normal `auto` Tile
+  loading while keeping Coverage metadata queries read-only.
 - Planned active-download visualization now uses separate Coverage map chip
   overlays instead of overloading Coverage cell statuses and colors.
 - Marked app-specific pages in the integrated Documentation table of contents
@@ -24,6 +40,8 @@ All notable changes to maptoy are documented in this file.
 
 ### Removed
 
+- Removed the Coverage view's state-comparison controls, comparison styling,
+  and manual **Apply to visible area** action.
 - Removed the unused future `inProgress` Coverage response count, purple cell
   coloring, and corresponding legend scale ahead of the later chip-overlay
   implementation.

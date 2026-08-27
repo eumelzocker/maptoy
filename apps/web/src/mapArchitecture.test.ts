@@ -53,17 +53,39 @@ describe("Map view architecture", () => {
     expect(coverageView).toContain("rendererTransition.then");
     expect(coverageView).toContain("MapZoomControl");
     expect(coverageView).toContain("zoomControl: false");
+    expect(coverageView).toContain("cachedTilesOnly: false");
+    expect(coverageView).toContain("onSelectionChanged");
+    expect(coverageView).toContain('<details class="cache-state" open>');
+    expect(coverageView).toContain("scrollIntoView");
+    expect(coverageView).toContain("coverageGridCellTileCapacity");
+    expect(coverageView).toContain("About the Aggregation Grid");
+    expect(coverageView).toContain('class="mdi mdi-information-outline"');
+    expect(coverageView).not.toContain("Cell:");
+    expect(coverageView).not.toContain("Compare with");
+    expect(coverageView).not.toContain("Apply to visible area");
+    expect(coverageView).not.toContain("compareTo");
+    expect(coverageView).not.toContain("inspectTiles");
+    expect(coverageView).not.toContain("Inspect individual tiles");
+    expect(coverageModel).not.toContain("cell.comparison");
+    const selectionHandler = coverageView.slice(
+      coverageView.indexOf("function onSelectionChanged"),
+      coverageView.indexOf("watch(selectedId"),
+    );
+    expect(selectionHandler).toContain("queryVisibleCoverage");
     expect(coverageView).toContain(':min="selected.minZoom + 1"');
     expect(coverageView).toContain("{{ selected.tileSize }}");
     expect(coverageView).toContain(
       "Zoom {{ selected.minZoom }}–{{ selected.maxZoom }}",
     );
     expect(coverageView).toContain(
-      "source z{{ response.sourceZoom }} → grid z{{ formatZoom(previewZoom) }}",
+      "source z{{ response.sourceZoom }} → map z{{ formatZoom(previewZoom) }}",
     );
+    expect(coverageView).toContain('<dt class="summary-label">');
+    expect(coverageView).toContain("Aggregation-Grid");
+    expect(coverageView).toContain("<dd>z{{ response.aggregationZoom }}</dd>");
     const sourceZoomHandler = coverageView.slice(
       coverageView.indexOf("async function onSourceZoomChanged"),
-      coverageView.indexOf("async function inspectTiles"),
+      coverageView.indexOf("async function onMapSetChanged"),
     );
     expect(sourceZoomHandler).toContain("queryVisibleCoverage");
     expect(sourceZoomHandler).toContain("applyPreviewZoomRange");

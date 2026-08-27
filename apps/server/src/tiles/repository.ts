@@ -1202,7 +1202,7 @@ export class TileArchiveRepository {
                 MIN(selected.last_validated_at) AS oldest_validated_at,
                 COALESCE(SUM(CASE WHEN selected.content_hash IS NOT NULL
                                        AND selected.last_validated_at >= ? THEN 1 ELSE 0 END), 0)
-                  AS available_count,
+                  AS fresh_count,
                 COALESCE(SUM(CASE WHEN selected.content_hash IS NOT NULL
                                        AND selected.last_validated_at < ? THEN 1 ELSE 0 END), 0)
                   AS stale_count,
@@ -1245,7 +1245,7 @@ export class TileArchiveRepository {
       byte_length: number;
       newest_validated_at: string | null;
       oldest_validated_at: string | null;
-      available_count: number;
+      fresh_count: number;
       stale_count: number;
       primary_count: number;
       identical_count: number;
@@ -1261,7 +1261,7 @@ export class TileArchiveRepository {
       newestValidatedAt: row.newest_validated_at,
       oldestValidatedAt: row.oldest_validated_at,
       statuses: {
-        available: row.available_count,
+        fresh: row.fresh_count,
         stale: row.stale_count,
       },
       primaryCount: row.primary_count,
