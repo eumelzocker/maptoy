@@ -119,8 +119,7 @@ than loading every Tile hash into server memory.
 Open **Coverage** to inspect a bounded part of the Tile Archive on a map. Choose a
 Map Set, source Zoom, and one of the current state, an immutable Snapshot, or an
 ISO-8601 point in time. The map classifies the selected area as available, stale,
-missing, or in progress. The in-progress state is part of the stable response
-contract and remains zero until the download worker is introduced.
+or missing.
 
 Enable **Compare with** to compare any two supported states. Green cells are
 identical, orange cells contain changed Tiles, blue cells contain Tiles added in

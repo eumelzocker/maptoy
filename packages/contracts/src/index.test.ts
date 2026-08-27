@@ -101,7 +101,6 @@ describe("Map Set contracts", () => {
             available: 1,
             missing: 14,
             stale: 1,
-            inProgress: 0,
           },
           comparison: null,
         },

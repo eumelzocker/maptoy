@@ -4,6 +4,28 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Reusable renderer-neutral Map Zoom control shared by the standard Map and
+  Coverage views, with an exact quarter-step indicator, normal one-level
+  buttons, Ctrl-click quarter steps, and Shift-click integer stepping.
+- Clickable Zoom indicator with a Map-Set-bounded whole-level slider that keeps
+  changes local while dragging, applies only on release, and supports internally
+  configurable automatic popup closing.
+
+### Changed
+
+- Moved the standard Map view's Zoom value out of the coordinates overlay and
+  into the shared Zoom control.
+- Planned active-download visualization now uses separate Coverage map chip
+  overlays instead of overloading Coverage cell statuses and colors.
+
+### Removed
+
+- Removed the unused future `inProgress` Coverage response count, purple cell
+  coloring, and corresponding legend scale ahead of the later chip-overlay
+  implementation.
+
 ## [0.1.1] - 2026-08-27
 
 ### Added

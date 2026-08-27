@@ -28,34 +28,9 @@ export const STALE_COVERAGE_STEPS = [
   { minimumPercent: 100, color: "#965511", label: "100% stale" },
 ] as const;
 
-export const IN_PROGRESS_COVERAGE_STEPS = [
-  {
-    minimumPercent: 0,
-    color: "#e3def2",
-    label: "0.0001–24.9999% in progress",
-  },
-  {
-    minimumPercent: 25,
-    color: "#c4b9e2",
-    label: "25–49.9999% in progress",
-  },
-  {
-    minimumPercent: 50,
-    color: "#9d8dcc",
-    label: "50–74.9999% in progress",
-  },
-  {
-    minimumPercent: 75,
-    color: "#7868b4",
-    label: "75–99.9999% in progress",
-  },
-  { minimumPercent: 100, color: "#55458e", label: "100% in progress" },
-] as const;
-
 export const COVERAGE_STATUS_SCALES = [
   { label: "Available", steps: AVAILABLE_COVERAGE_STEPS },
   { label: "Stale", steps: STALE_COVERAGE_STEPS },
-  { label: "In progress", steps: IN_PROGRESS_COVERAGE_STEPS },
 ] as const;
 
 export interface CoveragePreviewViewport {
@@ -195,15 +170,6 @@ function cellColors(cell: CoverageCell): {
       return { fillColor: "#4e9b79", strokeColor: "#235c47" };
     }
   }
-  if (cell.statuses.inProgress > 0) {
-    return {
-      fillColor: inProgressCoverageColor(
-        cell.statuses.inProgress,
-        cell.tileCount,
-      ),
-      strokeColor: "#473b7c",
-    };
-  }
   if (cell.statuses.stale > 0) {
     return {
       fillColor: staleCoverageColor(cell.statuses.stale, cell.tileCount),
@@ -235,17 +201,6 @@ export function availableCoverageColor(
 
 export function staleCoverageColor(stale: number, tileCount: number): string {
   return coveragePercentageColor(stale, tileCount, STALE_COVERAGE_STEPS);
-}
-
-export function inProgressCoverageColor(
-  inProgress: number,
-  tileCount: number,
-): string {
-  return coveragePercentageColor(
-    inProgress,
-    tileCount,
-    IN_PROGRESS_COVERAGE_STEPS,
-  );
 }
 
 function coveragePercentageColor(

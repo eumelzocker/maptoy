@@ -127,9 +127,7 @@ in den Arbeitsspeicher des Servers zu laden.
 Unter **Coverage** lässt sich ein begrenzter Ausschnitt des Tile-Archivs auf einer
 Karte untersuchen. Wähle Map Set, Quellzoom und entweder den aktuellen Stand, einen
 unveränderlichen Snapshot oder einen ISO-8601-Zeitpunkt. Die Karte unterscheidet
-verfügbare, veraltete, fehlende und laufend bearbeitete Bereiche. Der Zustand
-`laufend` ist bereits Teil des stabilen Vertrags und bleibt bis zur Einführung des
-Download-Workers bei null.
+verfügbare, veraltete und fehlende Bereiche.
 
 Mit **Compare with** können zwei dieser Stände verglichen werden. Grüne Zellen sind
 identisch, orangefarbene enthalten geänderte Tiles, blaue im Vergleichsstand

@@ -134,7 +134,7 @@ describe("TileArchiveService", () => {
       totals: {
         tileCount: 3,
         revisionCount: 3,
-        statuses: { available: 1, stale: 1, missing: 1, inProgress: 0 },
+        statuses: { available: 1, stale: 1, missing: 1 },
         comparison: { identical: 1, changed: 1, added: 0, missing: 0 },
       },
     });
@@ -142,7 +142,7 @@ describe("TileArchiveService", () => {
     expect(result.cells.find(({ x }) => x === 6)).toMatchObject({
       tileCount: 1,
       revisionCount: 0,
-      statuses: { available: 0, stale: 0, missing: 1, inProgress: 0 },
+      statuses: { available: 0, stale: 0, missing: 1 },
     });
 
     const aggregated = service.coverage(mapSet, {
@@ -156,7 +156,7 @@ describe("TileArchiveService", () => {
       aggregationZoom: 1,
       totals: {
         tileCount: 3,
-        statuses: { available: 0, stale: 2, missing: 1, inProgress: 0 },
+        statuses: { available: 0, stale: 2, missing: 1 },
       },
     });
   });

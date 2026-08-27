@@ -610,8 +610,6 @@ export class TileArchiveService {
           available: aggregate?.statuses.available ?? 0,
           stale: aggregate?.statuses.stale ?? 0,
           missing: cell.tileCount - (aggregate?.primaryCount ?? 0),
-          // Phase 6 can populate this contract without changing Coverage clients.
-          inProgress: 0,
         },
         comparison:
           aggregate?.comparison ??
@@ -634,7 +632,6 @@ export class TileArchiveService {
           available: result.statuses.available + cell.statuses.available,
           missing: result.statuses.missing + cell.statuses.missing,
           stale: result.statuses.stale + cell.statuses.stale,
-          inProgress: result.statuses.inProgress + cell.statuses.inProgress,
         },
         comparison:
           result.comparison === null || cell.comparison === null
@@ -651,7 +648,7 @@ export class TileArchiveService {
         tileCount: 0,
         revisionCount: 0,
         byteLength: 0,
-        statuses: { available: 0, missing: 0, stale: 0, inProgress: 0 },
+        statuses: { available: 0, missing: 0, stale: 0 },
         comparison:
           compareTo === null
             ? null

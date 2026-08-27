@@ -707,7 +707,7 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 - Die Revisionsherkunft ist in API und Persistenz nachvollziehbar; bestehende Datenbanken ab Baseline 4 werden verlustfrei migriert.
 - Die Dokumentation weist sichtbar darauf hin, dass der weiterhin unauthentifizierte Endpunkt nur in vertrauenswürdiger Umgebung oder hinter Zugriffsschutz betrieben werden darf.
 
-Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckung baut unmittelbar auf dem Tile-Archiv auf, und das Layer-Plugin-System benötigt kein persistentes Jobmodell. Erst die Kennzeichnung aktuell bearbeiteter Coverage-Bereiche wird mit dem späteren Download-Worker verbunden.
+Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckung baut unmittelbar auf dem Tile-Archiv auf, und das Layer-Plugin-System benötigt kein persistentes Jobmodell. Erst einfache Overlay-Chips für aktuell bearbeitete Coverage-Bereiche werden mit dem späteren Download-Worker ergänzt.
 
 ### Phase 4: Cache-Abdeckung
 
@@ -716,7 +716,7 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 **Aufgaben**
 
 - effiziente Abdeckungsabfrage und Aggregation entwickeln
-- Zoomfilter und Statusklassen für vorhanden, fehlend und veraltet implementieren; den später vom Job-System gelieferten Zustand `laufend` bereits im Vertrag vorsehen
+- Zoomfilter und Statusklassen für vorhanden, fehlend und veraltet implementieren
 - Coverage-Layer über die neutrale Adapter-Schnittstelle bauen
 - Auswahl von aktuellem Stand, Snapshot und Zeitpunkt sowie Vergleichsdarstellung ergänzen
 - Detailansicht mit Tile-Zahl, Revisionen, Änderungen, Größe und Aktualität ergänzen
@@ -727,7 +727,6 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 - Die Abdeckung eines typischen Caches wird ohne Übertragung sämtlicher Tile-Datensätze flüssig dargestellt.
 - Zwei ausgewählte Stände lassen sich aggregiert vergleichen und bis zu einzelnen geänderten Tiles untersuchen.
 - Die Anzeige stimmt in Stichproben mit dem Dateisystem und den Cache-Metadaten überein.
-- Die Coverage-Verträge können den Zustand `laufend` aufnehmen, ohne bereits ein Job-System vorauszusetzen.
 
 ### Phase 5: Layer-Plugin-System
 
@@ -759,7 +758,7 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 - providerbezogene Rate-Limits, Parallelität, Retries und `Retry-After` umsetzen
 - Pause, Fortsetzung, Abbruch und Neustart-Recovery ergänzen
 - Download-Ansicht mit Gebietsauswahl und Jobfortschritt erstellen
-- laufende Download-Einheiten in die vorhandene Coverage-Abfrage integrieren und dort als `laufend` darstellen
+- laufende Download-Einheiten als einfache Chip-Overlays über der Coverage-Karte darstellen, ohne sie in Zellstatus oder Farblegende zu integrieren
 - konfigurierte Speicher-, Größen- und Betriebsgrenzen durchsetzen und Terms-/Attributionshinweise vor Start anzeigen
 
 **Ergebnis/Akzeptanz**
@@ -767,7 +766,7 @@ Die Reihenfolge der nächsten drei Phasen ist bewusst entkoppelt: Cache-Abdeckun
 - Eine kleine definierte Region kann vollständig vorab geladen werden.
 - Schätzung und tatsächliche Zahl der bearbeiteten Tiles sind nachvollziehbar.
 - 429-Antworten verlangsamen den Worker; Abbruch und Neustart führen nicht zu beschädigten Daten.
-- Die Coverage-Ansicht zeigt die vom Worker aktuell bearbeiteten Tiles konsistent als `laufend` an.
+- Die Coverage-Ansicht zeigt die vom Worker aktuell bearbeiteten Tiles konsistent als separate Chip-Overlays an.
 - Die Oberfläche macht die Eigenverantwortung sichtbar, trifft aber keine rechtliche Zulässigkeitsentscheidung für den Nutzer.
 
 ### Phase 7: Kartenbild-Export

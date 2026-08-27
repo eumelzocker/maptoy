@@ -68,7 +68,7 @@ export interface CoverageAggregateRow {
   byteLength: number;
   newestValidatedAt: string | null;
   oldestValidatedAt: string | null;
-  statuses: Omit<CoverageStatusCounts, "missing" | "inProgress">;
+  statuses: Omit<CoverageStatusCounts, "missing">;
   primaryCount: number;
   comparison: CoverageComparisonCounts | null;
 }

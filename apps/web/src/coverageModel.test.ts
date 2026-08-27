@@ -11,7 +11,6 @@ import {
   coverageSelection,
   coverageViewportZoom,
   hasCoveragePreviewZoomRange,
-  inProgressCoverageColor,
   staleCoverageColor,
   visibleCoverageBounds,
 } from "./coverageModel.js";
@@ -26,12 +25,10 @@ describe("Coverage view model", () => {
     expect(availableCoverageColor(4, 4)).toBe("#176443");
   });
 
-  it("maps stale and in-progress shares to their status scales", () => {
+  it("maps stale shares to their status scale", () => {
     expect(staleCoverageColor(1, 10)).toBe("#f6e5bd");
     expect(staleCoverageColor(3, 4)).toBe("#ca8423");
     expect(staleCoverageColor(10, 10)).toBe("#965511");
-    expect(inProgressCoverageColor(1, 2)).toBe("#9d8dcc");
-    expect(inProgressCoverageColor(10, 10)).toBe("#55458e");
   });
 
   it("keeps grid zoom at least one level below source zoom", () => {
@@ -117,7 +114,7 @@ describe("Coverage view model", () => {
         tileCount: 1,
         revisionCount: 2,
         byteLength: 10,
-        statuses: { available: 1, stale: 0, missing: 0, inProgress: 0 },
+        statuses: { available: 1, stale: 0, missing: 0 },
         comparison: { identical: 0, changed: 1, added: 0, missing: 0 },
       },
       cells: [
@@ -132,7 +129,7 @@ describe("Coverage view model", () => {
           byteLength: 10,
           newestValidatedAt: "2026-08-26T10:00:00.000Z",
           oldestValidatedAt: "2026-08-26T09:00:00.000Z",
-          statuses: { available: 1, stale: 0, missing: 0, inProgress: 0 },
+          statuses: { available: 1, stale: 0, missing: 0 },
           comparison: { identical: 0, changed: 1, added: 0, missing: 0 },
         },
       ],

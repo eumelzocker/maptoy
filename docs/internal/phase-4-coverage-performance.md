@@ -23,4 +23,4 @@ stored state and revision aggregates are read from SQLite. The existing unique
 coordinate index on `(map_set_id, zoom, tile_x, tile_y)` and the revision-time index
 cover the current, Snapshot, and time-based query paths, so Phase 4 requires no
 additional migration or precomputed aggregate table. A later worker can add
-`inProgress` counts without changing the response schema.
+separate progress chips over the Coverage map without changing cell status colors.

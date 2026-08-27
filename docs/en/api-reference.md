@@ -63,10 +63,9 @@ or `{"kind":"asOf","timestamp":"..."}`.
 
 The response reports the chosen `aggregationZoom`, total Tile, Revision, byte,
 freshness, and comparison counts, followed by bounded geographic cells with the
-same metadata. Status counts contain `available`, `stale`, `missing`, and the
-future-compatible `inProgress`. Comparison counts contain `identical`, `changed`,
-`added`, and `missing`. The endpoint reads SQLite metadata only and never contacts
-a provider.
+same metadata. Status counts contain `available`, `stale`, and `missing`.
+Comparison counts contain `identical`, `changed`, `added`, and `missing`. The
+endpoint reads SQLite metadata only and never contacts a provider.
 
 Invalid bounds, Zooms, or timestamps return `400 COVERAGE_QUERY_INVALID`; an
 unknown Snapshot returns `404 SNAPSHOT_NOT_FOUND`.
