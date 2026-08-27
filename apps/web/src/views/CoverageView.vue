@@ -22,6 +22,8 @@ import { useRoute, useRouter } from "vue-router";
 import { apiRequest } from "../api.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import MapZoomControl from "../components/MapZoomControl.vue";
 import {
   type CoveragePagePreferences,
   loadCoveragePagePreferences,
@@ -355,8 +357,7 @@ async function renderMapGeneration(generation: number): Promise<void> {
         minZoom: mapSet.minZoom,
         maxZoom: mapSet.maxZoom,
         tileSize: mapSet.tileSize,
-        showZoomLevelControl: true,
-        shiftClickIntegerZoom: true,
+        zoomControl: false,
       },
     });
     if (generation !== renderGeneration) {
@@ -446,6 +447,22 @@ async function applyPreviewZoomRange(value: number): Promise<void> {
     }
   } finally {
     adjustingPreviewZoom = false;
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function applyPreviewMapZoom(gridZoom: number): Promise<void> {
+  const activeRenderer = renderer;
+  const mapSet = selected.value;
+  if (activeRenderer === null || mapSet === null) return;
+  const viewport = activeRenderer.getViewport();
+  const zoomOffset = leafletXyzZoomOptions(mapSet).zoomOffset;
+  await activeRenderer.setViewport({
+    center: viewport.center,
+    zoom: coverageViewportZoom(gridZoom, zoomOffset),
+  });
+  if (renderer === activeRenderer) {
+    updatePreviewViewport(activeRenderer, mapSet);
   }
 }
 
@@ -785,6 +802,14 @@ onBeforeUnmount(destroyRenderer);
 
     <section class="coverage-map" aria-label="Cache Coverage map">
       <div ref="mapHost" class="map-host"></div>
+      <MapZoomControl
+        v-if="selected"
+        :zoom="previewZoom"
+        :minimum="selected.minZoom"
+        :maximum="sourceZoom - 1"
+        auto-close-on-change
+        @change="applyPreviewMapZoom"
+      />
       <div v-if="store.loading" class="map-message">Loading Map Sets…</div>
       <div v-else-if="store.loaded && store.items.length === 0" class="map-message">Create a Map Set to inspect Coverage.</div>
     </section>

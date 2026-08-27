@@ -1,16 +1,1 @@
 @import "leaflet/dist/leaflet.css";
-
-.leaflet-control-zoom .leaflet-control-zoom-level {
-  display: block;
-  width: 30px;
-  height: 30px;
-  border-bottom: 1px solid #ccc;
-  color: #333;
-  background: #fff;
-  font:
-    700 13px / 30px system-ui,
-    sans-serif;
-  text-align: center;
-  cursor: default;
-  user-select: none;
-}

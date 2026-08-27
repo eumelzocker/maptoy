@@ -36,24 +36,7 @@ export interface LeafletXyzConfiguration {
   minZoom: number;
   maxZoom: number;
   tileSize: 256 | 512;
-  showZoomLevelControl: boolean;
-  shiftClickIntegerZoom: boolean;
-}
-
-export function formatLeafletZoomLevel(value: number): string {
-  const quarters = Math.round(value * 4);
-  const sign = quarters < 0 ? "−" : "";
-  const absoluteQuarters = Math.abs(quarters);
-  const whole = Math.floor(absoluteQuarters / 4);
-  const fraction = ["", "¼", "½", "¾"][absoluteQuarters % 4] ?? "";
-  return `${sign}${whole}${fraction}`;
-}
-
-export function integerLeafletZoomTarget(
-  value: number,
-  direction: "in" | "out",
-): number {
-  return direction === "in" ? Math.floor(value) + 1 : Math.ceil(value) - 1;
+  zoomControl: boolean;
 }
 
 export function leafletXyzZoomOptions(
@@ -89,10 +72,7 @@ function configuration(value: unknown): LeafletXyzConfiguration {
     typeof value.maxZoom !== "number" ||
     !("tileSize" in value) ||
     (value.tileSize !== 256 && value.tileSize !== 512) ||
-    ("showZoomLevelControl" in value &&
-      typeof value.showZoomLevelControl !== "boolean") ||
-    ("shiftClickIntegerZoom" in value &&
-      typeof value.shiftClickIntegerZoom !== "boolean")
+    ("zoomControl" in value && typeof value.zoomControl !== "boolean")
   ) {
     throw new Error("Leaflet XYZ configuration is invalid.");
   }
@@ -102,16 +82,10 @@ function configuration(value: unknown): LeafletXyzConfiguration {
     minZoom: value.minZoom,
     maxZoom: value.maxZoom,
     tileSize: value.tileSize,
-    showZoomLevelControl:
-      "showZoomLevelControl" in value &&
-      typeof value.showZoomLevelControl === "boolean"
-        ? value.showZoomLevelControl
-        : false,
-    shiftClickIntegerZoom:
-      "shiftClickIntegerZoom" in value &&
-      typeof value.shiftClickIntegerZoom === "boolean"
-        ? value.shiftClickIntegerZoom
-        : false,
+    zoomControl:
+      "zoomControl" in value && typeof value.zoomControl === "boolean"
+        ? value.zoomControl
+        : true,
   };
 }
 
@@ -125,6 +99,7 @@ async function createLeafletInstance(
     minZoom: zoomOptions.minZoom,
     maxZoom: zoomOptions.maxZoom,
     zoomSnap: 0.25,
+    zoomControl: leafletConfiguration.zoomControl,
     worldCopyJump: true,
   }).setView(
     [
@@ -143,67 +118,6 @@ async function createLeafletInstance(
     tileSize: leafletConfiguration.tileSize,
     zoomOffset: zoomOptions.zoomOffset,
   }).addTo(map);
-
-  let updateZoomLevel: (() => void) | null = null;
-  let zoomInButton: HTMLElement | null = null;
-  let zoomOutButton: HTMLElement | null = null;
-  let onShiftZoomIn: ((event: MouseEvent) => void) | null = null;
-  let onShiftZoomOut: ((event: MouseEvent) => void) | null = null;
-  if (
-    leafletConfiguration.showZoomLevelControl ||
-    leafletConfiguration.shiftClickIntegerZoom
-  ) {
-    const container = map.zoomControl.getContainer();
-    zoomInButton =
-      container?.querySelector<HTMLElement>(".leaflet-control-zoom-in") ?? null;
-    zoomOutButton =
-      container?.querySelector<HTMLElement>(".leaflet-control-zoom-out") ??
-      null;
-    if (
-      container !== undefined &&
-      zoomInButton !== null &&
-      zoomOutButton !== null
-    ) {
-      if (leafletConfiguration.showZoomLevelControl) {
-        const indicator = L.DomUtil.create(
-          "span",
-          "leaflet-control-zoom-level",
-        );
-        indicator.setAttribute("role", "status");
-        updateZoomLevel = () => {
-          const label = formatLeafletZoomLevel(
-            map.getZoom() + zoomOptions.zoomOffset,
-          );
-          indicator.textContent = label;
-          indicator.title = `Grid zoom ${label}`;
-          indicator.setAttribute("aria-label", `Grid zoom ${label}`);
-        };
-        container.insertBefore(indicator, zoomOutButton);
-        map.on("zoom", updateZoomLevel);
-        updateZoomLevel();
-      }
-      if (leafletConfiguration.shiftClickIntegerZoom) {
-        const shiftZoom =
-          (direction: "in" | "out") =>
-          (event: MouseEvent): void => {
-            if (!event.shiftKey) return;
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            const gridZoom = map.getZoom() + zoomOptions.zoomOffset;
-            map.setZoom(
-              integerLeafletZoomTarget(gridZoom, direction) -
-                zoomOptions.zoomOffset,
-            );
-          };
-        onShiftZoomIn = shiftZoom("in");
-        onShiftZoomOut = shiftZoom("out");
-        zoomInButton.addEventListener("click", onShiftZoomIn, true);
-        zoomOutButton.addEventListener("click", onShiftZoomOut, true);
-        zoomInButton.title = "Zoom in; Shift-click for next integer zoom";
-        zoomOutButton.title = "Zoom out; Shift-click for previous integer zoom";
-      }
-    }
-  }
 
   const layers = new Map<
     string,
@@ -388,15 +302,6 @@ async function createLeafletInstance(
       return { longitude: coordinate.lng, latitude: coordinate.lat };
     },
     destroy: () => {
-      if (zoomInButton !== null && onShiftZoomIn !== null) {
-        zoomInButton.removeEventListener("click", onShiftZoomIn, true);
-      }
-      if (zoomOutButton !== null && onShiftZoomOut !== null) {
-        zoomOutButton.removeEventListener("click", onShiftZoomOut, true);
-      }
-      if (updateZoomLevel !== null) {
-        map.off("zoom", updateZoomLevel);
-      }
       for (const { event, handler } of subscriptions) {
         map.off(event, handler);
       }

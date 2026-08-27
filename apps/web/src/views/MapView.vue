@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import {
-  formatLeafletZoomLevel,
-  leafletXyzZoomOptions,
-} from "@maptoy/leaflet-xyz";
+import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
 import type {
   GeographicCoordinate,
   MapRendererInstance,
@@ -27,6 +24,8 @@ import GotoCoordinatesDialog from "../components/GotoCoordinatesDialog.vue";
 import HtmlTooltip from "../components/HtmlTooltip.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import MapZoomControl from "../components/MapZoomControl.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import TileCalculatorDialog from "../components/TileCalculatorDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
@@ -97,8 +96,10 @@ const showTitleBar = computed({
   set: (value) => uiPreferences.setShowTitleBar(value),
 });
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const displayedZoom = computed(() =>
-  zoom.value === null ? null : formatLeafletZoomLevel(zoom.value),
+const controlZoom = computed(() =>
+  selected.value === null || zoom.value === null
+    ? null
+    : zoom.value + leafletXyzZoomOptions(selected.value).zoomOffset,
 );
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const mapContextMenuItems = computed(() =>
@@ -194,7 +195,7 @@ async function renderSelectedMap(): Promise<void> {
         minZoom: mapSet.minZoom,
         maxZoom: mapSet.maxZoom,
         tileSize: mapSet.tileSize,
-        shiftClickIntegerZoom: true,
+        zoomControl: false,
       },
     });
     if (generation !== renderGeneration) {
@@ -404,6 +405,15 @@ function openTileCalculator(): void {
     >
       <div ref="mapHost" class="map-host"></div>
 
+      <MapZoomControl
+        v-if="selected"
+        :zoom="controlZoom"
+        :minimum="selected.minZoom"
+        :maximum="selected.maxZoom"
+        auto-close-on-change
+        @change="applyMapZoom"
+      />
+
       <div v-if="store.items.length > 0" class="map-controls">
         <MapSetSelect
           v-if="showMapSelector"
@@ -490,13 +500,12 @@ function openTileCalculator(): void {
           </label>
         </TogglePanel>
         <p
-          v-if="zoom !== null || pointer"
+          v-if="pointer"
           class="viewport-status"
           :style="{ visibility: showCoordinates ? 'visible' : 'hidden' }"
-          aria-label="Map viewport status"
+          aria-label="Map coordinates"
         >
-          <span v-if="displayedZoom !== null">Zoom {{ displayedZoom }}</span>
-          <span v-if="pointer" class="coordinates">
+          <span class="coordinates">
             {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
           </span>
         </p>

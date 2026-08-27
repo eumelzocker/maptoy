@@ -21,9 +21,11 @@ describe("Map view architecture", () => {
     );
     expect(mapView).not.toMatch(/from ["']leaflet["']/);
     expect(mapView).not.toContain("https://");
-    expect(mapView).not.toContain("showZoomLevelControl");
-    expect(mapView).toContain("shiftClickIntegerZoom: true");
-    expect(mapView).toContain("formatLeafletZoomLevel(zoom.value)");
+    expect(mapView).toContain("MapZoomControl");
+    expect(mapView).toContain("zoomControl: false");
+    expect(mapView).not.toContain("formatLeafletZoomLevel(zoom.value)");
+    expect(mapView).not.toContain("Zoom {{ displayedZoom }}");
+    expect(mapView).toContain('aria-label="Map coordinates"');
     expect(mapView).not.toContain("Math.round(zoom)");
     expect(tileUrl).not.toContain("https://");
   });
@@ -49,8 +51,8 @@ describe("Map view architecture", () => {
     expect(coverageView).toContain("coverageGridZoom(");
     expect(coverageView).toContain("applyPreviewZoomRange(sourceZoom.value)");
     expect(coverageView).toContain("rendererTransition.then");
-    expect(coverageView).toContain("showZoomLevelControl: true");
-    expect(coverageView).toContain("shiftClickIntegerZoom: true");
+    expect(coverageView).toContain("MapZoomControl");
+    expect(coverageView).toContain("zoomControl: false");
     expect(coverageView).toContain(':min="selected.minZoom + 1"');
     expect(coverageView).toContain("{{ selected.tileSize }}");
     expect(coverageView).toContain(
@@ -82,6 +84,49 @@ describe("Map view architecture", () => {
     expect(coverageModel).toContain('type: "rectangle-grid"');
     expect(coverageView).not.toMatch(/from ["']leaflet["']/);
     expect(coverageModel).not.toMatch(/from ["']leaflet["']/);
+  });
+
+  it("shares a deferred-apply zoom slider between map views", async () => {
+    const [zoomControl, mapView, coverageView] = await Promise.all([
+      readFile(
+        fileURLToPath(
+          new URL("./components/MapZoomControl.vue", import.meta.url),
+        ),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./views/CoverageView.vue", import.meta.url)),
+        "utf8",
+      ),
+    ]);
+
+    expect(mapView).toContain("<MapZoomControl");
+    expect(mapView).toContain(':minimum="selected.minZoom"');
+    expect(mapView).toContain(':maximum="selected.maxZoom"');
+    expect(mapView).toContain("auto-close-on-change");
+    expect(coverageView).toContain("<MapZoomControl");
+    expect(coverageView).toContain("auto-close-on-change");
+    expect(zoomControl).toContain('type="range"');
+    expect(zoomControl).toContain('step="1"');
+    expect(zoomControl).toContain('@input="updateSliderZoom"');
+    expect(zoomControl).toContain('@change="applySliderZoom"');
+    const previewHandler = zoomControl.slice(
+      zoomControl.indexOf("function updateSliderZoom"),
+      zoomControl.indexOf("function applySliderZoom"),
+    );
+    const applyHandler = zoomControl.slice(
+      zoomControl.indexOf("function applySliderZoom"),
+      zoomControl.indexOf("function closeSlider"),
+    );
+    expect(previewHandler).not.toContain('emit("change"');
+    expect(applyHandler).toContain('emit("change"');
+    expect(applyHandler).toContain("props.autoCloseOnChange");
+    expect(applyHandler).toContain("closeSlider()");
+    expect(zoomControl).toContain("{ autoCloseOnChange: false }");
   });
 
   it("deep-links from Coverage to Cache details and the Map Set editor", async () => {
