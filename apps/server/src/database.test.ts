@@ -24,18 +24,23 @@ describe("database migrations", () => {
     const database = await openDatabase(databasePath);
     expect(
       database.sqlite.prepare("SELECT version FROM schema_migrations").all(),
-    ).toEqual([{ version: 4 }, { version: 5 }]);
+    ).toEqual([{ version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }]);
     expect(
       database.sqlite
         .prepare(
           `SELECT name FROM sqlite_master
             WHERE type = 'table' AND name IN ('map_sets', 'source_revisions',
-              'logical_tiles', 'tile_revisions', 'cache_snapshots')
+              'logical_tiles', 'tile_revisions', 'cache_snapshots',
+              'layer_instances', 'layer_instance_versions', 'layer_assets', 'jobs')
             ORDER BY name`,
         )
         .all(),
     ).toEqual([
       { name: "cache_snapshots" },
+      { name: "jobs" },
+      { name: "layer_assets" },
+      { name: "layer_instance_versions" },
+      { name: "layer_instances" },
       { name: "logical_tiles" },
       { name: "map_sets" },
       { name: "tile_revisions" },
@@ -52,6 +57,12 @@ describe("database migrations", () => {
         .all()
         .map((column) => (column as { name: string }).name),
     ).toContain("origin");
+    expect(
+      database.sqlite
+        .prepare("PRAGMA table_info(layer_instances)")
+        .all()
+        .map((column) => (column as { name: string }).name),
+    ).not.toContain("map_set_id");
     database.close();
   });
 
@@ -151,7 +162,7 @@ describe("database migrations", () => {
       reopened.sqlite
         .prepare("SELECT version FROM schema_migrations ORDER BY version")
         .all(),
-    ).toEqual([{ version: 4 }, { version: 5 }]);
+    ).toEqual([{ version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }]);
     expect(
       reopened.sqlite
         .prepare("SELECT name FROM map_sets WHERE id = ?")

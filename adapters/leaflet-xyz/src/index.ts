@@ -1,6 +1,11 @@
 import {
   type CreateMapRendererOptions,
   MAP_ADAPTER_SDK_VERSION,
+  isMapAreaLayerData,
+  isMapCompositeLayerData,
+  isMapLineLayerData,
+  isMapPointLayerData,
+  isMapRasterOverlayLayerData,
   isMapRectangleLayerData,
   type MapLayerDescriptor,
   type MapRendererEvent,
@@ -180,6 +185,192 @@ async function createLeafletInstance(
     return group;
   };
 
+  const bindFeatureSelection = (
+    layer: Leaflet.Layer,
+    descriptor: MapLayerDescriptor,
+    featureId: string,
+  ): void => {
+    layer.on("click", (event: Leaflet.LeafletMouseEvent) => {
+      for (const listener of selectionListeners) {
+        listener({
+          layerId: descriptor.id,
+          featureId,
+          coordinate: {
+            longitude: event.latlng.lng,
+            latitude: event.latlng.lat,
+          },
+        });
+      }
+    });
+  };
+
+  const createPointLayer = (
+    descriptor: MapLayerDescriptor,
+  ): Leaflet.LayerGroup | null => {
+    if (
+      descriptor.type !== "point-collection" ||
+      !isMapPointLayerData(descriptor.data)
+    ) {
+      return null;
+    }
+    const group = L.layerGroup();
+    for (const feature of descriptor.data.features) {
+      const point = L.circleMarker(
+        [feature.coordinate.latitude, feature.coordinate.longitude],
+        {
+          radius: feature.symbolizer.radius,
+          color: feature.symbolizer.strokeColor,
+          weight: feature.symbolizer.strokeWidth,
+          fillColor: feature.symbolizer.fillColor,
+          fillOpacity: feature.symbolizer.fillOpacity * descriptor.opacity,
+          opacity: descriptor.opacity,
+          bubblingMouseEvents: false,
+        },
+      );
+      if (feature.title !== undefined) {
+        point.bindTooltip(feature.title, { sticky: true });
+      }
+      if (feature.previewUrl !== undefined) {
+        const preview = document.createElement("img");
+        preview.src = feature.previewUrl;
+        preview.alt = feature.title ?? "";
+        preview.loading = "lazy";
+        preview.style.maxWidth = "18rem";
+        preview.style.maxHeight = "14rem";
+        point.bindPopup(preview);
+      }
+      bindFeatureSelection(point, descriptor, feature.id);
+      point.addTo(group);
+    }
+    return group;
+  };
+
+  const createLineLayer = (
+    descriptor: MapLayerDescriptor,
+  ): Leaflet.LayerGroup | null => {
+    if (
+      descriptor.type !== "line-collection" ||
+      !isMapLineLayerData(descriptor.data)
+    ) {
+      return null;
+    }
+    const group = L.layerGroup();
+    for (const feature of descriptor.data.features) {
+      const line = L.polyline(
+        feature.coordinates.map(
+          ({ latitude, longitude }) =>
+            [latitude, longitude] as [number, number],
+        ),
+        {
+          color: feature.symbolizer.color,
+          weight: feature.symbolizer.width,
+          opacity: feature.symbolizer.opacity * descriptor.opacity,
+          dashArray: feature.symbolizer.dashArray,
+          bubblingMouseEvents: false,
+        },
+      );
+      if (feature.title !== undefined) {
+        line.bindTooltip(feature.title, { sticky: true });
+      }
+      bindFeatureSelection(line, descriptor, feature.id);
+      line.addTo(group);
+    }
+    return group;
+  };
+
+  const createAreaLayer = (
+    descriptor: MapLayerDescriptor,
+  ): Leaflet.LayerGroup | null => {
+    if (
+      descriptor.type !== "area-collection" ||
+      !isMapAreaLayerData(descriptor.data)
+    ) {
+      return null;
+    }
+    const group = L.layerGroup();
+    for (const feature of descriptor.data.features) {
+      const area = L.polygon(
+        feature.rings.map((ring) =>
+          ring.map(
+            ({ latitude, longitude }) =>
+              [latitude, longitude] as [number, number],
+          ),
+        ),
+        {
+          color: feature.symbolizer.strokeColor,
+          weight: feature.symbolizer.strokeWidth,
+          opacity: feature.symbolizer.strokeOpacity * descriptor.opacity,
+          fillColor: feature.symbolizer.fillColor,
+          fillOpacity: feature.symbolizer.fillOpacity * descriptor.opacity,
+          bubblingMouseEvents: false,
+        },
+      );
+      if (feature.title !== undefined) {
+        area.bindTooltip(feature.title, { sticky: true });
+      }
+      bindFeatureSelection(area, descriptor, feature.id);
+      area.addTo(group);
+    }
+    return group;
+  };
+
+  const createRasterOverlayLayer = (
+    descriptor: MapLayerDescriptor,
+  ): Leaflet.LayerGroup | null => {
+    if (
+      descriptor.type !== "raster-overlay" ||
+      !isMapRasterOverlayLayerData(descriptor.data)
+    ) {
+      return null;
+    }
+    const group = L.layerGroup();
+    for (const feature of descriptor.data.features) {
+      const overlay = L.imageOverlay(
+        feature.imageUrl,
+        [
+          [feature.bounds.south, feature.bounds.west],
+          [feature.bounds.north, feature.bounds.east],
+        ],
+        {
+          opacity: descriptor.opacity,
+          interactive: true,
+        },
+      );
+      if (feature.title !== undefined) {
+        overlay.bindTooltip(feature.title, { sticky: true });
+      }
+      bindFeatureSelection(overlay, descriptor, feature.id);
+      overlay.addTo(group);
+    }
+    return group;
+  };
+
+  const createDescriptorLayer = (
+    descriptor: MapLayerDescriptor,
+  ): Leaflet.LayerGroup | null => {
+    if (
+      descriptor.type === "composite" &&
+      isMapCompositeLayerData(descriptor.data)
+    ) {
+      const group = L.layerGroup();
+      for (const data of descriptor.data.layers) {
+        createDescriptorLayer({
+          ...descriptor,
+          type: data.kind,
+          data,
+        })?.addTo(group);
+      }
+      return group;
+    }
+    return (
+      createRectangleLayer(descriptor) ??
+      createPointLayer(descriptor) ??
+      createLineLayer(descriptor) ??
+      createAreaLayer(descriptor) ??
+      createRasterOverlayLayer(descriptor)
+    );
+  };
+
   const replaceLayer = (descriptor: MapLayerDescriptor): void => {
     const previous = layers.get(descriptor.id);
     if (
@@ -188,7 +379,7 @@ async function createLeafletInstance(
     ) {
       previous.leafletLayer.removeFrom(map);
     }
-    const leafletLayer = createRectangleLayer(descriptor);
+    const leafletLayer = createDescriptorLayer(descriptor);
     layers.set(descriptor.id, { descriptor, leafletLayer });
     if (descriptor.visible && leafletLayer !== null) {
       leafletLayer.addTo(map);

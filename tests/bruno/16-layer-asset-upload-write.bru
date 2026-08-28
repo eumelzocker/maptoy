@@ -1,0 +1,25 @@
+meta {
+  name: Layer Asset - Upload Track (writes data)
+  type: http
+  seq: 16
+}
+post {
+  url: {{appUrl}}/api/layers/{{layerId}}/assets
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  file: @file({{layerAssetFile}})
+}
+
+docs {
+  Uploads one GPX or GeoJSON file to an existing Track Layer. This creates a managed Asset and updates normalized Track data.
+}
+
+tests {
+  test("imports a managed Track Asset", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.asset.kind).to.equal("managed");
+  });
+}

@@ -8,6 +8,27 @@ export const DEFAULT_TRAFFIC_LOG_MAX_BYTES = 10 * 1024 * 1024;
 export const DEFAULT_TRAFFIC_LOG_MAX_FILES = 5;
 export const DEFAULT_PROVIDER_TIMEOUT_MILLISECONDS = 10_000;
 export const DEFAULT_MAX_TILE_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_MAX_IMAGE_BYTES = 100 * 1024 * 1024;
+export const DEFAULT_MAX_LAYER_ASSET_BYTES = 25 * 1024 * 1024;
+export const DEFAULT_MAX_IMAGE_PIXELS = 100_000_000;
+export const DEFAULT_IMAGE_PREVIEW_MAX_EDGE = 640;
+export const DEFAULT_IMAGE_SCAN_BATCH_SIZE = 100;
+export const DEFAULT_IMAGE_DECODER_CONCURRENCY = 2;
+export const DEFAULT_MAX_IMAGE_SCAN_FILES = 100_000;
+
+const IMAGE_LIMITS = {
+  bytes: 1024 * 1024 * 1024,
+  pixels: 500_000_000,
+  previewEdge: 4096,
+  scanBatch: 10_000,
+  decoderConcurrency: 16,
+  scanFiles: 1_000_000,
+} as const;
+
+export interface ImageRootConfig {
+  id: string;
+  path: string;
+}
 
 export type LogLevel =
   | "fatal"
@@ -31,6 +52,14 @@ export interface MaptoyConfig {
   allowPrivateTileHosts: boolean;
   providerTimeoutMilliseconds: number;
   maximumTileBytes: number;
+  maximumLayerAssetBytes: number;
+  imageRoots: readonly ImageRootConfig[];
+  maximumImageBytes: number;
+  maximumImagePixels: number;
+  imagePreviewMaximumEdge: number;
+  imageScanBatchSize: number;
+  imageDecoderConcurrency: number;
+  maximumImageScanFiles: number;
 }
 
 function parseLogDirectory(
@@ -95,6 +124,52 @@ function parsePositiveInteger(
   return parsed;
 }
 
+function parseBoundedPositiveInteger(
+  value: string | undefined,
+  defaultValue: number,
+  maximum: number,
+  name: string,
+): number {
+  const parsed = parsePositiveInteger(value, defaultValue, name);
+  if (parsed > maximum) {
+    throw new Error(`${name} must not exceed ${maximum}.`);
+  }
+  return parsed;
+}
+
+function parseImageRoots(
+  value: string | undefined,
+): readonly ImageRootConfig[] {
+  if (value === undefined || value.trim() === "") {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("MAPTOY_IMAGE_ROOTS_JSON must be valid JSON.");
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("MAPTOY_IMAGE_ROOTS_JSON must be a JSON object.");
+  }
+  return Object.entries(parsed).map(([id, configuredPath]) => {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+      throw new Error(
+        "MAPTOY_IMAGE_ROOTS_JSON keys must be lowercase stable IDs.",
+      );
+    }
+    if (
+      typeof configuredPath !== "string" ||
+      !path.isAbsolute(configuredPath)
+    ) {
+      throw new Error(
+        `MAPTOY_IMAGE_ROOTS_JSON path for ${id} must be absolute.`,
+      );
+    }
+    return { id, path: path.normalize(configuredPath) };
+  });
+}
+
 export function loadConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): MaptoyConfig {
@@ -143,6 +218,48 @@ export function loadConfig(
       environment.MAPTOY_MAX_TILE_BYTES,
       DEFAULT_MAX_TILE_BYTES,
       "MAPTOY_MAX_TILE_BYTES",
+    ),
+    maximumLayerAssetBytes: parsePositiveInteger(
+      environment.MAPTOY_MAX_LAYER_ASSET_BYTES,
+      DEFAULT_MAX_LAYER_ASSET_BYTES,
+      "MAPTOY_MAX_LAYER_ASSET_BYTES",
+    ),
+    imageRoots: parseImageRoots(environment.MAPTOY_IMAGE_ROOTS_JSON),
+    maximumImageBytes: parseBoundedPositiveInteger(
+      environment.MAPTOY_MAX_IMAGE_BYTES,
+      DEFAULT_MAX_IMAGE_BYTES,
+      IMAGE_LIMITS.bytes,
+      "MAPTOY_MAX_IMAGE_BYTES",
+    ),
+    maximumImagePixels: parseBoundedPositiveInteger(
+      environment.MAPTOY_MAX_IMAGE_PIXELS,
+      DEFAULT_MAX_IMAGE_PIXELS,
+      IMAGE_LIMITS.pixels,
+      "MAPTOY_MAX_IMAGE_PIXELS",
+    ),
+    imagePreviewMaximumEdge: parseBoundedPositiveInteger(
+      environment.MAPTOY_IMAGE_PREVIEW_MAX_EDGE,
+      DEFAULT_IMAGE_PREVIEW_MAX_EDGE,
+      IMAGE_LIMITS.previewEdge,
+      "MAPTOY_IMAGE_PREVIEW_MAX_EDGE",
+    ),
+    imageScanBatchSize: parseBoundedPositiveInteger(
+      environment.MAPTOY_IMAGE_SCAN_BATCH_SIZE,
+      DEFAULT_IMAGE_SCAN_BATCH_SIZE,
+      IMAGE_LIMITS.scanBatch,
+      "MAPTOY_IMAGE_SCAN_BATCH_SIZE",
+    ),
+    imageDecoderConcurrency: parseBoundedPositiveInteger(
+      environment.MAPTOY_IMAGE_DECODER_CONCURRENCY,
+      DEFAULT_IMAGE_DECODER_CONCURRENCY,
+      IMAGE_LIMITS.decoderConcurrency,
+      "MAPTOY_IMAGE_DECODER_CONCURRENCY",
+    ),
+    maximumImageScanFiles: parseBoundedPositiveInteger(
+      environment.MAPTOY_MAX_IMAGE_SCAN_FILES,
+      DEFAULT_MAX_IMAGE_SCAN_FILES,
+      IMAGE_LIMITS.scanFiles,
+      "MAPTOY_MAX_IMAGE_SCAN_FILES",
     ),
   };
 }

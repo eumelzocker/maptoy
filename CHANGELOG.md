@@ -4,6 +4,39 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-28
+
+### Added
+
+- Phase 5 Layer Plugin SDK with reusable Point, Line, and Area geometry,
+  adapter-neutral display descriptors, manifest validation, schema migration
+  hooks, and build-time plugin registration.
+- Track and Image reference plugins with GPX/GeoJSON import, timestamp-capable
+  Track vertices, GPS image points, geographic raster overlays, and shared
+  interactive renderer integration.
+- Persistent Layer, Asset, and Job APIs, managed non-image uploads, configured
+  read-only image roots, incremental directory scans, EXIF metadata extraction,
+  SQLite catalog metadata, and derived WebP previews without copying image
+  originals into the application data directory.
+- Optional Layer tooling inside the standard Map view, including visibility,
+  opacity, Zoom limits, ordering, Track import, image scanning, image-position
+  editing, and persisted scan controls. Layer instances form a global Overlay stack
+  that retains visibility, order, and configuration across Map Set changes.
+- Hierarchical Layer presentation with plugin-defined top-level categories and
+  optional `/`-separated Layer name paths. Every category and generated folder
+  level can be collapsed independently, Layer configurations default to collapsed,
+  and both UI preferences persist in browser-local storage.
+- Icon-based Layer category selection, optional automatically numbered Layer names,
+  and an Add workflow that immediately expands the new editor and focuses its
+  primary import control.
+- Layer Plugin and Map Adapter SDK documentation plus Bruno requests for Layer,
+  image-root, Asset, scan-Job, and Job APIs.
+
+### Changed
+
+- Reserved the coordinate readout height before the first pointer movement so the
+  bottom-left Map tools no longer shift when coordinates first appear.
+
 ## [0.1.2] - 2026-08-27
 
 ### Added

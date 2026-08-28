@@ -56,4 +56,40 @@ describe("loadConfig", () => {
       "MAPTOY_TRAFFIC_LOG_MAX_FILES",
     );
   });
+
+  it("validates named absolute read-only image roots and image limits", () => {
+    const config = loadConfig({
+      MAPTOY_IMAGE_ROOTS_JSON: JSON.stringify({
+        photos: "/images/photos",
+        "photo-archive": "/images/archive",
+      }),
+      MAPTOY_MAX_IMAGE_BYTES: "2048",
+      MAPTOY_MAX_IMAGE_PIXELS: "4096",
+      MAPTOY_IMAGE_PREVIEW_MAX_EDGE: "320",
+      MAPTOY_IMAGE_SCAN_BATCH_SIZE: "25",
+      MAPTOY_IMAGE_DECODER_CONCURRENCY: "1",
+      MAPTOY_MAX_IMAGE_SCAN_FILES: "500",
+    });
+    expect(config.imageRoots).toEqual([
+      { id: "photos", path: "/images/photos" },
+      { id: "photo-archive", path: "/images/archive" },
+    ]);
+    expect(config).toMatchObject({
+      maximumImageBytes: 2048,
+      maximumImagePixels: 4096,
+      imagePreviewMaximumEdge: 320,
+      imageScanBatchSize: 25,
+      imageDecoderConcurrency: 1,
+      maximumImageScanFiles: 500,
+    });
+    expect(() =>
+      loadConfig({ MAPTOY_IMAGE_ROOTS_JSON: '{"bad id":"/images"}' }),
+    ).toThrow("lowercase stable IDs");
+    expect(() =>
+      loadConfig({ MAPTOY_IMAGE_ROOTS_JSON: '{"photos":"relative"}' }),
+    ).toThrow("must be absolute");
+    expect(() =>
+      loadConfig({ MAPTOY_IMAGE_DECODER_CONCURRENCY: "17" }),
+    ).toThrow("must not exceed 16");
+  });
 });

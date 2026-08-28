@@ -779,7 +779,7 @@ onBeforeUnmount(destroyRenderer);
           <div><dt>Stale</dt><dd>{{ formatNumber(response.totals.statuses.stale) }}</dd></div>
           <div><dt>Missing</dt><dd>{{ formatNumber(response.totals.statuses.missing) }}</dd></div>
           <div><dt>Revisions</dt><dd>{{ formatNumber(response.totals.revisionCount) }}</dd></div>
-          <div><dt>Selected bytes</dt><dd>{{ formatBytes(response.totals.byteLength) }}</dd></div>
+          <div><dt>Cached bytes</dt><dd>{{ formatBytes(response.totals.byteLength) }}</dd></div>
         </dl>
       </section>
 

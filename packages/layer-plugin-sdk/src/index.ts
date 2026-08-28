@@ -6,11 +6,138 @@ export type JsonObject = Readonly<Record<string, unknown>>;
 export interface GeographicCoordinate {
   longitude: number;
   latitude: number;
+  elevation?: number;
 }
 
 export interface ScreenPoint {
   x: number;
   y: number;
+}
+
+export interface PointGeometry {
+  type: "Point";
+  coordinate: GeographicCoordinate;
+}
+
+export interface LineVertex<TProperties = JsonObject> {
+  coordinate: GeographicCoordinate;
+  properties?: TProperties;
+}
+
+export interface LineGeometry<TVertexProperties = JsonObject> {
+  type: "LineString";
+  vertices: readonly LineVertex<TVertexProperties>[];
+}
+
+export interface AreaGeometry {
+  type: "Polygon";
+  rings: readonly (readonly GeographicCoordinate[])[];
+}
+
+export interface LayerFeature<
+  TGeometry extends PointGeometry | LineGeometry<unknown> | AreaGeometry,
+  TProperties = JsonObject,
+> {
+  id: string;
+  geometry: TGeometry;
+  properties: TProperties;
+}
+
+export type PointFeature<TProperties = JsonObject> = LayerFeature<
+  PointGeometry,
+  TProperties
+>;
+
+export type LineFeature<
+  TProperties = JsonObject,
+  TVertexProperties = JsonObject,
+> = LayerFeature<LineGeometry<TVertexProperties>, TProperties>;
+
+export type AreaFeature<TProperties = JsonObject> = LayerFeature<
+  AreaGeometry,
+  TProperties
+>;
+
+function geometryInvariant(
+  condition: boolean,
+  message: string,
+): asserts condition {
+  if (!condition) {
+    throw new Error(`Layer geometry validation failed: ${message}`);
+  }
+}
+
+export function assertGeographicCoordinate(value: GeographicCoordinate): void {
+  geometryInvariant(
+    Number.isFinite(value.longitude) &&
+      value.longitude >= -180 &&
+      value.longitude <= 180,
+    "longitude must be between -180 and 180",
+  );
+  geometryInvariant(
+    Number.isFinite(value.latitude) &&
+      value.latitude >= -90 &&
+      value.latitude <= 90,
+    "latitude must be between -90 and 90",
+  );
+  geometryInvariant(
+    value.elevation === undefined || Number.isFinite(value.elevation),
+    "elevation must be finite",
+  );
+}
+
+export function assertPointGeometry(value: PointGeometry): void {
+  geometryInvariant(value.type === "Point", "expected Point geometry");
+  assertGeographicCoordinate(value.coordinate);
+}
+
+export function assertLineGeometry(value: LineGeometry<unknown>): void {
+  geometryInvariant(
+    value.type === "LineString",
+    "expected LineString geometry",
+  );
+  geometryInvariant(
+    value.vertices.length >= 2,
+    "a line requires at least two vertices",
+  );
+  for (const vertex of value.vertices) {
+    assertGeographicCoordinate(vertex.coordinate);
+  }
+}
+
+function coordinatesEqual(
+  first: GeographicCoordinate,
+  second: GeographicCoordinate,
+): boolean {
+  return (
+    first.longitude === second.longitude &&
+    first.latitude === second.latitude &&
+    first.elevation === second.elevation
+  );
+}
+
+export function assertAreaGeometry(value: AreaGeometry): void {
+  geometryInvariant(value.type === "Polygon", "expected Polygon geometry");
+  geometryInvariant(
+    value.rings.length >= 1,
+    "a polygon requires an outer ring",
+  );
+  for (const ring of value.rings) {
+    geometryInvariant(
+      ring.length >= 4,
+      "a polygon ring requires at least four coordinates",
+    );
+    for (const coordinate of ring) {
+      assertGeographicCoordinate(coordinate);
+    }
+    geometryInvariant(
+      coordinatesEqual(
+        ring[0] as GeographicCoordinate,
+        ring.at(-1) as GeographicCoordinate,
+      ),
+      "a polygon ring must be closed",
+    );
+  }
 }
 
 export interface LayerPluginCapabilities {
@@ -25,6 +152,10 @@ export interface LayerPluginManifest {
   version: string;
   sdkVersion: string;
   displayName: string;
+  category: {
+    id: string;
+    displayName: string;
+  };
   schemaVersion: number;
   configurationSchema: JsonObject;
   dataSchema: JsonObject;
@@ -46,19 +177,54 @@ export interface LayerPluginSharedHooks {
 export interface InteractiveLayerInput {
   configuration: unknown;
   data: unknown;
+  assets: readonly LayerPluginAssetReference[];
   opacity: number;
   visible: boolean;
 }
 
+export interface LayerPluginAssetReference {
+  id: string;
+  status: "pending" | "ready" | "changed" | "missing" | "failed";
+  fileName: string;
+  previewUrl?: string;
+  originalUrl?: string;
+  longitude: number | null;
+  latitude: number | null;
+  bounds?: Readonly<{
+    west: number;
+    south: number;
+    east: number;
+    north: number;
+  }>;
+}
+
 export interface InteractiveLayerDescriptor {
-  type: string;
-  data: unknown;
+  type:
+    | "point-collection"
+    | "line-collection"
+    | "area-collection"
+    | "raster-overlay"
+    | "composite";
+  data: Readonly<{
+    kind:
+      | "point-collection"
+      | "line-collection"
+      | "area-collection"
+      | "raster-overlay"
+      | "composite";
+    features?: readonly unknown[];
+    layers?: readonly unknown[];
+  }>;
 }
 
 export interface LayerPluginFrontendContext {
   instanceId: string;
   publishLayer: (descriptor: InteractiveLayerDescriptor) => void;
   clearLayer: () => void;
+  resolveAssetUrl: (
+    assetId: string,
+    variant?: "preview" | "original",
+  ) => string;
 }
 
 export interface LayerPluginFrontendHandle {
@@ -108,8 +274,16 @@ export interface LayerDrawingSurface {
 export interface LayerPluginServerRenderContext {
   configuration: unknown;
   data: unknown;
+  assets: readonly LayerPluginServerAssetReference[];
   project: (coordinate: GeographicCoordinate) => ScreenPoint;
   surface: LayerDrawingSurface;
+}
+
+export interface LayerPluginServerAssetReference {
+  assetId: string;
+  longitude: number | null;
+  latitude: number | null;
+  bounds?: readonly [GeographicCoordinate, GeographicCoordinate];
 }
 
 export interface LayerPluginServerHooks {
@@ -151,6 +325,14 @@ export function assertValidLayerPluginDefinition(
     `unsupported SDK version: ${manifest.sdkVersion}`,
   );
   invariant(manifest.displayName.trim().length > 0, "empty display name");
+  invariant(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(manifest.category.id),
+    `invalid category id: ${manifest.category.id}`,
+  );
+  invariant(
+    manifest.category.displayName.trim().length > 0,
+    "empty category display name",
+  );
   invariant(
     Number.isInteger(manifest.schemaVersion) && manifest.schemaVersion >= 1,
     "schema version must be a positive integer",
@@ -276,6 +458,7 @@ export async function exerciseLayerPluginContract(
     const input: InteractiveLayerInput = {
       configuration: fixture.configuration,
       data: fixture.data,
+      assets: [],
       opacity: 1,
       visible: true,
     };

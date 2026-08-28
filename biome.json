@@ -7,7 +7,8 @@
   },
   "formatter": {
     "enabled": true,
-    "indentStyle": "space"
+    "indentStyle": "space",
+    "trailingNewline": true
   },
   "linter": {
     "enabled": true,

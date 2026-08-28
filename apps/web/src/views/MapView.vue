@@ -2,8 +2,10 @@
 import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
 import type {
   GeographicCoordinate,
+  MapLayerDescriptor,
   MapRendererInstance,
 } from "@maptoy/map-adapter-sdk";
+import type { LayerPluginFrontendHandle } from "@maptoy/layer-plugin-sdk";
 import { documentation } from "virtual:maptoy-docs";
 import { storeToRefs } from "pinia";
 import {
@@ -22,6 +24,8 @@ import AppContextMenu from "../components/AppContextMenu.vue";
 import GotoCoordinatesDialog from "../components/GotoCoordinatesDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import LayerPanel from "../components/LayerPanel.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
@@ -51,7 +55,11 @@ import { mapTileUrl } from "../mapTileUrl.js";
 import { availableLocalStorage } from "../localStorage.js";
 import { applyMapCenter } from "../mapViewportActions.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
-import { MAP_RENDERER_FACTORY_REGISTRY_KEY } from "../registries.js";
+import {
+  LAYER_PLUGIN_REGISTRY_KEY,
+  MAP_RENDERER_FACTORY_REGISTRY_KEY,
+} from "../registries.js";
+import { useLayersStore } from "../stores/layers.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
 import { useUiPreferencesStore } from "../stores/uiPreferences.js";
 
@@ -60,9 +68,15 @@ if (injectedFactories === undefined) {
   throw new Error("Map renderer factory registry is not available.");
 }
 const factories = injectedFactories;
+const injectedLayerPlugins = inject(LAYER_PLUGIN_REGISTRY_KEY);
+if (injectedLayerPlugins === undefined) {
+  throw new Error("Layer plugin registry is not available.");
+}
+const layerPlugins = injectedLayerPlugins;
 
 const router = useRouter();
 const store = useMapSetsStore();
+const layers = useLayersStore();
 const { selected, selectedId } = storeToRefs(store);
 const mapHost = ref<HTMLElement | null>(null);
 const mapError = ref<string | null>(null);
@@ -128,6 +142,10 @@ const mapContextMenuItems = computed(() =>
 );
 let renderer: MapRendererInstance | null = null;
 let renderGeneration = 0;
+const layerHandles = new Map<string, LayerPluginFrontendHandle>();
+const attachedLayerIds = new Set<string>();
+const publishedLayers = new Map<string, MapLayerDescriptor>();
+let layerOperation: Promise<void> = Promise.resolve();
 
 watch(showCoordinates, (value) => saveShowCoordinates(value, browserStorage));
 watch(showMapSelector, (value) => saveShowMapSelector(value, browserStorage));
@@ -141,11 +159,148 @@ watch(showAttribution, (value) => {
 });
 
 async function destroyRenderer(): Promise<void> {
-  if (renderer !== null) {
-    saveMapViewport(browserStorage, renderer.getViewport());
-    await renderer.destroy();
-    renderer = null;
+  const activeRenderer = renderer;
+  renderer = null;
+  for (const handle of layerHandles.values()) {
+    await handle.destroy();
   }
+  layerHandles.clear();
+  attachedLayerIds.clear();
+  publishedLayers.clear();
+  layerOperation = Promise.resolve();
+  if (activeRenderer !== null) {
+    saveMapViewport(browserStorage, activeRenderer.getViewport());
+    await activeRenderer.destroy();
+  }
+}
+
+async function renderPluginLayers(): Promise<void> {
+  const activeRenderer = renderer;
+  const mapSet = selected.value;
+  if (
+    activeRenderer === null ||
+    mapSet === null ||
+    !mapSet.capabilities.layerRendering
+  ) {
+    return;
+  }
+
+  for (const handle of layerHandles.values()) {
+    await handle.destroy();
+  }
+  layerHandles.clear();
+  await layerOperation;
+
+  for (const layer of layers.items) {
+    if (layer.status !== "ready") {
+      continue;
+    }
+    const plugin = layerPlugins.get(layer.pluginId);
+    if (plugin?.frontend === undefined) {
+      continue;
+    }
+    const assets = (layers.assetsByLayer[layer.id] ?? []).map((asset) => ({
+      id: asset.id,
+      status: asset.status,
+      fileName: asset.fileName,
+      ...(asset.previewAvailable
+        ? { previewUrl: `api/layers/${layer.id}/assets/${asset.id}` }
+        : {}),
+      longitude: asset.longitude,
+      latitude: asset.latitude,
+      ...(asset.bounds === null ? {} : { bounds: asset.bounds }),
+    }));
+    const handle = await plugin.frontend.mount(
+      {
+        instanceId: layer.id,
+        publishLayer: (descriptor) => {
+          const mapLayer: MapLayerDescriptor = {
+            id: layer.id,
+            type: descriptor.type,
+            visible: layerIsVisibleAtCurrentZoom(layer),
+            opacity: layer.opacity,
+            data: descriptor.data,
+          };
+          publishedLayers.set(layer.id, mapLayer);
+          layerOperation = layerOperation.then(async () => {
+            if (renderer !== activeRenderer) {
+              return;
+            }
+            if (attachedLayerIds.has(layer.id)) {
+              await activeRenderer.updateLayer(mapLayer);
+            } else {
+              await activeRenderer.attachLayer(mapLayer);
+              attachedLayerIds.add(layer.id);
+            }
+          });
+        },
+        clearLayer: () => {
+          layerOperation = layerOperation.then(async () => {
+            if (
+              renderer === activeRenderer &&
+              attachedLayerIds.delete(layer.id)
+            ) {
+              await activeRenderer.removeLayer(layer.id);
+              publishedLayers.delete(layer.id);
+            }
+          });
+        },
+        resolveAssetUrl: (assetId) =>
+          `api/layers/${layer.id}/assets/${encodeURIComponent(assetId)}`,
+      },
+      {
+        configuration: layer.configuration,
+        data: layer.data,
+        assets,
+        opacity: layer.opacity,
+        visible: layer.visible,
+      },
+    );
+    layerHandles.set(layer.id, handle);
+  }
+  await layerOperation;
+  if (renderer === activeRenderer) {
+    await activeRenderer.reorderLayers(
+      layers.items
+        .filter((layer) => attachedLayerIds.has(layer.id))
+        .map(({ id }) => id),
+    );
+  }
+}
+
+function layerIsVisibleAtCurrentZoom(
+  layer: (typeof layers.items)[number],
+): boolean {
+  const mapSet = selected.value;
+  if (!layer.visible || zoom.value === null || mapSet === null) {
+    return false;
+  }
+  const sourceZoom = zoom.value + leafletXyzZoomOptions(mapSet).zoomOffset;
+  return (
+    (layer.minimumZoom === null || sourceZoom >= layer.minimumZoom) &&
+    (layer.maximumZoom === null || sourceZoom <= layer.maximumZoom)
+  );
+}
+
+async function refreshLayerZoomVisibility(): Promise<void> {
+  const activeRenderer = renderer;
+  if (activeRenderer === null) {
+    return;
+  }
+  await Promise.all(
+    layers.items.map(async (layer) => {
+      const published = publishedLayers.get(layer.id);
+      if (published === undefined) {
+        return;
+      }
+      const next = {
+        ...published,
+        visible: layerIsVisibleAtCurrentZoom(layer),
+      };
+      publishedLayers.set(layer.id, next);
+      await activeRenderer.updateLayer(next);
+    }),
+  );
 }
 
 async function renderSelectedMap(): Promise<void> {
@@ -221,7 +376,16 @@ async function renderSelectedMap(): Promise<void> {
       const viewport = nextRenderer.getViewport();
       zoom.value = viewport.zoom;
       saveMapViewport(browserStorage, viewport);
+      void refreshLayerZoomVisibility();
     });
+    if (mapSet.capabilities.layerRendering) {
+      if (!layers.loaded) {
+        await layers.load();
+      }
+      if (generation === renderGeneration && renderer === nextRenderer) {
+        await renderPluginLayers();
+      }
+    }
   } catch (error) {
     mapError.value =
       error instanceof Error
@@ -450,6 +614,11 @@ function openTileCalculator(): void {
       </div>
 
       <div class="map-bottom-left">
+        <LayerPanel
+          v-if="selected"
+          :enabled="selected.capabilities.layerRendering"
+          @changed="renderPluginLayers"
+        />
         <TogglePanel ref="displayOptionsPanel" label="Display Options" align="start">
           <template #trigger>
             <i class="mdi mdi-tune" aria-hidden="true"></i>
@@ -500,14 +669,16 @@ function openTileCalculator(): void {
           </label>
         </TogglePanel>
         <p
-          v-if="pointer"
           class="viewport-status"
-          :style="{ visibility: showCoordinates ? 'visible' : 'hidden' }"
+          :style="{
+            visibility: showCoordinates && pointer ? 'visible' : 'hidden',
+          }"
           aria-label="Map coordinates"
         >
-          <span class="coordinates">
+          <span v-if="pointer" class="coordinates">
             {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
           </span>
+          <span v-else class="coordinates" aria-hidden="true">&nbsp;</span>
         </p>
       </div>
 

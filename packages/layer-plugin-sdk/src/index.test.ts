@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  assertAreaGeometry,
+  assertLineGeometry,
+  assertPointGeometry,
   createLayerPluginRegistry,
   exerciseLayerPluginContract,
   LAYER_PLUGIN_SDK_VERSION,
@@ -20,6 +23,7 @@ function fakePlugin(): LayerPluginDefinition {
       version: "1.0.0",
       sdkVersion: LAYER_PLUGIN_SDK_VERSION,
       displayName: "Contract fake",
+      category: { id: "contract-features", displayName: "Contract features" },
       schemaVersion: 2,
       configurationSchema: { type: "object" },
       dataSchema: { type: "object" },
@@ -43,10 +47,18 @@ function fakePlugin(): LayerPluginDefinition {
     },
     frontend: {
       mount: (context, input) => {
-        context.publishLayer({ type: "fake", data: input.data });
+        void input;
+        context.publishLayer({
+          type: "point-collection",
+          data: { kind: "point-collection", features: [] },
+        });
         return {
           update: (nextInput) => {
-            context.publishLayer({ type: "fake", data: nextInput.data });
+            void nextInput;
+            context.publishLayer({
+              type: "point-collection",
+              data: { kind: "point-collection", features: [] },
+            });
           },
           destroy: context.clearLayer,
         };
@@ -80,6 +92,49 @@ function fakePlugin(): LayerPluginDefinition {
 }
 
 describe("layer plugin contract", () => {
+  it("validates reusable point, line, and area geometries", () => {
+    expect(() =>
+      assertPointGeometry({
+        type: "Point",
+        coordinate: { longitude: 13.4, latitude: 52.5 },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertLineGeometry({
+        type: "LineString",
+        vertices: [
+          { coordinate: { longitude: 13.4, latitude: 52.5 } },
+          { coordinate: { longitude: 13.5, latitude: 52.6 } },
+        ],
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertAreaGeometry({
+        type: "Polygon",
+        rings: [
+          [
+            { longitude: 13.4, latitude: 52.5 },
+            { longitude: 13.5, latitude: 52.5 },
+            { longitude: 13.5, latitude: 52.6 },
+            { longitude: 13.4, latitude: 52.5 },
+          ],
+        ],
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertAreaGeometry({
+        type: "Polygon",
+        rings: [
+          [
+            { longitude: 13.4, latitude: 52.5 },
+            { longitude: 13.5, latitude: 52.5 },
+            { longitude: 13.5, latitude: 52.6 },
+          ],
+        ],
+      }),
+    ).toThrow("at least four coordinates");
+  });
+
   it("exercises validation, migration, lifecycle, import, and rendering", async () => {
     const publishLayer = vi.fn();
     const clearLayer = vi.fn();
@@ -95,6 +150,7 @@ describe("layer plugin contract", () => {
           instanceId: "fixture-layer",
           publishLayer,
           clearLayer,
+          resolveAssetUrl: (assetId) => `api/assets/${assetId}`,
         },
         asset: {
           assetId: "fixture-asset",
@@ -105,6 +161,7 @@ describe("layer plugin contract", () => {
         renderContext: {
           configuration: {},
           data: {},
+          assets: [],
           project: ({ longitude, latitude }) => ({
             x: longitude,
             y: latitude,

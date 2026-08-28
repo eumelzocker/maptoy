@@ -68,16 +68,141 @@ export interface MapRectangleLayerData {
   features: readonly MapRectangleFeature[];
 }
 
-export function isMapRectangleLayerData(
-  value: unknown,
-): value is MapRectangleLayerData {
+export interface MapPointSymbolizer {
+  radius: number;
+  fillColor: string;
+  strokeColor: string;
+  strokeWidth: number;
+  fillOpacity: number;
+}
+
+export interface MapPointFeature {
+  id: string;
+  coordinate: GeographicCoordinate;
+  title?: string;
+  previewUrl?: string;
+  symbolizer: MapPointSymbolizer;
+}
+
+export interface MapPointLayerData {
+  kind: "point-collection";
+  features: readonly MapPointFeature[];
+}
+
+export interface MapLineSymbolizer {
+  color: string;
+  width: number;
+  opacity: number;
+  dashArray?: string;
+}
+
+export interface MapLineFeature {
+  id: string;
+  coordinates: readonly GeographicCoordinate[];
+  title?: string;
+  symbolizer: MapLineSymbolizer;
+}
+
+export interface MapLineLayerData {
+  kind: "line-collection";
+  features: readonly MapLineFeature[];
+}
+
+export interface MapAreaSymbolizer {
+  fillColor: string;
+  fillOpacity: number;
+  strokeColor: string;
+  strokeWidth: number;
+  strokeOpacity: number;
+}
+
+export interface MapAreaFeature {
+  id: string;
+  rings: readonly (readonly GeographicCoordinate[])[];
+  title?: string;
+  symbolizer: MapAreaSymbolizer;
+}
+
+export interface MapAreaLayerData {
+  kind: "area-collection";
+  features: readonly MapAreaFeature[];
+}
+
+export interface MapRasterOverlayFeature {
+  id: string;
+  imageUrl: string;
+  bounds: MapGeographicBounds;
+  title?: string;
+}
+
+export interface MapRasterOverlayLayerData {
+  kind: "raster-overlay";
+  features: readonly MapRasterOverlayFeature[];
+}
+
+export type MapPrimitiveLayerData =
+  | MapRectangleLayerData
+  | MapPointLayerData
+  | MapLineLayerData
+  | MapAreaLayerData
+  | MapRasterOverlayLayerData;
+
+export interface MapCompositeLayerData {
+  kind: "composite";
+  layers: readonly MapPrimitiveLayerData[];
+}
+
+export type MapSupportedLayerData =
+  | MapPrimitiveLayerData
+  | MapCompositeLayerData;
+
+function hasKind(value: unknown, kind: MapPrimitiveLayerData["kind"]): boolean {
   return (
     typeof value === "object" &&
     value !== null &&
     "kind" in value &&
-    value.kind === "rectangle-grid" &&
+    value.kind === kind &&
     "features" in value &&
     Array.isArray(value.features)
+  );
+}
+
+export function isMapRectangleLayerData(
+  value: unknown,
+): value is MapRectangleLayerData {
+  return hasKind(value, "rectangle-grid");
+}
+
+export function isMapPointLayerData(
+  value: unknown,
+): value is MapPointLayerData {
+  return hasKind(value, "point-collection");
+}
+
+export function isMapLineLayerData(value: unknown): value is MapLineLayerData {
+  return hasKind(value, "line-collection");
+}
+
+export function isMapAreaLayerData(value: unknown): value is MapAreaLayerData {
+  return hasKind(value, "area-collection");
+}
+
+export function isMapRasterOverlayLayerData(
+  value: unknown,
+): value is MapRasterOverlayLayerData {
+  return hasKind(value, "raster-overlay");
+}
+
+export function isMapCompositeLayerData(
+  value: unknown,
+): value is MapCompositeLayerData {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    value.kind === "composite" &&
+    "layers" in value &&
+    Array.isArray(value.layers)
   );
 }
 
@@ -296,17 +421,36 @@ export async function exerciseMapRendererContract(
   invariant(typeof unsubscribe === "function", "subscribe must return cleanup");
   unsubscribe();
 
-  const layer: MapLayerDescriptor = {
-    id: "contract-layer",
-    type: "fixture",
-    visible: true,
-    opacity: 0.75,
-    data: { fixture: true },
-  };
-  await instance.attachLayer(layer);
-  await instance.updateLayer({ ...layer, opacity: 0.5 });
-  await instance.reorderLayers([layer.id]);
-  await instance.removeLayer(layer.id);
+  const layerData: readonly MapSupportedLayerData[] = [
+    { kind: "point-collection", features: [] },
+    { kind: "line-collection", features: [] },
+    { kind: "area-collection", features: [] },
+    { kind: "raster-overlay", features: [] },
+    {
+      kind: "composite",
+      layers: [
+        { kind: "point-collection", features: [] },
+        { kind: "raster-overlay", features: [] },
+      ],
+    },
+  ];
+  const layerIds: string[] = [];
+  for (const [index, data] of layerData.entries()) {
+    const layer: MapLayerDescriptor = {
+      id: `contract-layer-${index}`,
+      type: data.kind,
+      visible: true,
+      opacity: 0.75,
+      data,
+    };
+    await instance.attachLayer(layer);
+    await instance.updateLayer({ ...layer, opacity: 0.5 });
+    layerIds.push(layer.id);
+  }
+  await instance.reorderLayers(layerIds.toReversed());
+  for (const layerId of layerIds) {
+    await instance.removeLayer(layerId);
+  }
 
   await instance.setAttributionVisible(false);
   await instance.setAttributionVisible(true);

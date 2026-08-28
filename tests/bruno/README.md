@@ -16,3 +16,8 @@ Before using the Tile-seeding request, set `tileFile` to an absolute PNG, JPEG, 
 WebP path and adjust its `Content-Type` header to the Map Set's configured format.
 The request sends that file directly as the body and is intentionally marked as a
 write operation.
+
+Layer requests use `layerId` for a Track Layer, `imageLayerId` for an Image Layer,
+`layerAssetFile` for a GPX or GeoJSON file, and `imageRootId` for one of the safe IDs
+returned by **Image Roots - List**. Upload and scan requests are explicitly marked as
+state-changing and should be run individually.

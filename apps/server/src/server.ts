@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import fastifyMultipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { loadConfig, type MaptoyConfig } from "@maptoy/config";
 import type { HealthResponse, ReadyResponse } from "@maptoy/contracts";
@@ -10,6 +11,15 @@ import Fastify, {
 } from "fastify";
 import { layerPluginRegistry, mapRendererRegistry } from "./registries.js";
 import { openDatabase } from "./database.js";
+import { ImageScanService } from "./layers/imageScanner.js";
+import {
+  ImagePreviewStorage,
+  ImageRootResolver,
+} from "./layers/imageStorage.js";
+import { ManagedAssetService } from "./layers/managedAssets.js";
+import { JobRepository, LayerRepository } from "./layers/repository.js";
+import { registerLayerRoutes } from "./layers/routes.js";
+import { LayerService } from "./layers/service.js";
 import { MapSetRepository } from "./mapSets/repository.js";
 import { registerMapSetRoutes } from "./mapSets/routes.js";
 import { MapSetService } from "./mapSets/service.js";
@@ -71,6 +81,14 @@ const configurationEnvironmentNames = new Set([
   "MAPTOY_ALLOW_PRIVATE_TILE_HOSTS",
   "MAPTOY_PROVIDER_TIMEOUT_MS",
   "MAPTOY_MAX_TILE_BYTES",
+  "MAPTOY_MAX_LAYER_ASSET_BYTES",
+  "MAPTOY_IMAGE_ROOTS_JSON",
+  "MAPTOY_MAX_IMAGE_BYTES",
+  "MAPTOY_MAX_IMAGE_PIXELS",
+  "MAPTOY_IMAGE_PREVIEW_MAX_EDGE",
+  "MAPTOY_IMAGE_SCAN_BATCH_SIZE",
+  "MAPTOY_IMAGE_DECODER_CONCURRENCY",
+  "MAPTOY_MAX_IMAGE_SCAN_FILES",
 ]);
 
 function providerSecretValues(environment: NodeJS.ProcessEnv): string[] {
@@ -91,6 +109,13 @@ export async function buildServer(
   const config = options.config ?? loadConfig();
   const environment = options.environment ?? process.env;
   const server = Fastify({ logger: options.logger ?? false });
+  await server.register(fastifyMultipart, {
+    limits: {
+      files: 1,
+      fields: 0,
+      fileSize: config.maximumLayerAssetBytes,
+    },
+  });
   server.addContentTypeParser(
     "*",
     { parseAs: "buffer" },
@@ -117,6 +142,8 @@ export async function buildServer(
   await mkdir(config.dataDirectory, { recursive: true });
   const database = await openDatabase(config.databasePath);
   const mapSetRepository = new MapSetRepository(database.sqlite);
+  const layerRepository = new LayerRepository(database.sqlite);
+  const jobRepository = new JobRepository(database.sqlite);
   const tileArchiveRepository = new TileArchiveRepository(database.sqlite);
   const tileArchive = new TileArchiveService(
     tileArchiveRepository,
@@ -146,8 +173,36 @@ export async function buildServer(
       maximumTileBytes: config.maximumTileBytes,
     },
   );
+  const layerService = new LayerService(layerRepository, layerPluginRegistry);
+  await layerService.initialize();
+  const imageScanService = new ImageScanService(
+    layerService,
+    layerRepository,
+    jobRepository,
+    new ImageRootResolver(config.imageRoots),
+    new ImagePreviewStorage(config.dataDirectory, {
+      maximumImageBytes: config.maximumImageBytes,
+      maximumImagePixels: config.maximumImagePixels,
+      previewMaximumEdge: config.imagePreviewMaximumEdge,
+    }),
+    {
+      batchSize: config.imageScanBatchSize,
+      decoderConcurrency: config.imageDecoderConcurrency,
+      maximumFiles: config.maximumImageScanFiles,
+    },
+  );
+  const managedAssetService = new ManagedAssetService(
+    layerService,
+    layerPluginRegistry,
+    layerRepository,
+    config.dataDirectory,
+    config.maximumLayerAssetBytes,
+  );
+  await managedAssetService.initialize();
+  await imageScanService.initialize();
 
   server.addHook("onClose", async () => {
+    await imageScanService.shutdown();
     await Promise.all([apiTrafficLog.close(), providerTrafficLog.close()]);
     database.close();
   });
@@ -231,6 +286,12 @@ export async function buildServer(
   registerMapSetRoutes(server, mapSetService, tileArchive, {
     maximumTileBytes: config.maximumTileBytes,
   });
+  registerLayerRoutes(
+    server,
+    layerService,
+    imageScanService,
+    managedAssetService,
+  );
 
   if (options.serveWeb ?? true) {
     const root = options.staticDirectory ?? defaultStaticDirectory();

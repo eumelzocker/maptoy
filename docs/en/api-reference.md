@@ -70,6 +70,34 @@ endpoint reads SQLite metadata only and never contacts a provider.
 Invalid bounds, Zooms, or timestamps return `400 COVERAGE_QUERY_INVALID`; an
 unknown Snapshot returns `404 SNAPSHOT_NOT_FOUND`.
 
+## Layers and assets
+
+`GET api/layers` lists the global overlay stack. Layer instances are independent of
+Map Sets. `POST api/layers`, `GET api/layers/:id`, `PATCH api/layers/:id`, and
+`DELETE api/layers/:id` provide generic CRUD using the registered plugin's
+validation. `name` is required and uses non-empty `/`-separated segments as the
+hierarchy below the plugin category.
+
+`GET api/layers/:id/assets` cursor-paginates the Asset catalog. `POST` to the same
+path accepts one plugin-validated `multipart/form-data` non-image file. Its maximum
+size is `MAPTOY_MAX_LAYER_ASSET_BYTES`. `GET api/layers/:id/assets/:assetId` returns
+the controlled managed file or an external image's derived WebP preview. It never
+returns an external image original. `PATCH` updates an image's complete point or
+geographic bounds; the two forms are mutually exclusive.
+
+`GET api/image-roots` lists stable IDs and availability without absolute paths.
+`POST api/layers/:id/image-scan-jobs` accepts `rootId`, a relative
+`relativeDirectory`, and `recursive`. It creates a persistent scan Job.
+
+## Jobs
+
+`GET api/jobs` lists Jobs and `GET api/jobs/:id` reads one Job. An image scan in a
+valid state can be controlled with `POST api/jobs/:id/pause`,
+`POST api/jobs/:id/resume`, and `POST api/jobs/:id/cancel`. Responses include
+`total`, `completed`, `skipped`, `failed`, status timestamps, and a safe last error.
+Image scans additionally persist `summary` counts for `created`, `changed`,
+`unchanged`, `missing`, and `failed` files.
+
 ## Security boundary
 
 *maptoy* v1 does not authenticate API requests. The Tile upload is a write operation

@@ -5,6 +5,10 @@ FROM node:24.19.0-bookworm-slim AS toolchain
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
+RUN apt-get update \
+  && apt-get install --yes --no-install-recommends libimage-exiftool-perl \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
 
 WORKDIR /workspace
@@ -36,7 +40,7 @@ RUN mkdir -p /release/web && cp -R apps/web/dist /release/web/dist
 FROM node:24.19.0-bookworm-slim AS runtime
 
 RUN apt-get update \
-  && apt-get install --yes --no-install-recommends ca-certificates gdal-bin proj-bin tini \
+  && apt-get install --yes --no-install-recommends ca-certificates gdal-bin libimage-exiftool-perl proj-bin tini \
   && rm -rf /var/lib/apt/lists/*
 
 ENV MAPTOY_HOST=0.0.0.0

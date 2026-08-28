@@ -26,8 +26,63 @@ describe("Map view architecture", () => {
     expect(mapView).not.toContain("formatLeafletZoomLevel(zoom.value)");
     expect(mapView).not.toContain("Zoom {{ displayedZoom }}");
     expect(mapView).toContain('aria-label="Map coordinates"');
+    expect(mapView).not.toContain(
+      'v-if="pointer"\n          class="viewport-status"',
+    );
+    expect(mapView).toContain("showCoordinates && pointer");
     expect(mapView).not.toContain("Math.round(zoom)");
     expect(tileUrl).not.toContain("https://");
+  });
+
+  it("keeps layer tools inside the standard Map view", async () => {
+    const [mapView, main, coverageView, layerPanel, layerStore] =
+      await Promise.all([
+        readFile(
+          fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
+          "utf8",
+        ),
+        readFile(fileURLToPath(new URL("./main.ts", import.meta.url)), "utf8"),
+        readFile(
+          fileURLToPath(new URL("./views/CoverageView.vue", import.meta.url)),
+          "utf8",
+        ),
+        readFile(
+          fileURLToPath(
+            new URL("./components/LayerPanel.vue", import.meta.url),
+          ),
+          "utf8",
+        ),
+        readFile(
+          fileURLToPath(new URL("./stores/layers.ts", import.meta.url)),
+          "utf8",
+        ),
+      ]);
+
+    expect(mapView).toContain("<LayerPanel");
+    expect(mapView).toContain("LAYER_PLUGIN_REGISTRY_KEY");
+    expect(mapView).toContain("renderPluginLayers");
+    expect(layerPanel).toContain("Scan directory");
+    expect(layerPanel).toContain('class="layer-configuration"');
+    expect(layerPanel).toContain(":aria-expanded=");
+    expect(layerPanel).toContain("loadExpandedLayerConfigurations");
+    expect(layerPanel).toContain("buildLayerHierarchyRows");
+    expect(layerPanel).toContain("Name or folder/name");
+    expect(layerPanel).toContain("visibleHierarchyRows");
+    expect(layerPanel).toContain("loadCollapsedLayerHierarchy");
+    expect(layerPanel).toContain("visibleLayerHierarchyRows");
+    expect(layerPanel).toContain('class="hierarchy-heading hierarchy-toggle"');
+    expect(layerPanel).toContain('class="layer-type-option"');
+    expect(layerPanel).toContain(':placeholder="suggestedLayerName"');
+    expect(layerPanel).toContain("data-layer-primary-action");
+    expect(layerPanel).toContain("focusPrimaryLayerAction");
+    expect(layerPanel).toContain(":suspend-outside-close=");
+    expect(mapView).toContain("if (!layers.loaded)");
+    expect(mapView).not.toContain("layers.load(mapSet.id)");
+    expect(layerStore).toContain('apiRequest<LayerListResponse>("api/layers")');
+    expect(layerStore).not.toContain("mapSetId");
+    expect(layerPanel).not.toContain("Detach and keep reusable");
+    expect(main).not.toContain('path: "/layers"');
+    expect(coverageView).not.toContain("LayerPanel");
   });
 
   it("renders Coverage through a neutral rectangle-grid Layer", async () => {

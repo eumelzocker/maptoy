@@ -4,6 +4,7 @@ import {
   CoverageQuerySchema,
   CoverageResponseSchema,
   createDefaultMapSetInput,
+  LayerInputSchema,
   MapSetInputSchema,
   TileRevisionSummarySchema,
   TileUploadResponseSchema,
@@ -107,5 +108,24 @@ describe("Map Set contracts", () => {
         cells: [],
       }),
     ).toBe(true);
+  });
+
+  it("keeps Layer instances independent of Map Sets", () => {
+    const layer = {
+      name: "Track",
+      pluginId: "track-layer",
+      configuration: {},
+      data: { features: [] },
+      visible: true,
+      displayOrder: 0,
+      opacity: 1,
+      minimumZoom: null,
+      maximumZoom: null,
+    };
+
+    expect(Value.Check(LayerInputSchema, layer)).toBe(true);
+    expect(
+      Value.Check(LayerInputSchema, { ...layer, mapSetId: "map-set" }),
+    ).toBe(false);
   });
 });

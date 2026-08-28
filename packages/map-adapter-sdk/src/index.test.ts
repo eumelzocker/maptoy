@@ -4,6 +4,10 @@ import {
   createMapRendererFactoryRegistry,
   createMapRendererManifestRegistry,
   exerciseMapRendererContract,
+  isMapAreaLayerData,
+  isMapLineLayerData,
+  isMapPointLayerData,
+  isMapRasterOverlayLayerData,
   isMapRectangleLayerData,
 } from "./index.js";
 
@@ -49,6 +53,21 @@ describe("map renderer contract", () => {
     expect(isMapRectangleLayerData({ kind: "points", features: [] })).toBe(
       false,
     );
+  });
+
+  it("recognizes the shared point, line, area, and raster descriptors", () => {
+    expect(
+      isMapPointLayerData({ kind: "point-collection", features: [] }),
+    ).toBe(true);
+    expect(isMapLineLayerData({ kind: "line-collection", features: [] })).toBe(
+      true,
+    );
+    expect(isMapAreaLayerData({ kind: "area-collection", features: [] })).toBe(
+      true,
+    );
+    expect(
+      isMapRasterOverlayLayerData({ kind: "raster-overlay", features: [] }),
+    ).toBe(true);
   });
 
   it("lets renderers constrain their viewport zoom without changing the SDK version", async () => {

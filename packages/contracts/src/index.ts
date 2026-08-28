@@ -150,6 +150,248 @@ export const MapSetListResponseSchema = Type.Object(
 
 export type MapSetListResponse = Static<typeof MapSetListResponseSchema>;
 
+export const LayerStatusSchema = Type.Union([
+  Type.Literal("ready"),
+  Type.Literal("plugin-missing"),
+  Type.Literal("incompatible"),
+  Type.Literal("migration-failed"),
+]);
+
+export type LayerStatus = Static<typeof LayerStatusSchema>;
+
+export const LayerInputSchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 120 }),
+    pluginId: Type.String({
+      minLength: 1,
+      maxLength: 128,
+      pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    }),
+    configuration: Type.Record(Type.String(), Type.Unknown()),
+    data: Type.Record(Type.String(), Type.Unknown()),
+    visible: Type.Boolean(),
+    displayOrder: Type.Integer({ minimum: 0 }),
+    opacity: Type.Number({ minimum: 0, maximum: 1 }),
+    minimumZoom: Type.Union([
+      Type.Null(),
+      Type.Number({ minimum: 0, maximum: 24 }),
+    ]),
+    maximumZoom: Type.Union([
+      Type.Null(),
+      Type.Number({ minimum: 0, maximum: 24 }),
+    ]),
+  },
+  { additionalProperties: false, $id: "LayerInput" },
+);
+
+export type LayerInput = Static<typeof LayerInputSchema>;
+
+export const LayerPatchSchema = Type.Partial(LayerInputSchema, {
+  additionalProperties: false,
+  $id: "LayerPatch",
+});
+
+export type LayerPatch = Static<typeof LayerPatchSchema>;
+
+export const LayerSchema = Type.Composite(
+  [
+    LayerInputSchema,
+    Type.Object(
+      {
+        id: Type.String(),
+        pluginVersion: Type.String(),
+        schemaVersion: Type.Integer({ minimum: 1 }),
+        status: LayerStatusSchema,
+        diagnostic: Type.Union([Type.String(), Type.Null()]),
+        createdAt: Type.String(),
+        updatedAt: Type.String(),
+      },
+      { additionalProperties: false },
+    ),
+  ],
+  { additionalProperties: false, $id: "Layer" },
+);
+
+export type Layer = Static<typeof LayerSchema>;
+
+export const LayerListResponseSchema = Type.Object(
+  { items: Type.Array(LayerSchema) },
+  { additionalProperties: false, $id: "LayerListResponse" },
+);
+
+export type LayerListResponse = Static<typeof LayerListResponseSchema>;
+
+export const CoordinateSourceSchema = Type.Union([
+  Type.Literal("exif"),
+  Type.Literal("manual"),
+  Type.Literal("none"),
+]);
+
+export type CoordinateSource = Static<typeof CoordinateSourceSchema>;
+
+export const LayerAssetStatusSchema = Type.Union([
+  Type.Literal("pending"),
+  Type.Literal("ready"),
+  Type.Literal("changed"),
+  Type.Literal("missing"),
+  Type.Literal("failed"),
+]);
+
+export const LayerAssetSchema = Type.Object(
+  {
+    id: Type.String(),
+    layerId: Type.String(),
+    kind: Type.Union([Type.Literal("managed"), Type.Literal("external-image")]),
+    status: LayerAssetStatusSchema,
+    fileName: Type.String(),
+    contentType: Type.Union([Type.String(), Type.Null()]),
+    byteLength: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+    contentHash: Type.Union([Type.String(), Type.Null()]),
+    sourceRootId: Type.Union([Type.String(), Type.Null()]),
+    relativePath: Type.Union([Type.String(), Type.Null()]),
+    sourceModifiedAt: Type.Union([Type.String(), Type.Null()]),
+    width: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
+    height: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
+    longitude: Type.Union([
+      Type.Number({ minimum: -180, maximum: 180 }),
+      Type.Null(),
+    ]),
+    latitude: Type.Union([
+      Type.Number({ minimum: -90, maximum: 90 }),
+      Type.Null(),
+    ]),
+    coordinateSource: CoordinateSourceSchema,
+    bounds: Type.Union([
+      Type.Null(),
+      Type.Object(
+        {
+          west: Type.Number({ minimum: -180, maximum: 180 }),
+          south: Type.Number({ minimum: -90, maximum: 90 }),
+          east: Type.Number({ minimum: -180, maximum: 180 }),
+          north: Type.Number({ minimum: -90, maximum: 90 }),
+        },
+        { additionalProperties: false },
+      ),
+    ]),
+    previewAvailable: Type.Boolean(),
+    errorCode: Type.Union([Type.String(), Type.Null()]),
+    errorMessage: Type.Union([Type.String(), Type.Null()]),
+    createdAt: Type.String(),
+    updatedAt: Type.String(),
+  },
+  { additionalProperties: false, $id: "LayerAsset" },
+);
+
+export type LayerAsset = Static<typeof LayerAssetSchema>;
+
+export const LayerAssetPatchSchema = Type.Object(
+  {
+    longitude: Type.Union([
+      Type.Null(),
+      Type.Number({ minimum: -180, maximum: 180 }),
+    ]),
+    latitude: Type.Union([
+      Type.Null(),
+      Type.Number({ minimum: -90, maximum: 90 }),
+    ]),
+    bounds: Type.Union([
+      Type.Null(),
+      Type.Object(
+        {
+          west: Type.Number({ minimum: -180, maximum: 180 }),
+          south: Type.Number({ minimum: -90, maximum: 90 }),
+          east: Type.Number({ minimum: -180, maximum: 180 }),
+          north: Type.Number({ minimum: -90, maximum: 90 }),
+        },
+        { additionalProperties: false },
+      ),
+    ]),
+  },
+  { additionalProperties: false, $id: "LayerAssetPatch" },
+);
+
+export type LayerAssetPatch = Static<typeof LayerAssetPatchSchema>;
+
+export const LayerAssetImportResponseSchema = Type.Object(
+  {
+    layer: LayerSchema,
+    asset: LayerAssetSchema,
+  },
+  { additionalProperties: false, $id: "LayerAssetImportResponse" },
+);
+
+export const LayerAssetListResponseSchema = Type.Object(
+  {
+    items: Type.Array(LayerAssetSchema),
+    nextCursor: Type.Union([Type.String(), Type.Null()]),
+  },
+  { additionalProperties: false, $id: "LayerAssetListResponse" },
+);
+
+export const ImageRootSchema = Type.Object(
+  {
+    id: Type.String(),
+    available: Type.Boolean(),
+  },
+  { additionalProperties: false, $id: "ImageRoot" },
+);
+
+export const ImageRootListResponseSchema = Type.Object(
+  { items: Type.Array(ImageRootSchema) },
+  { additionalProperties: false, $id: "ImageRootListResponse" },
+);
+
+export const ImageScanJobInputSchema = Type.Object(
+  {
+    rootId: Type.String({ minLength: 1, maxLength: 64 }),
+    relativeDirectory: Type.String({ maxLength: 4096 }),
+    recursive: Type.Boolean(),
+  },
+  { additionalProperties: false, $id: "ImageScanJobInput" },
+);
+
+export type ImageScanJobInput = Static<typeof ImageScanJobInputSchema>;
+
+export const JobStatusSchema = Type.Union([
+  Type.Literal("queued"),
+  Type.Literal("running"),
+  Type.Literal("paused"),
+  Type.Literal("completed"),
+  Type.Literal("failed"),
+  Type.Literal("cancelled"),
+]);
+
+export const JobSchema = Type.Object(
+  {
+    id: Type.String(),
+    type: Type.Union([
+      Type.Literal("image-scan"),
+      Type.Literal("tile-download"),
+      Type.Literal("map-export"),
+    ]),
+    status: JobStatusSchema,
+    input: Type.Record(Type.String(), Type.Unknown()),
+    total: Type.Integer({ minimum: 0 }),
+    completed: Type.Integer({ minimum: 0 }),
+    skipped: Type.Integer({ minimum: 0 }),
+    failed: Type.Integer({ minimum: 0 }),
+    summary: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
+    lastError: Type.Union([Type.String(), Type.Null()]),
+    createdAt: Type.String(),
+    startedAt: Type.Union([Type.String(), Type.Null()]),
+    updatedAt: Type.String(),
+    finishedAt: Type.Union([Type.String(), Type.Null()]),
+  },
+  { additionalProperties: false, $id: "Job" },
+);
+
+export type Job = Static<typeof JobSchema>;
+
+export const JobListResponseSchema = Type.Object(
+  { items: Type.Array(JobSchema) },
+  { additionalProperties: false, $id: "JobListResponse" },
+);
+
 export const MapSetTestResponseSchema = Type.Object(
   {
     ok: Type.Boolean(),

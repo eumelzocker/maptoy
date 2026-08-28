@@ -1,7 +1,18 @@
-import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import type { MaptoyConfig } from "@maptoy/config";
 import { createDefaultMapSetInput } from "@maptoy/contracts";
 import { xyzTileBounds } from "@maptoy/map-core";
@@ -9,6 +20,8 @@ import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderClient } from "./providerClient.js";
 import { buildServer } from "./server.js";
+
+const executeFile = promisify(execFile);
 
 const temporaryDirectories: string[] = [];
 const validPng = Buffer.from(
@@ -42,6 +55,14 @@ async function testConfig(): Promise<MaptoyConfig> {
     allowPrivateTileHosts: true,
     providerTimeoutMilliseconds: 1000,
     maximumTileBytes: 1024 * 1024,
+    maximumLayerAssetBytes: 1024 * 1024,
+    imageRoots: [],
+    maximumImageBytes: 10 * 1024 * 1024,
+    maximumImagePixels: 10_000_000,
+    imagePreviewMaximumEdge: 320,
+    imageScanBatchSize: 10,
+    imageDecoderConcurrency: 1,
+    maximumImageScanFiles: 1000,
   };
 }
 
@@ -217,10 +238,379 @@ describe("maptoy server", () => {
     });
     expect(layerPlugins.json()).toMatchObject({
       items: [
-        { id: "track-layer", sdkVersion: "1.0.0" },
-        { id: "image-layer", sdkVersion: "1.0.0" },
+        {
+          id: "track-layer",
+          sdkVersion: "1.0.0",
+          category: { id: "tracks", displayName: "Tracks" },
+        },
+        {
+          id: "image-layer",
+          sdkVersion: "1.0.0",
+          category: { id: "images", displayName: "Images" },
+        },
       ],
     });
+    await server.close();
+  });
+
+  it("manages layers, imports a Track, and scans external images without copying originals", async () => {
+    const config = await testConfig();
+    const imageRoot = `${config.dataDirectory}-external-photos`;
+    await mkdir(imageRoot, { recursive: true });
+    temporaryDirectories.push(imageRoot);
+    await sharp({
+      create: {
+        width: 48,
+        height: 32,
+        channels: 3,
+        background: "#336699",
+      },
+    })
+      .jpeg()
+      .toFile(path.join(imageRoot, "photo.jpg"));
+    await executeFile("exiftool", [
+      "-overwrite_original",
+      "-GPSLatitude=52.52",
+      "-GPSLatitudeRef=N",
+      "-GPSLongitude=13.405",
+      "-GPSLongitudeRef=E",
+      path.join(imageRoot, "photo.jpg"),
+    ]);
+    const server = await buildServer({
+      config: {
+        ...config,
+        imageRoots: [{ id: "photos", path: imageRoot }],
+      },
+      providerClient,
+      serveWeb: false,
+    });
+
+    const imageLayerResponse = await server.inject({
+      method: "POST",
+      url: "/api/layers",
+      payload: {
+        name: "Trips / Photos",
+        pluginId: "image-layer",
+        configuration: {},
+        data: {},
+        visible: true,
+        displayOrder: 0,
+        opacity: 1,
+        minimumZoom: null,
+        maximumZoom: null,
+      },
+    });
+    expect(imageLayerResponse.statusCode, imageLayerResponse.body).toBe(201);
+    expect(imageLayerResponse.json().name).toBe("Trips/Photos");
+    const imageLayerId = imageLayerResponse.json().id as string;
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: "/api/image-roots",
+        })
+      ).json(),
+    ).toEqual({ items: [{ id: "photos", available: true }] });
+
+    const scanResponse = await server.inject({
+      method: "POST",
+      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      payload: {
+        rootId: "photos",
+        relativeDirectory: "",
+        recursive: true,
+      },
+    });
+    expect(scanResponse.statusCode, scanResponse.body).toBe(201);
+    const jobId = scanResponse.json().id as string;
+    await vi.waitFor(
+      async () => {
+        const response = await server.inject({
+          method: "GET",
+          url: `/api/jobs/${jobId}`,
+        });
+        expect(response.json()).toMatchObject({
+          status: "completed",
+          summary: { created: 1 },
+        });
+      },
+      { timeout: 5000 },
+    );
+    const assetsResponse = await server.inject({
+      method: "GET",
+      url: `/api/layers/${imageLayerId}/assets`,
+    });
+    expect(assetsResponse.statusCode, assetsResponse.body).toBe(200);
+    expect(assetsResponse.json()).toMatchObject({
+      items: [
+        {
+          kind: "external-image",
+          status: "ready",
+          fileName: "photo.jpg",
+          coordinateSource: "exif",
+          longitude: 13.405,
+          latitude: 52.52,
+          previewAvailable: true,
+        },
+      ],
+    });
+    const imageAssetId = assetsResponse.json().items[0].id as string;
+    const preview = await server.inject({
+      method: "GET",
+      url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.headers["content-type"]).toBe("image/webp");
+    await expect(
+      readFile(path.join(config.dataDirectory, "photo.jpg")),
+    ).rejects.toThrow();
+    const manualPosition = await server.inject({
+      method: "PATCH",
+      url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+      payload: {
+        longitude: 13.405,
+        latitude: 52.52,
+        bounds: null,
+      },
+    });
+    expect(manualPosition.json()).toMatchObject({
+      coordinateSource: "manual",
+      longitude: 13.405,
+      latitude: 52.52,
+    });
+    const repeatedScan = await server.inject({
+      method: "POST",
+      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      payload: {
+        rootId: "photos",
+        relativeDirectory: "",
+        recursive: true,
+      },
+    });
+    const repeatedJobId = repeatedScan.json().id as string;
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${repeatedJobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        skipped: 1,
+        summary: { unchanged: 1 },
+      });
+    });
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: `/api/layers/${imageLayerId}/assets`,
+        })
+      ).json().items[0],
+    ).toMatchObject({ coordinateSource: "manual", longitude: 13.405 });
+
+    const removedPosition = await server.inject({
+      method: "PATCH",
+      url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+      payload: { longitude: null, latitude: null, bounds: null },
+    });
+    expect(removedPosition.json()).toMatchObject({
+      coordinateSource: "none",
+      longitude: null,
+      latitude: null,
+    });
+    await sharp({
+      create: {
+        width: 49,
+        height: 32,
+        channels: 3,
+        background: "#663399",
+      },
+    })
+      .jpeg()
+      .toFile(path.join(imageRoot, "photo.jpg"));
+    const changedScan = await server.inject({
+      method: "POST",
+      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      payload: {
+        rootId: "photos",
+        relativeDirectory: "",
+        recursive: true,
+      },
+    });
+    const changedJobId = changedScan.json().id as string;
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${changedJobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        completed: 1,
+        summary: { changed: 1 },
+      });
+    });
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: `/api/layers/${imageLayerId}/assets`,
+        })
+      ).json().items[0],
+    ).toMatchObject({
+      coordinateSource: "none",
+      longitude: null,
+      latitude: null,
+      width: 49,
+    });
+
+    await unlink(path.join(imageRoot, "photo.jpg"));
+    const missingScan = await server.inject({
+      method: "POST",
+      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      payload: {
+        rootId: "photos",
+        relativeDirectory: "",
+        recursive: true,
+      },
+    });
+    const missingJobId = missingScan.json().id as string;
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${missingJobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        summary: { missing: 1 },
+      });
+    });
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: `/api/layers/${imageLayerId}/assets`,
+        })
+      ).json().items[0],
+    ).toMatchObject({ status: "missing", coordinateSource: "none" });
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    const trackLayerResponse = await server.inject({
+      method: "POST",
+      url: "/api/layers",
+      payload: {
+        name: "Trips/Track",
+        pluginId: "track-layer",
+        configuration: {},
+        data: { features: [] },
+        visible: true,
+        displayOrder: 1,
+        opacity: 1,
+        minimumZoom: null,
+        maximumZoom: null,
+      },
+    });
+    expect(trackLayerResponse.statusCode, trackLayerResponse.body).toBe(201);
+    expect(trackLayerResponse.json().name).toBe("Trips/Track");
+    const trackLayerId = trackLayerResponse.json().id as string;
+    const boundary = "maptoy-track-boundary";
+    const geoJson = JSON.stringify({
+      type: "LineString",
+      coordinates: [
+        [13.4, 52.5],
+        [13.5, 52.6],
+      ],
+    });
+    const multipartBody = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="track.geojson"\r\nContent-Type: application/geo+json\r\n\r\n${geoJson}\r\n--${boundary}--\r\n`,
+    );
+    const upload = await server.inject({
+      method: "POST",
+      url: `/api/layers/${trackLayerId}/assets`,
+      headers: {
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: multipartBody,
+    });
+    expect(upload.statusCode, upload.body).toBe(201);
+    expect(upload.json().layer.data.features).toHaveLength(1);
+    expect(upload.json().asset).toMatchObject({
+      kind: "managed",
+      fileName: "track.geojson",
+      status: "ready",
+    });
+    const managedAsset = await server.inject({
+      method: "GET",
+      url: `/api/layers/${trackLayerId}/assets/${upload.json().asset.id}`,
+    });
+    expect(managedAsset.statusCode).toBe(200);
+    expect(managedAsset.headers["content-type"]).toBe("application/geo+json");
+    expect(managedAsset.body).toBe(geoJson);
+
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: "/api/layers",
+        })
+      ).json(),
+    ).toMatchObject({
+      items: [
+        { id: imageLayerId, name: "Trips/Photos" },
+        { id: trackLayerId, name: "Trips/Track" },
+      ],
+    });
+    expect(
+      (
+        await server.inject({
+          method: "POST",
+          url: "/api/layers",
+          payload: {
+            name: "Trips//Broken",
+            pluginId: "track-layer",
+            configuration: {},
+            data: { features: [] },
+            visible: true,
+            displayOrder: 2,
+            opacity: 1,
+            minimumZoom: null,
+            maximumZoom: null,
+          },
+        })
+      ).statusCode,
+    ).toBe(400);
+
+    expect(
+      (
+        await server.inject({
+          method: "DELETE",
+          url: `/api/layers/${trackLayerId}`,
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      await readdir(
+        path.join(config.dataDirectory, "layer-assets", trackLayerId),
+      ),
+    ).toEqual([]);
+    expect(
+      (
+        await server.inject({
+          method: "DELETE",
+          url: `/api/layers/${imageLayerId}`,
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      await readdir(path.join(config.dataDirectory, "layer-previews")),
+    ).toEqual([]);
+
     await server.close();
   });
 

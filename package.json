@@ -1,6 +1,6 @@
 {
   "name": "maptoy",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.21.0",
@@ -34,5 +34,6 @@
     "tsx": "4.23.12",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
-  }
+  },
+  "license": "WTFPL"
 }

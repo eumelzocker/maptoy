@@ -2,12 +2,13 @@
 import { onBeforeUnmount, ref, watch } from "vue";
 import { useDisclosure } from "../composables/useDisclosure.js";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     label: string;
     align?: "start" | "end";
+    suspendOutsideClose?: boolean;
   }>(),
-  { align: "start" },
+  { align: "start", suspendOutsideClose: false },
 );
 
 const {
@@ -23,6 +24,9 @@ const root = ref<HTMLElement | null>(null);
 defineExpose({ close });
 
 function onOutsideClick(event: MouseEvent): void {
+  if (props.suspendOutsideClose) {
+    return;
+  }
   const target = event.target;
   if (!(target instanceof Node) || !root.value?.contains(target)) {
     close();

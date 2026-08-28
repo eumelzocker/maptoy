@@ -1,0 +1,21 @@
+meta {
+  name: Jobs - List
+  type: http
+  seq: 18
+}
+get {
+  url: {{appUrl}}/api/jobs
+  body: none
+  auth: none
+}
+
+docs {
+  Lists persistent Jobs with progress and diagnostics without changing state.
+}
+
+tests {
+  test("lists jobs", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.items).to.be.an("array");
+  });
+}

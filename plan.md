@@ -19,7 +19,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
   ausdrücklich konfigurierten, nur lesbar eingebundenen Bildwurzeln.
 - Auswahl und Nutzung einer Kartenquelle erfolgen in Eigenverantwortung des Nutzers. maptoy verlinkt Nutzungsbedingungen und dokumentiert konfigurierbare technische Limits, bewertet oder erzwingt aber nicht, ob Caching, Batch-Abrufe oder Exporte rechtlich beziehungsweise vertraglich zulässig sind.
 - Anbieterbedingungen können sich ändern. Der Nutzer muss sie eigenständig prüfen und Map Sets, Limits sowie Nutzung entsprechend anpassen; die mitgelieferte Dokumentation ist keine Rechtsberatung und keine Garantie für Zulässigkeit.
-- Eine `Map Set`-Konfiguration beschreibt Kartenquelle, Renderer-Adapter, Darstellung, Cache-Regeln und zugeordnete Layer; echte Server-Secrets werden nur per Environment referenziert und nicht im Klartext in Map Sets gespeichert.
+- Eine `Map Set`-Konfiguration beschreibt Kartenquelle, Renderer-Adapter, Darstellung und Cache-Regeln. Zusatzlayer bilden einen davon unabhängigen globalen Overlay-Stack; echte Server-Secrets werden nur per Environment referenziert und nicht im Klartext in Map Sets gespeichert.
 - Die erste Version konzentriert sich auf Raster-Tiles nach dem XYZ-Schema. Vector Tiles und WMTS-Sonderfälle sind mögliche spätere Erweiterungen.
 - Die Kartenansicht verwendet eine Frontend-Adapter-Schnittstelle. v1.0 implementiert ausschließlich den Leaflet-/XYZ-Adapter; ein späterer Adapter für die Google Maps JavaScript API und weitere Karten-APIs ist architektonisch vorgesehen, aber ausdrücklich nicht Bestandteil von v1.0.
 - Provider- und Renderer-Fähigkeiten wie interaktive Anzeige, Tile-Cache, Batch-Download, Export und Layer-Unterstützung werden getrennt ausgewiesen und nicht für jeden Adapter vorausgesetzt.
@@ -211,7 +211,7 @@ Ein Map Set enthält mindestens:
 - effektive Capability-Flags des Quellen-/Renderer-Paars
 - Cache-Policy mit maximalem Alter und optionalem Speicherwarn-/Aufnahmelimit
 - Download-Policy mit Requests pro Sekunde, Parallelität, Retry-Limit und optionaler täglicher Obergrenze
-- optionale Standard-Layer-Instanzen und Darstellungsparameter
+- keine Layer-Zuordnung; Layer-Instanzen sind global und bleiben beim Wechsel des Map Sets erhalten
 
 Die Anwendung validiert URL-Templates, Wertebereiche und Secret-Referenzen vor dem Speichern. Eine Testfunktion ruft genau ein Tile ab und zeigt Status, Content-Type und Attribution an. Hinweise, Notizen oder ein Prüfdatum zu Nutzungsbedingungen sind rein informativ und werden von maptoy nicht als rechtliche Freigabe interpretiert.
 
@@ -282,9 +282,11 @@ Hintergrundverarbeitung aufgebaut.
 
 Eine Layer-Instanz ist eine persistente Verwendung eines registrierten Plugins und enthält:
 
-- stabile ID, Anzeigename und Plugin-ID
+- stabile ID, verpflichtender Anzeigename als `/`-segmentierbarer Hierarchiepfad und Plugin-ID
+- eine vom Plugin-Manifest deklarierte Kategorie als erste Hierarchieebene, zum
+  Beispiel `Tracks`, `Images` oder künftig `POIs`
 - Plugin- und Schema-Version
-- Map-Set-Zuordnung oder Kennzeichnung als wiederverwendbarer Layer
+- globale Verfügbarkeit unabhängig vom aktuell gewählten Map Set
 - validierte, pluginabhängige Konfiguration
 - Sichtbarkeit, Reihenfolge, Deckkraft und gegebenenfalls zoombasierte Grenzen
 - Referenzen auf kontrollierte Asset-IDs statt frei zusammengesetzter Dateipfade
@@ -461,19 +463,24 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 
 Für Layer, Assets und Bildkatalog wird in v1 keine eigene Hauptansicht und keine
 eigene `/layers`-Route angelegt. Die Kartenansicht bleibt während Auswahl,
-Konfiguration und Import sichtbar. Ein kompaktes, schließbares Layer-Panel zeigt die
-Layer des aktuellen Map Sets sowie Sichtbarkeit, Deckkraft, Reihenfolge, Zoomgrenzen
-und Diagnosestatus. Plugin-Auswahl, Trackimport, Bildwurzelauswahl,
+Konfiguration und Import sichtbar. Ein kompaktes, schließbares Layer-Panel zeigt den
+globalen Overlay-Stack sowie Sichtbarkeit, Deckkraft, Reihenfolge, Zoomgrenzen und
+Diagnosestatus. Plugin-Auswahl, Trackimport, Bildwurzelauswahl,
 Verzeichnisscan, Detailbearbeitung und Diagnose öffnen fokussierte Dialoge oder
 Unterpanels innerhalb dieser Ansicht.
 
-Wiederverwendbare oder noch keinem Map Set zugeordnete Layer bleiben über
-`Add layer` und einen Auswahl-/Verwaltungsdialog erreichbar. Dieser Dialog erlaubt
-das Erstellen eines neuen Layers, das Zuordnen eines vorhandenen Layers und die
-begrenzte Verwaltung wiederverwendbarer Layer, ohne daraus eine eigene
-Navigationsansicht zu machen. Große Bildbestände werden im Layer-Panel nur
-zusammengefasst; gefilterte Assetdetails werden cursor-paginiert beziehungsweise
-virtualisiert in einem Dialog angezeigt.
+`Add layer` erstellt einen global verfügbaren Layer. Beim Wechsel des Map Sets wird
+nur der Basiskarten-Renderer neu aufgebaut; dieselben Layer-Instanzen werden in
+unveränderter Sichtbarkeit und Reihenfolge wieder angehängt. Eine spätere
+Map-Set-spezifische Auswahl darf ausschließlich als separates Anzeige-Preset
+modelliert werden und ändert weder Eigentum noch Persistenz der Layer. Große
+Bildbestände werden im Layer-Panel nur zusammengefasst; gefilterte Assetdetails
+werden cursor-paginiert beziehungsweise virtualisiert in einem Dialog angezeigt.
+
+Das Layer-Panel gruppiert die Instanzen auf der ersten Ebene nach der im
+Plugin-Manifest deklarierten Kategorie. Weitere Ebenen entstehen ohne zusätzliches
+Persistenzmodell aus `/`-Segmenten des verpflichtenden Layernamens, beispielsweise
+`Tracks > Reisen > 2026 > Alpen` für den Namen `Reisen/2026/Alpen`.
 
 ### 7.2 Bedienprinzipien
 
@@ -484,6 +491,11 @@ virtualisiert in einem Dialog angezeigt.
 - Nicht unterstützte Funktionen werden anhand der Adapter-/Provider-Capabilities deaktiviert und mit einer Begründung versehen.
 - Das Layer-Panel ist ein optionales Werkzeug des Map View und wird bei fehlender
   Capability `layerRendering` nicht als scheinbar nutzbare Verwaltung angeboten.
+- Die Konfiguration jeder Layer-Instanz ist im Layer-Panel einzeln aufklappbar,
+  standardmäßig geschlossen und merkt sich ihren Zustand lokal im Browser.
+- Plugin-Kategorien und alle aus `/`-Namenssegmenten entstehenden Ordner sind auf-
+  und zuklappbar; eingeklappte Hierarchieknoten werden lokal im Browser gespeichert
+  und sind ohne gespeicherte Präferenz geöffnet.
 - Plugin-Editoren erscheinen innerhalb einer einheitlichen Layer-Oberfläche und dürfen Navigation, globale Stores oder andere Plugins nicht direkt manipulieren.
 - Bildverzeichnisscans zeigen Fortschritt, neue, geänderte, fehlende und
   fehlgeschlagene Dateien, ohne pro EXIF-GPS-Position eine Bestätigung zu verlangen.
@@ -907,6 +919,9 @@ erst mit dem Download-Worker ergänzt.
 
 ### Phase 5: Layer-Plugin-System und externer Bildkatalog
 
+**Status:** Kernumfang am 28. August 2026 als Version `0.2.0` veröffentlicht;
+Abschluss nach den unten aufgeführten Restarbeiten
+
 **Aufgaben**
 
 - Registry, Manifestprüfung, Capability-Modell und SDK-Kompatibilitätsprüfung implementieren
@@ -923,9 +938,12 @@ erst mit dem Download-Worker ergänzt.
 - ein optional einblendbares Layer-Panel und fokussierte Plugin-, Import-, Scan-,
   Konfigurations- und Assetdialoge in den bestehenden Map View integrieren; keine
   eigene Layer-Route oder Hauptansicht anlegen
-- wiederverwendbare beziehungsweise noch nicht zugeordnete Layer über einen
-  Auswahl-/Verwaltungsdialog im Map View auffindbar und einem Map Set zuordenbar
-  machen
+- Layer-Instanzen als globalen Overlay-Stack unabhängig von Map Sets persistieren
+  und beim Wechsel der Basiskarte mit Sichtbarkeit, Reihenfolge und Konfiguration
+  wieder an den neu erzeugten Renderer anhängen
+- Plugin-Kategorie und `/`-segmentierte Layernamen als erweiterbare Hierarchie im
+  Layer-Panel darstellen; neue Layer dürfen einen expliziten Namen erhalten oder
+  verwenden bei leerem Feld einen freien, je Kategorie nummerierten Standardnamen
 - Datei-Upload verwalteter Nicht-Bild-Assets über Frontend/API mit generierten
   Asset-IDs, Status, Hash und kontrolliertem Speicherort umsetzen
 - benannte, serverseitig konfigurierte und ausschließlich lesbare Bildwurzeln sowie
@@ -958,6 +976,16 @@ erst mit dem Download-Worker ergänzt.
 **Ergebnis/Akzeptanz**
 
 - Ein Track und ein GPS-getaggtes Bild lassen sich importieren, konfigurieren, anordnen und im Leaflet-/XYZ-Adapter darstellen.
+- Beim Wechsel des Map Sets bleiben dieselben globalen Overlay-Layer mit ihrer
+  Sichtbarkeit, Reihenfolge und Konfiguration erhalten und werden am neuen Renderer
+  dargestellt, sofern dieser Layer-Rendering unterstützt.
+- Layer erscheinen unter ihrer Plugin-Kategorie und lassen sich über Namen wie
+  `Reisen/2026/Alpen` ohne zusätzliche Ordnerdatensätze weiter strukturieren.
+- Kategorien und sämtliche aus Namenssegmenten entstehenden Ordnerebenen sind
+  unabhängig ein- und ausklappbar; der Zustand bleibt lokal im Browser erhalten.
+- Der Add-Layer-Dialog bietet die Kategorien als visuelle Auswahl an. Nach dem
+  Anlegen wird der neue Layer sichtbar aufgeklappt und der primäre Import- oder
+  Scan-Einstieg fokussiert.
 - Sämtliche Layeraufgaben der v1 sind über das optionale Panel und die zugehörigen
   Dialoge im Standard-Map-View erreichbar; es gibt keine eigene Layer-Hauptansicht
   oder `/layers`-Route, und die Coverage-Ansicht bleibt unverändert auf das
@@ -981,6 +1009,27 @@ erst mit dem Download-Worker ergänzt.
 - Beide Referenz-Plugins verwenden ausschließlich die veröffentlichten Plugin-Schnittstellen und bestehen dieselbe Contract-Test-Suite.
 - Ein deaktiviertes oder fehlendes Plugin verursacht keinen Datenverlust; ungültige beziehungsweise inkompatible Zustände werden verständlich angezeigt.
 - Es kann kein ausführbarer Plugin-Code über API oder Weboberfläche installiert werden.
+
+**Offene Restarbeiten vor Abschluss der Phase**
+
+- Fortschrittszähler und Zusammenfassungen von Bildscan-Jobs bei Pause,
+  Fortsetzung und Neustart-Recovery konsistent halten. Eine erneut begonnene
+  inkrementelle Verarbeitung darf bereits gezählte Dateien nicht ein zweites Mal
+  addieren; Integrationsprüfungen decken Pause, Fortsetzung, Abbruch und Recovery
+  einschließlich `completed + skipped + failed <= total` ab.
+- Standard- und Hartgrenzen für Bilddateigröße, dekodierte Pixel,
+  Vorschauabmessungen, Scan-Batchgröße und parallele Decoder mit repräsentativen
+  Bildverzeichnissen messen. Messumgebung, Laufzeit, Speicherbedarf, gewählte
+  Defaults und Diagnosen für einzelne zu große oder beschädigte Dateien werden
+  nachvollziehbar dokumentiert.
+- Für abgeschlossene Jobs und ihre begrenzte Fehlerhistorie eine konfigurierbare
+  Aufbewahrungsstrategie sowie einen nachvollziehbaren manuellen beziehungsweise
+  automatischen Bereinigungsweg umsetzen. Laufende und pausierte Jobs bleiben
+  geschützt; Phase 7 erweitert dieselbe Entscheidung um fertige Exportdateien.
+- Den Bildkatalog im Frontend bedarfsgerecht und cursor-basiert laden, statt beim
+  Initialisieren sämtliche Assetseiten aller Layer abzurufen und anschließend nur
+  einen Ausschnitt anzuzeigen. Verwaltung und Kartenanzeige bleiben auch bei großen
+  konfigurierten Bildkatalogen kontrolliert nutzbar.
 
 ### Phase 6: Batch-Downloads und Erweiterung des Job-Systems
 
@@ -1097,15 +1146,17 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.1.0` | eigenständig versionierte Firefox-Erweiterung, bereinigter Rendering-Spike und kleinere Metadatenkorrekturen |
 | `0.1.1` | Phase 4: aggregierte Cache-Abdeckung, Zustandsvergleiche, Drill-down und Coverage-Kartenansicht |
 | `0.1.2` | Coverage-Ansicht bereinigt und präzisiert, gemeinsame Zoom-Steuerung sowie Dokumentationsverbesserungen |
+| `0.2.0` | Kernumfang von Phase 5: Layer-Plugin-System, Track-/Bildlayer, globaler Overlay-Stack, externer Bildkatalog und persistente Scan-Jobs |
 
 ### 13.2 Weitere Releases
 
-Mit `0.1.1` ist Phase 4 abgeschlossen. Die danach ausstehenden Phasen bestimmen
-die fachliche Reihenfolge, erhalten aber erst beim tatsächlichen Release eine
-konkrete Patchnummer:
+Mit `0.2.0` ist der nutzbare Kernumfang von Phase 5 veröffentlicht. Vor Beginn von
+Phase 6 werden die bei Phase 5 dokumentierten Restarbeiten abgeschlossen. Die
+weitere fachliche Reihenfolge erhält erst beim tatsächlichen Release konkrete
+Patchnummern:
 
-1. Phase 5: Layer-Plugin-System, Track-/Bild-Referenzen, externer Bildkatalog,
-   Vorschaubilder, Verzeichnisscans und minimaler persistenter Jobkern
+1. Abschluss Phase 5: konsistente Job-Recovery, gemessene Bildlimits,
+   Job-Aufbewahrung und skalierbares Laden des Bildkatalogs
 2. Phase 6: kontrollierter Batch-Download, Provider-Limits und Erweiterung des
    gemeinsamen Job-Systems
 3. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
@@ -1142,7 +1193,7 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 | EXIF-GPS-Daten werden unbeabsichtigt weitergegeben | Datenschutzproblem | nur eine nachvollziehbar als `exif` gekennzeichnete wirksame Position übernehmen, nachträgliche Korrektur/Entfernung ermöglichen und nicht benötigte Metadaten aus Vorschauen/Exporten entfernen |
 | Dokumentation und Verhalten laufen auseinander | Fehlbedienung und falsche API-Nutzung | API-Referenz generieren, Feature-DoD um Dokumentation ergänzen und versionsgleich veröffentlichen |
 | Englische Dokumentation ist unvollständig oder lokalisierter Fallback ist defekt | fehlende Hilfe und widersprüchliche Navigation | Englisch als Build-Gate, stabile Dokument-/Abschnitts-IDs, Fallback-Tests und Übersetzungsstatusbericht |
-| Externe Provider-Links oder Bedingungen veralten | Nutzer verlässt sich auf überholte Hinweise | offizielle Quellen, sichtbares Prüfdatum, Linkprüfung und ausdrücklicher Hinweis auf eigenständige Prüfung der aktuellen Bedingungen |
+| Externe Provider-Links oder Bedingungen veralten | Nutzer verlässt sich auf überholte Hinweise | sichtbares Prüfdatum, Linkprüfung und ausdrücklicher Hinweis auf eigenständige Prüfung der aktuellen Bedingungen |
 
 ## 15. Definition of Done für v1.0
 
@@ -1229,12 +1280,13 @@ geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
 
 | Spätestens vor | Entscheidung | Benötigtes Ergebnis |
 | --- | --- | --- |
-| Phase 5 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Bilddateigröße, dekodierte Pixel, Vorschauabmessungen, Scan-Batchgröße und parallele Decoder? | Mit repräsentativen Bildverzeichnissen gemessene Defaults, konfigurierbare Grenzen, begrenzter Ressourcenverbrauch und verständliche Diagnose einzelner zu großer oder beschädigter Dateien, ohne den gesamten Scan abzubrechen oder die Gesamtgröße eines Verzeichnisses unnötig zu begrenzen. |
+| Abschluss Phase 5 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Bilddateigröße, dekodierte Pixel, Vorschauabmessungen, Scan-Batchgröße und parallele Decoder? | Mit repräsentativen Bildverzeichnissen gemessene Defaults, konfigurierbare Grenzen, begrenzter Ressourcenverbrauch und verständliche Diagnose einzelner zu großer oder beschädigter Dateien, ohne den gesamten Scan abzubrechen oder die Gesamtgröße eines Verzeichnisses unnötig zu begrenzen. |
 | Phase 6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? Die Coverage-Antwort ist unabhängig davon bereits auf standardmäßig 1.024 und maximal 4.096 aggregierte Zellen begrenzt. | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_MAX_TILE_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
-| Phase 5/7 | Wie lange bleiben abgeschlossene Jobs, begrenzte Fehlerhistorien und fertige Exportdateien erhalten? | Standardfristen, konfigurierbare Aufbewahrung, Schutz laufender Bildscans und Downloads sowie ein nachvollziehbarer manueller beziehungsweise automatischer Bereinigungsweg. |
+| Abschluss Phase 5 | Wie lange bleiben abgeschlossene Jobs und begrenzte Fehlerhistorien erhalten? | Standardfristen, konfigurierbare Aufbewahrung, Schutz laufender und pausierter Jobs sowie ein nachvollziehbarer manueller beziehungsweise automatischer Bereinigungsweg. |
+| Phase 7 | Wie lange bleiben fertige Exportdateien erhalten? | Auf der allgemeinen Job-Aufbewahrung aufbauende Standardfrist, konfigurierbare Grenze und nachvollziehbarer Bereinigungsweg für Exportdateien. |
 | Phase 8 | Ist eine ausreichend gute Thai-Suche mit vertretbarem Aufwand möglich? | Entweder getestete Thai-Segmentierung und Suche oder eine bewusst deaktivierte Thai-Suche mit sichtbarem Verweis auf die englische Suche. |
 
-Die jeweilige Entscheidung wird vor Beginn der betroffenen Implementierung anhand
+Die jeweilige Entscheidung wird spätestens vor Abschluss der genannten Phase anhand
 von Messungen beziehungsweise eines kleinen Spikes getroffen. Ein ADR ist nur nötig,
 wenn die Entscheidung eine dauerhafte Architektur- oder Betriebsgrenze setzt.
 
