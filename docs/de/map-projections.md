@@ -10,17 +10,17 @@ Eine Kartenprojektion überträgt Positionen von der gekrümmten Erde auf eine e
 
 Ein **Koordinatenreferenzsystem (KRS, englisch CRS)** umfasst mehr als die Projektion: Es legt auch Datum, Koordinatenachsen, Einheiten und Gültigkeitsgebiet fest. Ein **EPSG-Code** bezeichnet ein bestimmtes KRS. Ein Projektionsname allein, etwa „Mercator“, reicht nicht aus, um Koordinaten zuverlässig zu interpretieren.
 
-## Geplante anfängliche Unterstützung in maptoy
+## Geplante anfängliche Unterstützung in *maptoy*
 
 Der Projektionsexport ist noch nicht implementiert. Die für v1 geplante Liste zugelassener Exportziele beginnt mit drei Koordinatenreferenzsystemen. Die später auf dieser Seite beschriebenen Projektionen dienen der Einordnung, sind aber nicht als anfängliche Exportziele vorgesehen.
 
-| KRS | Einordnung | Sinnvoller Einsatz in maptoy | Wichtige Grenze |
+| KRS | Einordnung | Sinnvoller Einsatz in *maptoy* | Wichtige Grenze |
 | --- | --- | --- | --- |
 | `EPSG:3857` — WGS 84 / Pseudo-Mercator | Projizierte Web-Mercator-Koordinaten, nominell in Metern | XYZ-Quelltiles, interaktive Slippy Maps und Exporte im vertrauten Webkartenbild | Maßstabs- und Flächenverzerrung nehmen zu den Polen stark zu; jenseits von etwa 85,0511° Nord oder Süd nicht darstellbar und für genaue Messungen ungeeignet |
 | `EPSG:4326` — WGS 84 | Geografische Länge und Breite in Grad; kein projiziertes KRS | Eingabe von Bounds, Austausch von GPS-/GeoJSON-artigen Koordinaten und Exporte auf einem Längen-/Breitengradgitter | Grad sind Winkeleinheiten und keine konstanten Bodenentfernungen; die rechteckige Darstellung erzeugt Verzerrungen ähnlich der Plattkarte |
 | `EPSG:25833` — ETRS89 / UTM-Zone 33N | Projizierte Transverse-Mercator-Koordinaten in Metern | Regionale und topografische Exporte innerhalb der UTM-Zone 33N, darunter Ostdeutschland und Mitteleuropa nahe 12°O–18°O | Regionales Zonen-KRS statt Weltkarte; außerhalb des Gültigkeitsgebiets ist die passende UTM-Zone oder ein lokales KRS zu verwenden |
 
-Eine EPSG-Definition legt auch die Achsenreihenfolge fest. `EPSG:4326` verwendet formal Breite, Länge, während GeoJSON und viele Web-APIs üblicherweise Länge, Breite verwenden. Koordinatenfelder in maptoy müssen die Reihenfolge ausdrücklich bezeichnen; sie darf nie allein aus den beiden Zahlen abgeleitet werden.
+Eine EPSG-Definition legt auch die Achsenreihenfolge fest. `EPSG:4326` verwendet formal Breite, Länge, während GeoJSON und viele Web-APIs üblicherweise Länge, Breite verwenden. Koordinatenfelder in *maptoy* müssen die Reihenfolge ausdrücklich bezeichnen; sie darf nie allein aus den beiden Zahlen abgeleitet werden.
 
 ## Projektionseigenschaften
 
@@ -93,9 +93,9 @@ Ein KRS sollte nicht nur deshalb gewählt werden, weil seine Koordinaten in Mete
 
 ## Auswirkungen der Reprojektion
 
-In v1 wird maptoy XYZ-Rastertiles normalerweise in Web Mercator erhalten. Ein Export in ein anderes KRS verzerrt das zusammengesetzte Raster auf ein neues Pixelgitter. Dabei können zuvor gerade Kanten gebogen, der sichtbare Ausschnitt verändert, transparente Bereiche erzeugt und Beschriftungen oder Linien durch Resampling weicher werden. Eine Reprojektion kann keine in den Quelltiles fehlenden Details erzeugen.
+In v1 wird *maptoy* XYZ-Rastertiles normalerweise in Web Mercator erhalten. Ein Export in ein anderes KRS verzerrt das zusammengesetzte Raster auf ein neues Pixelgitter. Dabei können zuvor gerade Kanten gebogen, der sichtbare Ausschnitt verändert, transparente Bereiche erzeugt und Beschriftungen oder Linien durch Resampling weicher werden. Eine Reprojektion kann keine in den Quelltiles fehlenden Details erzeugen.
 
-Basiskarte und alle Plugin-Layer müssen dieselbe Transformation und dasselbe Ausgaberaster verwenden, damit Tracks und Bilder deckungsgleich bleiben. Am Antimeridian, an den Polen oder am Rand des KRS-Gültigkeitsgebiets muss ein Export gegebenenfalls geteilt werden oder wird abgelehnt. Wenn ein Exportbild außerhalb von maptoy weiterverwendet wird, sollten Ziel-KRS und Ausdehnung immer mitgeführt werden.
+Basiskarte und alle Plugin-Layer müssen dieselbe Transformation und dasselbe Ausgaberaster verwenden, damit Tracks und Bilder deckungsgleich bleiben. Am Antimeridian, an den Polen oder am Rand des KRS-Gültigkeitsgebiets muss ein Export gegebenenfalls geteilt werden oder wird abgelehnt. Wenn ein Exportbild außerhalb von *maptoy* weiterverwendet wird, sollten Ziel-KRS und Ausdehnung immer mitgeführt werden.
 
 ## Offizielle Referenzen
 

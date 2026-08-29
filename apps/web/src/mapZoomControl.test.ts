@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatMapZoomLevel,
+  formatMapZoomTitle,
   integerMapZoomTarget,
   mapZoomControlTarget,
   quarterStepMapZoomTarget,
@@ -14,6 +15,15 @@ describe("map zoom control", () => {
       formatMapZoomLevel(7.5),
       formatMapZoomLevel(7.75),
     ]).toEqual(["7", "7¼", "7½", "7¾"]);
+  });
+
+  it("formats browser-title zoom levels in decimal quarter steps", () => {
+    expect([
+      formatMapZoomTitle(7),
+      formatMapZoomTitle(7.24),
+      formatMapZoomTitle(7.49),
+      formatMapZoomTitle(7.76),
+    ]).toEqual(["z7", "z7.25", "z7.5", "z7.75"]);
   });
 
   it("targets the next integer zoom in the requested direction", () => {

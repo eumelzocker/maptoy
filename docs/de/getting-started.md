@@ -50,7 +50,7 @@ zulässige Größe von Map-Set-JSON oder anderen API-Requests.
 
 ## Traffic-Logs
 
-maptoy protokolliert Client/API-Traffic und Backend/Tile-Provider-Traffic getrennt
+*maptoy* protokolliert Client/API-Traffic und Backend/Tile-Provider-Traffic getrennt
 als JSON Lines. Compose bind-mountet die mit `MAPTOY_API_TRAFFIC_LOG_DIR` und
 `MAPTOY_PROVIDER_TRAFFIC_LOG_DIR` konfigurierten Verzeichnisse. Standardmäßig
 liegen sie unterhalb von `MAPTOY_DATA_DIR`; beide dürfen aber auf beliebige andere

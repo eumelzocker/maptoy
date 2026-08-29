@@ -10,17 +10,17 @@ A map projection converts positions on the curved Earth to a flat map. No projec
 
 A **coordinate reference system (CRS)** is broader than a projection: it also defines the datum, coordinate axes, units, and area of use. An **EPSG code** identifies one specific CRS. A projection name alone, such as “Mercator”, is not enough to interpret coordinates reliably.
 
-## Planned initial maptoy support
+## Planned initial *maptoy* support
 
 Projection export is not implemented yet. The planned v1 export allowlist starts with three coordinate reference systems. Other projections described later on this page are useful context, but are not planned as initial export targets.
 
-| CRS | What it is | Best use in maptoy | Important limitation |
+| CRS | What it is | Best use in *maptoy* | Important limitation |
 | --- | --- | --- | --- |
 | `EPSG:3857` — WGS 84 / Pseudo-Mercator | Projected Web Mercator coordinates, nominally in metres | XYZ source tiles, interactive slippy maps, and exports that should retain the familiar web-map appearance | Scale and area distortion grow rapidly toward the poles; unavailable beyond about 85.0511° north or south and unsuitable for precise measurement |
 | `EPSG:4326` — WGS 84 | Geographic longitude and latitude in degrees; not a projected CRS | Input bounds, GPS/GeoJSON-style coordinate exchange, and exports on a longitude/latitude grid | Degrees are angular units, not constant ground distances; displaying them as a rectangle introduces Plate Carrée-like distortion |
 | `EPSG:25833` — ETRS89 / UTM zone 33N | Projected Transverse Mercator coordinates in metres | Regional and topographic exports within UTM zone 33N, including eastern Germany and central Europe near 12°E–18°E | It is a zoned regional CRS, not a world map; use the appropriate UTM zone or local CRS outside its area of use |
 
-An EPSG definition also specifies axis order. `EPSG:4326` formally uses latitude, longitude order, while GeoJSON and many web APIs conventionally use longitude, latitude. maptoy coordinate fields must label the order explicitly; never infer it from the two numbers alone.
+An EPSG definition also specifies axis order. `EPSG:4326` formally uses latitude, longitude order, while GeoJSON and many web APIs conventionally use longitude, latitude. *maptoy* coordinate fields must label the order explicitly; never infer it from the two numbers alone.
 
 ## Projection properties
 
@@ -93,9 +93,9 @@ Do not choose a CRS only because its coordinates are expressed in metres. Check 
 
 ## What reprojection changes
 
-In v1, maptoy will normally receive XYZ raster tiles in Web Mercator. Exporting to another CRS warps the assembled raster onto a new pixel grid. This can bend previously straight edges, change the visible extent, leave transparent areas, and soften labels or lines through resampling. Reprojection cannot create detail that is absent from the source tiles.
+In v1, *maptoy* will normally receive XYZ raster tiles in Web Mercator. Exporting to another CRS warps the assembled raster onto a new pixel grid. This can bend previously straight edges, change the visible extent, leave transparent areas, and soften labels or lines through resampling. Reprojection cannot create detail that is absent from the source tiles.
 
-The base map and every plugin layer must use the same transformation and output grid so that tracks and images stay aligned. Near the antimeridian, poles, or the edge of a CRS's area of use, an export may also need a split extent or may be rejected. Always retain the target CRS and output extent with an exported image if it will be used outside maptoy.
+The base map and every plugin layer must use the same transformation and output grid so that tracks and images stay aligned. Near the antimeridian, poles, or the edge of a CRS's area of use, an export may also need a split extent or may be rejected. Always retain the target CRS and output extent with an exported image if it will be used outside *maptoy*.
 
 ## Official references
 

@@ -44,14 +44,14 @@ Darstellungspräferenzen bleiben lokal im Browser erhalten.
 In einem leeren Track-Layer ist **Import track…** als Primäraktion hervorgehoben.
 Nach erfolgreichem Import heißt die normale Aktion **Replace track…**, weil eine
 weitere Datei die normalisierte Trackgeometrie ersetzt. Beide Aktionen akzeptieren
-GPX beziehungsweise GeoJSON LineString/MultiLineString. maptoy vergibt eine Asset-ID, validiert über das Plugin
+GPX beziehungsweise GeoJSON LineString/MultiLineString. *maptoy* vergibt eine Asset-ID, validiert über das Plugin
 und speichert die Datei kontrolliert unter `MAPTOY_DATA_DIR/layer-assets`. Der
 ursprüngliche Dateiname bleibt nur Metadatum. DTD- und Entity-Deklarationen in GPX
 werden abgewiesen. Es gilt `MAPTOY_MAX_LAYER_ASSET_BYTES`.
 
 ## Externe Bildwurzeln
 
-maptoy übernimmt keine Bildoriginale in sein Datenverzeichnis. Stattdessen ordnet
+*maptoy* übernimmt keine Bildoriginale in sein Datenverzeichnis. Stattdessen ordnet
 der Betreiber einer stabilen ID einen absoluten, im Container nur lesbar
 eingebundenen Pfad zu:
 

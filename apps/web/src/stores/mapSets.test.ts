@@ -1,6 +1,24 @@
+import {
+  createDefaultMapSetInput,
+  type MapSetListItem,
+} from "@maptoy/contracts";
 import { createPinia, setActivePinia } from "pinia";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useMapSetsStore } from "./mapSets.js";
+
+const { apiRequestMock } = vi.hoisted(() => ({ apiRequestMock: vi.fn() }));
+vi.mock("../api.js", () => ({ apiRequest: apiRequestMock }));
+
+function mapSet(id: string, name: string): MapSetListItem {
+  return {
+    ...createDefaultMapSetInput(),
+    id,
+    name,
+    createdAt: "2026-08-29T00:00:00.000Z",
+    updatedAt: "2026-08-29T00:00:00.000Z",
+    logicalTileCount: 0,
+  };
+}
 
 function throwingLocalStorage(): Storage {
   return {
@@ -22,6 +40,7 @@ function throwingLocalStorage(): Storage {
 describe("map sets store selection persistence", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    apiRequestMock.mockReset();
   });
 
   afterEach(() => {
@@ -41,5 +60,20 @@ describe("map sets store selection persistence", () => {
     expect(store.selectedId).toBeNull();
     expect(() => store.select("map-set-a")).not.toThrow();
     expect(store.selectedId).toBe("map-set-a");
+  });
+
+  it("keeps the active Map Set selected when another one is created", async () => {
+    const active = mapSet("00000000-0000-4000-8000-000000000001", "Active");
+    const created = mapSet("00000000-0000-4000-8000-000000000002", "Created");
+    apiRequestMock
+      .mockResolvedValueOnce({ items: [active] })
+      .mockResolvedValueOnce(created);
+    const store = useMapSetsStore();
+    await store.load();
+
+    await store.create(createDefaultMapSetInput());
+
+    expect(store.selectedId).toBe(active.id);
+    expect(store.items.map(({ id }) => id)).toContain(created.id);
   });
 });

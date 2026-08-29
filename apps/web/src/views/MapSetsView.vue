@@ -31,6 +31,7 @@ const editingId = ref<string | null>(null);
 const busy = ref(false);
 const message = ref<string | null>(null);
 const error = ref<string | null>(null);
+const saveError = ref<string | null>(null);
 const testResult = ref<MapSetTestResponse | null>(null);
 const testedMapSetId = ref<string | null>(null);
 const sourceLocked = ref(false);
@@ -116,6 +117,7 @@ function newMapSet(): void {
   editorKey.value = `create-${Date.now()}`;
   message.value = null;
   error.value = null;
+  saveError.value = null;
   testResult.value = null;
   void scrollEditorIntoView();
 }
@@ -129,6 +131,7 @@ function openEditor(mapSet: MapSet, locked: boolean): void {
   editorKey.value = mapSet.id;
   message.value = null;
   error.value = null;
+  saveError.value = null;
   testResult.value = null;
 }
 
@@ -187,7 +190,7 @@ function requestCloseEditor(): void {
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function save(input: MapSetInput): Promise<void> {
   busy.value = true;
-  error.value = null;
+  saveError.value = null;
   message.value = null;
   try {
     const mapSet =
@@ -197,7 +200,7 @@ async function save(input: MapSetInput): Promise<void> {
     openEditor(mapSet, sourceLocked.value);
     message.value = `${mapSet.name} was saved.`;
   } catch (cause) {
-    error.value =
+    saveError.value =
       cause instanceof Error
         ? cause.message
         : "The Map Set could not be saved.";
@@ -428,6 +431,7 @@ async function test(mapSet: MapSet): Promise<void> {
         :submit-label="editorMode === 'create' ? 'Create Map Set' : 'Save changes'"
         :busy="busy"
         :source-locked="sourceLocked"
+        :error="saveError"
         @submit="save"
         @cancel="requestCloseEditor"
         @duplicate="duplicateEditing"

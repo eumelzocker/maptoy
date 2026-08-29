@@ -38,7 +38,13 @@ import LayerEditor from "./LayerEditor.vue";
 import TogglePanel from "./TogglePanel.vue";
 import TreeSelectDropdown from "./TreeSelectDropdown.vue";
 
-defineProps<{ enabled: boolean }>();
+withDefaults(
+  defineProps<{
+    enabled: boolean;
+    placement?: "top" | "right";
+  }>(),
+  { placement: "top" },
+);
 
 const emit = defineEmits<{ changed: [] }>();
 const store = useLayersStore();
@@ -603,6 +609,7 @@ onBeforeUnmount(() => {
   <TogglePanel
     label="Layers"
     align="start"
+    :placement="placement"
     :suspend-outside-close="addDialogOpen || editingAsset !== null"
   >
     <template #trigger>

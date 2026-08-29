@@ -169,7 +169,7 @@ defineExpose({ openAt, close });
 <style scoped>
 .app-context-menu {
   position: fixed;
-  z-index: 2000;
+  z-index: 5000;
 }
 
 @media (max-width: 700px) {

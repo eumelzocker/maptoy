@@ -77,7 +77,6 @@ export const useMapSetsStore = defineStore("map-sets", () => {
       body: JSON.stringify(input),
     });
     replace(mapSet);
-    select(mapSet.id);
     return mapSet;
   }
 

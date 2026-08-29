@@ -7,6 +7,7 @@ const props = defineProps<{
   submitLabel: string;
   busy?: boolean;
   sourceLocked?: boolean;
+  error?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -30,6 +31,8 @@ const dailyRequestLimit = ref<string | number>(
   draft.downloadPolicy.dailyRequestLimit?.toString() ?? "",
 );
 const localError = ref<string | null>(null);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const formError = computed(() => localError.value ?? props.error ?? null);
 
 function currentFormState(): unknown {
   return {
@@ -127,8 +130,6 @@ function submit(): void {
 
 <template>
   <form class="map-set-form" @submit.prevent="submit">
-    <p v-if="localError" class="form-error" role="alert">{{ localError }}</p>
-
     <fieldset>
       <legend>Identity and provider</legend>
       <label>
@@ -351,6 +352,8 @@ function submit(): void {
         <input v-model="dailyRequestLimit" type="number" min="1" />
       </label>
     </fieldset>
+
+    <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
 
     <div class="form-actions">
       <button class="primary-button" type="submit" :disabled="busy">

@@ -4,6 +4,28 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added an English Mapping Resources documentation page with curated references
+  for geospatial standards, APIs, formats, tools, and open data catalogs.
+
+### Changed
+
+- Vertically centered the Map view's Layer and Display Options.
+- Kept the Map viewport at least 400 by 400 pixels when the browser window is
+  resized, using application scrolling below that size.
+- Made browser titles identify the active route and relevant context, including
+  selected Map Set names for Map and Coverage, the Map view's current
+  quarter-step zoom level, documentation-page titles, and Cache Map Set IDs.
+
+### Fixed
+
+- Kept the Map context menu above controls, popups, and dialogs.
+- Displayed Map Set save and form-validation errors directly above the editor's
+  action row instead of at the start of the page or form.
+- Kept the active Map Set unchanged when another Map Set is created or
+  duplicated.
+
 ## [0.2.2] - 2026-08-29
 
 ### Added

@@ -14,6 +14,10 @@ export function formatMapZoomLevel(value: number): string {
   return `${sign}${whole}${fraction}`;
 }
 
+export function formatMapZoomTitle(value: number): string {
+  return `z${Math.round(value * 4) / 4}`;
+}
+
 export function integerMapZoomTarget(
   value: number,
   direction: MapZoomDirection,

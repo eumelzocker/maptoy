@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { documentation } from "virtual:maptoy-docs";
+import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import { version as appVersion } from "../package.json";
@@ -10,18 +11,67 @@ import {
 } from "./applicationViews.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import AppMenuSelect from "./components/AppMenuSelect.vue";
+import { applicationDocumentTitle } from "./documentTitle.js";
+import { documentationPageId } from "./documentationRoute.js";
+import { formatMapZoomTitle } from "./mapZoomControl.js";
 import type { MenuItem } from "./menuModels.js";
+import { useMapSetsStore } from "./stores/mapSets.js";
+import { useMapViewStateStore } from "./stores/mapViewState.js";
 import { useUiPreferencesStore } from "./stores/uiPreferences.js";
 
 const route = useRoute();
 const router = useRouter();
+const mapSets = useMapSetsStore();
+const mapViewState = useMapViewStateStore();
 const uiPreferences = useUiPreferencesStore();
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const showHeader = computed(
   () => route.path !== "/" || uiPreferences.showTitleBar,
 );
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const activeView = computed(() => applicationViewForPath(route.path));
+const routeContext = computed(() => {
+  switch (activeView.value?.id) {
+    case "map":
+      return mapSets.selected?.name ?? null;
+    case "cache": {
+      const mapSetId = route.params.mapSetId;
+      return typeof mapSetId === "string" ? mapSetId : null;
+    }
+    case "coverage": {
+      const mapSetId = route.params.mapSetId;
+      return typeof mapSetId === "string"
+        ? (mapSets.items.find(({ id }) => id === mapSetId)?.name ?? null)
+        : null;
+    }
+    case "docs": {
+      const requestedLanguage = String(
+        route.params.language ?? documentation.defaultLanguage,
+      );
+      const language = documentation.languages.some(
+        ({ code }) => code === requestedLanguage,
+      )
+        ? requestedLanguage
+        : documentation.defaultLanguage;
+      const pageId = documentationPageId(route.params.pageId);
+      return (
+        documentation.pages.find(
+          (page) => page.requestedLanguage === language && page.id === pageId,
+        )?.title ?? "Page not found"
+      );
+    }
+    default:
+      return null;
+  }
+});
+const browserTitle = computed(() =>
+  applicationDocumentTitle(
+    activeView.value?.label.toLowerCase() ?? null,
+    routeContext.value,
+    activeView.value?.id === "map" && mapViewState.sourceZoom !== null
+      ? formatMapZoomTitle(mapViewState.sourceZoom)
+      : null,
+  ),
+);
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const navigationViews = computed(() =>
   applicationViews.map((view) => ({
@@ -36,6 +86,14 @@ const navigationMenuItems = computed<MenuItem[]>(() =>
     label: view.label,
     icon: view.icon,
   })),
+);
+
+watch(
+  browserTitle,
+  (title) => {
+    document.title = title;
+  },
+  { immediate: true },
 );
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template

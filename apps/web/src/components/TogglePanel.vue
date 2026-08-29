@@ -6,9 +6,10 @@ const props = withDefaults(
   defineProps<{
     label: string;
     align?: "start" | "end";
+    placement?: "top" | "right";
     suspendOutsideClose?: boolean;
   }>(),
-  { align: "start", suspendOutsideClose: false },
+  { align: "start", placement: "top", suspendOutsideClose: false },
 );
 
 const {
@@ -50,7 +51,7 @@ onBeforeUnmount(() => {
   <span
     ref="root"
     class="toggle-panel"
-    :class="[`align-${align}`, { open }]"
+    :class="[`align-${align}`, `placement-${placement}`, { open }]"
     @keydown.esc="close"
   >
     <button
@@ -110,7 +111,6 @@ onBeforeUnmount(() => {
 
 .toggle-content {
   position: absolute;
-  bottom: calc(100% + 0.55rem);
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -125,11 +125,21 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
-.align-start .toggle-content {
+.placement-top .toggle-content {
+  bottom: calc(100% + 0.55rem);
+}
+
+.placement-right .toggle-content {
+  top: 50%;
+  left: calc(100% + 0.55rem);
+  transform: translateY(-50%);
+}
+
+.placement-top.align-start .toggle-content {
   left: 0;
 }
 
-.align-end .toggle-content {
+.placement-top.align-end .toggle-content {
   right: 0;
 }
 </style>

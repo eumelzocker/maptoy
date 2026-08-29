@@ -61,7 +61,6 @@ import {
   mapContextMenuIds,
 } from "../mapContextMenuItems.js";
 import type { MenuItem } from "../menuModels.js";
-import { mapDocumentTitle } from "../mapDocumentTitle.js";
 import { mapTileUrl } from "../mapTileUrl.js";
 import { availableLocalStorage } from "../localStorage.js";
 import { applyMapCenter } from "../mapViewportActions.js";
@@ -72,6 +71,7 @@ import {
 } from "../registries.js";
 import { useLayersStore } from "../stores/layers.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
+import { useMapViewStateStore } from "../stores/mapViewState.js";
 import { useUiPreferencesStore } from "../stores/uiPreferences.js";
 
 const injectedFactories = inject(MAP_RENDERER_FACTORY_REGISTRY_KEY);
@@ -87,6 +87,7 @@ const layerPlugins = injectedLayerPlugins;
 
 const router = useRouter();
 const store = useMapSetsStore();
+const mapViewState = useMapViewStateStore();
 const layers = useLayersStore();
 const { selected, selectedId } = storeToRefs(store);
 const mapHost = ref<HTMLElement | null>(null);
@@ -133,7 +134,6 @@ const showTitleBar = computed({
   get: () => uiPreferences.showTitleBar,
   set: (value) => uiPreferences.setShowTitleBar(value),
 });
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const controlZoom = computed(() =>
   selected.value === null || zoom.value === null
     ? null
@@ -174,6 +174,9 @@ let layerOperation: Promise<void> = Promise.resolve();
 watch(showCoordinates, (value) => saveShowCoordinates(value, browserStorage));
 watch(coordinateFormat, (value) => saveCoordinateFormat(value, browserStorage));
 watch(showMapSelector, (value) => saveShowMapSelector(value, browserStorage));
+watch(controlZoom, (value) => mapViewState.setSourceZoom(value), {
+  immediate: true,
+});
 watch(cachedTilesOnly, (value) => {
   saveCachedTilesOnly(value, browserStorage);
   void renderSelectedMap();
@@ -330,10 +333,10 @@ async function refreshLayerZoomVisibility(): Promise<void> {
 
 async function renderSelectedMap(): Promise<void> {
   const generation = ++renderGeneration;
+  zoom.value = null;
   await destroyRenderer();
   mapError.value = null;
   pointer.value = null;
-  zoom.value = null;
   await nextTick();
   if (generation !== renderGeneration) {
     return;
@@ -420,13 +423,6 @@ async function renderSelectedMap(): Promise<void> {
 }
 
 watch(selected, renderSelectedMap);
-watch(
-  selected,
-  (mapSet) => {
-    document.title = mapDocumentTitle(mapSet?.name ?? null);
-  },
-  { immediate: true },
-);
 watch(selectedId, (id) => store.select(id));
 
 onMounted(async () => {
@@ -438,9 +434,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(destroyRenderer);
-onBeforeUnmount(() => {
-  document.title = mapDocumentTitle(null);
-});
+onBeforeUnmount(() => mapViewState.setSourceZoom(null));
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function openMapContextMenu(event: MouseEvent): void {
@@ -645,13 +639,19 @@ function selectCoordinateFormat(value: string): void {
         </HtmlTooltip>
       </div>
 
-      <div class="map-bottom-left">
+      <div class="map-side-controls">
         <LayerPanel
           v-if="selected"
           :enabled="selected.capabilities.layerRendering"
+          placement="right"
           @changed="renderPluginLayers"
         />
-        <TogglePanel ref="displayOptionsPanel" label="Display Options" align="start">
+        <TogglePanel
+          ref="displayOptionsPanel"
+          label="Display Options"
+          align="start"
+          placement="right"
+        >
           <template #trigger>
             <i class="mdi mdi-tune" aria-hidden="true"></i>
           </template>
@@ -700,23 +700,24 @@ function selectCoordinateFormat(value: string): void {
             <span>Show Attribution</span>
           </label>
         </TogglePanel>
-        <div
-          class="coordinate-format-toggle"
-          :style="{
-            visibility: showCoordinates && pointer ? 'visible' : 'hidden',
-          }"
+      </div>
+
+      <div
+        class="coordinate-format-toggle"
+        :style="{
+          visibility: showCoordinates && pointer ? 'visible' : 'hidden',
+        }"
+      >
+        <AppMenuSelect
+          :model-value="coordinateFormat"
+          :items="coordinateFormatOptions"
+          aria-label="Map coordinates"
+          align="start"
+          variant="coordinates"
+          @update:model-value="selectCoordinateFormat"
         >
-          <AppMenuSelect
-            :model-value="coordinateFormat"
-            :items="coordinateFormatOptions"
-            aria-label="Map coordinates"
-            align="start"
-            variant="coordinates"
-            @update:model-value="selectCoordinateFormat"
-          >
-            <template #selected>{{ formattedPointer }}</template>
-          </AppMenuSelect>
-        </div>
+          <template #selected>{{ formattedPointer }}</template>
+        </AppMenuSelect>
       </div>
 
       <div v-if="store.loading" class="map-overlay">Loading Map Sets…</div>
@@ -756,7 +757,8 @@ function selectCoordinateFormat(value: string): void {
 <style scoped>
 .map-page {
   height: 100%;
-  min-height: 0;
+  min-width: 400px;
+  min-height: 400px;
 }
 
 .map-controls {
@@ -840,18 +842,23 @@ function selectCoordinateFormat(value: string): void {
   cursor: pointer;
 }
 
-.map-bottom-left {
+.map-side-controls {
   position: absolute;
-  bottom: 0.75rem;
+  top: 50%;
   left: 0.75rem;
   z-index: 1000;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   align-items: flex-start;
+  transform: translateY(-50%);
 }
 
 .coordinate-format-toggle {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 1000;
   display: inline-flex;
 }
 
@@ -909,8 +916,8 @@ function selectCoordinateFormat(value: string): void {
 .map-stage {
   position: relative;
   height: 100%;
-  min-width: 0;
-  min-height: 0;
+  min-width: 400px;
+  min-height: 400px;
   background: #a6c4b5;
 }
 
@@ -958,7 +965,11 @@ function selectCoordinateFormat(value: string): void {
     width: min(15rem, 58vw);
   }
 
-  .map-bottom-left {
+  .map-side-controls {
+    left: 0.5rem;
+  }
+
+  .coordinate-format-toggle {
     bottom: 0.5rem;
     left: 0.5rem;
   }
