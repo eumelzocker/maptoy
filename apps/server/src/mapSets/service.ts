@@ -17,6 +17,7 @@ import type {
   TileArchiveService,
 } from "../tiles/service.js";
 import type { MapSetRepository } from "./repository.js";
+import { createDefaultOpenTopoMapInput } from "./defaults.js";
 import {
   MapSetValidationError,
   providerHeaders,
@@ -90,6 +91,12 @@ export class MapSetService {
       maximumTileBytes: number;
     },
   ) {}
+
+  initialize(): void {
+    if (this.repository.list().length === 0) {
+      this.create(createDefaultOpenTopoMapInput());
+    }
+  }
 
   list(): MapSet[] {
     return this.repository.list();

@@ -137,14 +137,30 @@ function submit(): void {
       </label>
       <label class="wide-field">
         <span>XYZ URL template</span>
+        <small
+          v-if="sourceLocked"
+          id="template-source-lock-note"
+          class="field-note locked"
+        >
+          <i class="mdi mdi-lock" aria-hidden="true"></i>
+          The URL template is locked because this Map Set already contains cached Tiles. Direct database edits are possible but strongly discouraged.
+        </small>
         <input
           v-model.trim="draft.urlTemplate"
           required
           maxlength="4096"
           spellcheck="false"
           :disabled="sourceLocked"
+          :aria-describedby="
+            sourceLocked
+              ? 'template-source-lock-note template-format-note'
+              : 'template-format-note'
+          "
         />
-        <small>Required placeholders: {z}, {x}, {y}; optional: {s}. Use ${MAPTOY_PROVIDER_KEY} for secrets.</small>
+        <small id="template-format-note">
+          Required placeholders: {z}, {x}, {y}; optional: {s}. Use
+          ${MAPTOY_PROVIDER_KEY} for secrets.
+        </small>
       </label>
       <label class="wide-field">
         <span>Attribution</span>
@@ -170,7 +186,7 @@ function submit(): void {
       <p id="source-lock-note" class="wide-field field-note" :class="{ locked: sourceLocked }">
         <i v-if="sourceLocked" class="mdi mdi-lock" aria-hidden="true"></i>
         <template v-if="sourceLocked">
-          Source settings are locked because this Map Set contains cached Tiles.
+          Source settings are locked because this Map Set already contains cached Tiles.
         </template>
         <template v-else>
           URL, headers, subdomains, tile size, format, and projection become locked

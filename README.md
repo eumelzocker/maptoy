@@ -29,6 +29,13 @@ docker compose up --build
 
 Open <http://localhost:4004>.
 
+When the server starts with an empty Map Set table, *maptoy* creates an
+**OpenTopoMap** Map Set automatically. It uses no provider secret and includes the
+OpenTopoMap CC-BY-SA and OpenStreetMap contributor attribution. Existing Map Sets
+are never changed or supplemented; if all Map Sets are deleted, the default is
+created again on the next server start. Review the linked provider information
+before using the service beyond low-volume exploration.
+
 Compose bind-mounts the host directory configured by `MAPTOY_DATA_DIR` and the two traffic-log directories. They must exist and be writable by the container user. The defaults created above keep all of them below `.data`.
 
 Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](http://localhost:4004/docs/en/getting-started)** and **[Map Sets](http://localhost:4004/docs/en/map-sets)** documentation.

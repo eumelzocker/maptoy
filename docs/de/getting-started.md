@@ -6,10 +6,19 @@ language: de
 
 # Erste Schritte
 
-*maptoy* kann XYZ-Map-Sets speichern und über den Leaflet-Renderer anzeigen. Es ist
-absichtlich kein öffentlicher Tile-Provider vorkonfiguriert: Lege unter **Map Sets**
-eine Quelle an und wähle sie anschließend unter **Map** aus. Provider-URLs bleiben
-serverseitig; der Browser lädt Tiles über relative *maptoy*-API-URLs.
+*maptoy* kann XYZ-Map-Sets speichern und über den Leaflet-Renderer anzeigen. Startet
+der Server mit einer leeren `map_sets`-Tabelle, legt er automatisch ein
+**OpenTopoMap**-Map-Set an. Diese Vorgabe benötigt keine Zugangsdaten, enthält die
+CC-BY-SA-Attribution von OpenTopoMap sowie die Attribution der
+OpenStreetMap-Mitwirkenden und verlinkt die Informationsseite des Providers.
+Bestehende Map Sets bleiben unverändert. Löschst du alle Map Sets, wird OpenTopoMap
+beim nächsten Serverstart erneut angelegt.
+
+Unter **Map Sets** kannst du Quellen prüfen, bearbeiten, duplizieren, löschen oder
+neu anlegen und sie anschließend unter **Map** auswählen. Prüfe vor einer Nutzung
+der Vorgabe über kleinere Erkundungsabrufe hinaus die verlinkten
+Providerinformationen. Provider-URLs bleiben serverseitig; der Browser lädt Tiles
+über relative *maptoy*-API-URLs.
 
 ## Docker-Datenverzeichnis
 

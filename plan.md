@@ -1178,6 +1178,7 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.1.2` | Coverage-Ansicht bereinigt und präzisiert, gemeinsame Zoom-Steuerung sowie Dokumentationsverbesserungen |
 | `0.2.0` | Kernumfang von Phase 5: Layer-Plugin-System, Track-/Bildlayer, globaler Overlay-Stack, externer Bildkatalog und persistente Scan-Jobs |
 | `0.2.1` | Skalierbare Layer- und Hauptnavigation, vereinheitlichte Track-Deckkraftmigration sowie gruppierte Dokumentationsnavigation |
+| `0.2.2` | Koordinatenformate, verfeinerte Map-Set-Auswahl und Tile-Vorschau sowie OpenTopoMap als zugangsdatenfreie Erststartvorgabe |
 
 ### 13.2 Weitere Releases
 

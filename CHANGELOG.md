@@ -4,6 +4,8 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-29
+
 ### Added
 
 - Clicking the Map view's coordinate overlay opens a popup to choose the DD,
@@ -13,6 +15,8 @@ All notable changes to maptoy are documented in this file.
   normal cached Tile retrieval instead of requiring a separate Load Tile action,
   respects the Map view's Cached Tiles only option, and uses a centered,
   column-aligned cache-miss placeholder.
+- Server startup now creates the credential-free OpenTopoMap default, including
+  its attribution and provider information, whenever the Map Set table is empty.
 
 ### Changed
 

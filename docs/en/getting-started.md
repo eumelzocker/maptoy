@@ -6,10 +6,17 @@ language: en
 
 # Getting started
 
-*maptoy* can store XYZ Map Sets and display them through its Leaflet renderer. No
-public tile provider is configured automatically: open **Map Sets** to add a source,
-then select it on **Map**. Provider URLs remain on the server side and browser tile
-requests use relative *maptoy* API URLs.
+*maptoy* can store XYZ Map Sets and display them through its Leaflet renderer. When
+the server starts with an empty `map_sets` table, it automatically creates an
+**OpenTopoMap** Map Set. This credential-free default includes the OpenTopoMap
+CC-BY-SA and OpenStreetMap contributor attribution and links to the provider's
+information page. Existing Map Sets are left unchanged. If you delete every Map
+Set, OpenTopoMap is created again on the next server start.
+
+Open **Map Sets** to review, edit, duplicate, delete, or add sources, then select a
+source on **Map**. Review the linked provider information before using the default
+beyond low-volume exploration. Provider URLs remain on the server side and browser
+tile requests use relative *maptoy* API URLs.
 
 ## Development commands
 

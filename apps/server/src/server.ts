@@ -173,6 +173,7 @@ export async function buildServer(
       maximumTileBytes: config.maximumTileBytes,
     },
   );
+  mapSetService.initialize();
   const layerService = new LayerService(layerRepository, layerPluginRegistry);
   await layerService.initialize();
   const imageScanService = new ImageScanService(

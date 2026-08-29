@@ -83,6 +83,118 @@ afterEach(async () => {
 });
 
 describe("maptoy server", () => {
+  it("seeds OpenTopoMap whenever the Map Set table is empty at startup", async () => {
+    const config = await testConfig();
+    const firstServer = await buildServer({ config, serveWeb: false });
+
+    const firstList = await firstServer.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    expect(firstList.statusCode).toBe(200);
+    expect(firstList.json()).toEqual({
+      items: [
+        {
+          id: expect.stringMatching(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+          ),
+          name: "OpenTopoMap",
+          sourceType: "xyz-raster",
+          urlTemplate: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+          attribution:
+            '© <a href="http://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>) | Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.',
+          termsUrl: "https://opentopomap.org/about",
+          notes: "",
+          termsReviewedAt: "2026-08-23",
+          minZoom: 0,
+          maxZoom: 17,
+          tileSize: 256,
+          tileFormat: "png",
+          subdomains: ["a", "b", "c"],
+          headers: {},
+          sourceProjection: "EPSG:3857",
+          defaultCenter: { longitude: 10, latitude: 53.55 },
+          defaultZoom: 11,
+          rendererId: "leaflet-xyz",
+          capabilities: {
+            interactive: true,
+            tileArchive: true,
+            batchDownload: true,
+            serverExport: true,
+            layerRendering: true,
+          },
+          cachePolicy: {
+            enabled: true,
+            maximumAgeSeconds: 2_592_000,
+            maximumStorageBytes: null,
+          },
+          downloadPolicy: {
+            requestsPerSecond: 5,
+            concurrency: 2,
+            retryLimit: 3,
+            dailyRequestLimit: null,
+          },
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String),
+          logicalTileCount: 0,
+        },
+      ],
+    });
+    const firstId = firstList.json().items[0].id as string;
+    await firstServer.close();
+
+    const unchangedServer = await buildServer({ config, serveWeb: false });
+    const unchangedList = await unchangedServer.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    expect(unchangedList.json().items).toHaveLength(1);
+    expect(unchangedList.json().items[0].id).toBe(firstId);
+    await unchangedServer.inject({
+      method: "DELETE",
+      url: `/api/map-sets/${firstId}`,
+    });
+    await unchangedServer.close();
+
+    const reseededServer = await buildServer({ config, serveWeb: false });
+    const reseededList = await reseededServer.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    expect(reseededList.json().items).toHaveLength(1);
+    expect(reseededList.json().items[0]).toMatchObject({
+      name: "OpenTopoMap",
+      logicalTileCount: 0,
+    });
+    expect(reseededList.json().items[0].id).not.toBe(firstId);
+    const reseededId = reseededList.json().items[0].id as string;
+    const existingMapSet = await reseededServer.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        name: "Existing Map Set",
+      },
+    });
+    await reseededServer.inject({
+      method: "DELETE",
+      url: `/api/map-sets/${reseededId}`,
+    });
+    await reseededServer.close();
+
+    const nonEmptyServer = await buildServer({ config, serveWeb: false });
+    const nonEmptyList = await nonEmptyServer.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    expect(nonEmptyList.json().items).toHaveLength(1);
+    expect(nonEmptyList.json().items[0]).toMatchObject({
+      id: existingMapSet.json().id,
+      name: "Existing Map Set",
+    });
+    await nonEmptyServer.close();
+  });
+
   it("serves bounded Coverage for current, Snapshot, and time selections", async () => {
     const server = await buildServer({
       config: await testConfig(),
@@ -638,6 +750,14 @@ describe("maptoy server", () => {
       environment: { MAPTOY_TEST_KEY: "secret-value" },
       providerClient,
       serveWeb: false,
+    });
+    const seededMapSets = await server.inject({
+      method: "GET",
+      url: "/api/map-sets",
+    });
+    await server.inject({
+      method: "DELETE",
+      url: `/api/map-sets/${seededMapSets.json().items[0].id}`,
     });
     const input = {
       ...createDefaultMapSetInput(),
