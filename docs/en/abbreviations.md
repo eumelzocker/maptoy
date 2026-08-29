@@ -16,6 +16,9 @@ and format names that are not abbreviations are explained in the
 | API | Application Programming Interface | The HTTP interface used by the web application and other clients. |
 | CSP | Content Security Policy | Browser policy that restricts which resources and origins the application may use. |
 | CRS | Coordinate Reference System | A coordinate system together with the information needed to locate coordinates on Earth. |
+| DD | Decimal Degrees | A coordinate notation expressing latitude and longitude as signed decimal numbers, e.g. `53.548333°, 9.978889°`. |
+| DMM | Degrees and Decimal Minutes | A coordinate notation expressing latitude and longitude as whole degrees plus decimal minutes, e.g. `53° 32.900'N 9°58.733'E`. |
+| DMS | Degrees, Minutes, and Seconds | A coordinate notation expressing latitude and longitude as whole degrees, minutes, and seconds, e.g. `53° 32'54.0"N 9°58'44.0"E`. |
 | DPI | Dots per inch | Output-resolution metadata for an exported raster image; it does not add map detail by itself. |
 | EPSG | European Petroleum Survey Group | The name behind the commonly used numeric identifiers for coordinate reference systems, such as `EPSG:3857`. |
 | EXIF | Exchangeable image file format | Metadata in image files that can include orientation, capture time, and GPS coordinates. |

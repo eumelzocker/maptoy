@@ -6,18 +6,18 @@ language: en
 
 # Glossary
 
-This glossary defines map and maptoy concepts. Short forms are collected separately
+This glossary defines map and *maptoy* concepts. Short forms are collected separately
 in the [abbreviations directory](docs/en/abbreviations).
 
 ## Attribution
 
-The text or mark that identifies a map's data and imagery providers. maptoy preserves
+The text or mark that identifies a map's data and imagery providers. *maptoy* preserves
 configured attribution in the interactive map and in exports where applicable.
 
 ## Bounds
 
 A rectangular geographic extent, usually expressed by its western, southern,
-eastern, and northern edges. In maptoy, bounds can define a download area, export
+eastern, and northern edges. In *maptoy*, bounds can define a download area, export
 area, or the placement of an image layer.
 
 ## Cache
@@ -37,13 +37,20 @@ supports a function such as interactive display, caching, download, or export.
 
 ## Content hash
 
-A cryptographic digest calculated from stored bytes. maptoy uses it to recognize
+A cryptographic digest calculated from stored bytes. *maptoy* uses it to recognize
 identical tile content and to address content files without discarding revision
 history.
 
+## Coordinate notation
+
+A way of writing a WGS 84 longitude or latitude value. *maptoy* supports three
+notations: **DD** (Decimal Degrees, e.g. `53.548333°, 9.978889°`), **DMS**
+(Degrees, Minutes, and Seconds, e.g. `53° 32'54.0"N 9°58'44.0"E`), and **DMM**
+(Degrees and Decimal Minutes, e.g. `53° 32.900'N 9°58.733'E`).
+
 ## Coordinate reference system
 
-The rules that give coordinates a defined location on Earth. maptoy identifies
+The rules that give coordinates a defined location on Earth. *maptoy* identifies
 supported coordinate reference systems with EPSG codes.
 
 ## Coverage
@@ -58,7 +65,7 @@ plugin can import supported line and point geometry from GeoJSON.
 
 ## Layer
 
-Information drawn above the base map. In maptoy, a layer instance is managed by a
+Information drawn above the base map. In *maptoy*, a layer instance is managed by a
 registered layer plugin and may contain tracks, positioned images, or other data.
 
 ## Logical tile
@@ -68,7 +75,7 @@ One logical tile may have several immutable tile revisions.
 
 ## Map Set
 
-A maptoy configuration that combines a map source, renderer adapter, display
+A *maptoy* configuration that combines a map source, renderer adapter, display
 settings, cache and download policies, and assigned layers. Secret values are
 referenced from the environment rather than stored in the Map Set.
 
@@ -80,7 +87,7 @@ responsibility to review and follow.
 
 ## Renderer adapter
 
-The component that connects maptoy's neutral map interface to a concrete browser
+The component that connects *maptoy*'s neutral map interface to a concrete browser
 renderer. Version 1.0 supplies the Leaflet/XYZ adapter.
 
 ## Reprojection
@@ -100,7 +107,7 @@ content hash and validation metadata while preserving earlier and later content.
 
 ## URL template
 
-A provider URL containing placeholders such as `{z}`, `{x}`, and `{y}`. maptoy
+A provider URL containing placeholders such as `{z}`, `{x}`, and `{y}`. *maptoy*
 resolves the placeholders for a requested tile and handles configured secret
 references without storing their values in the Map Set.
 

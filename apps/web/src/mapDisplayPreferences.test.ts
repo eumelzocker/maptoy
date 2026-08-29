@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   loadCachedTilesOnly,
+  loadCoordinateFormat,
   loadShowAttribution,
   loadShowCoordinates,
   loadShowMapSelector,
   loadShowTitleBar,
   saveCachedTilesOnly,
+  saveCoordinateFormat,
   saveShowAttribution,
   saveShowCoordinates,
   saveShowMapSelector,
@@ -28,6 +30,7 @@ describe("Map display preferences", () => {
     expect(loadShowTitleBar(storage)).toBe(true);
     expect(loadShowMapSelector(storage)).toBe(true);
     expect(loadCachedTilesOnly(storage)).toBe(false);
+    expect(loadCoordinateFormat(storage)).toBe("dd");
   });
 
   it("round-trips a saved preference", () => {
@@ -37,11 +40,13 @@ describe("Map display preferences", () => {
     saveShowTitleBar(false, storage);
     saveShowMapSelector(false, storage);
     saveCachedTilesOnly(true, storage);
+    saveCoordinateFormat("dms", storage);
     expect(loadShowCoordinates(storage)).toBe(false);
     expect(loadShowAttribution(storage)).toBe(false);
     expect(loadShowTitleBar(storage)).toBe(false);
     expect(loadShowMapSelector(storage)).toBe(false);
     expect(loadCachedTilesOnly(storage)).toBe(true);
+    expect(loadCoordinateFormat(storage)).toBe("dms");
   });
 
   it("falls back to true for a malformed stored value", () => {
@@ -54,6 +59,7 @@ describe("Map display preferences", () => {
     expect(loadShowTitleBar(storage)).toBe(true);
     expect(loadShowMapSelector(storage)).toBe(true);
     expect(loadCachedTilesOnly(storage)).toBe(false);
+    expect(loadCoordinateFormat(storage)).toBe("dd");
   });
 
   it("keeps the preferences independent", () => {

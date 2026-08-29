@@ -6,19 +6,19 @@ language: de
 
 # Glossar
 
-Dieses Glossar erklärt Karten- und maptoy-Begriffe. Kurzformen sind gesondert im
+Dieses Glossar erklärt Karten- und *maptoy*-Begriffe. Kurzformen sind gesondert im
 [Abkürzungsverzeichnis](docs/de/abbreviations) aufgeführt.
 
 ## Attribution
 
-Text oder Kennzeichnung, die Daten- und Bildanbieter einer Karte nennt. maptoy
+Text oder Kennzeichnung, die Daten- und Bildanbieter einer Karte nennt. *maptoy*
 übernimmt die konfigurierte Attribution in die interaktive Karte und, soweit
 anwendbar, in Exporte.
 
 ## Bounds
 
 Ein rechteckiger geografischer Bereich, meist durch westliche, südliche, östliche
-und nördliche Grenze angegeben. Bounds können in maptoy ein Downloadgebiet, einen
+und nördliche Grenze angegeben. Bounds können in *maptoy* ein Downloadgebiet, einen
 Exportausschnitt oder die Position eines Bildlayers bestimmen.
 
 ## Cache
@@ -39,12 +39,19 @@ Funktion wie interaktive Anzeige, Caching, Download oder Export unterstützt.
 
 ## Content hash
 
-Kryptografischer Prüfwert aus den gespeicherten Bytes. maptoy erkennt damit gleiche
+Kryptografischer Prüfwert aus den gespeicherten Bytes. *maptoy* erkennt damit gleiche
 Tile-Inhalte und adressiert Inhaltsdateien, ohne die Revisionshistorie zu verwerfen.
+
+## Coordinate notation
+
+Eine Schreibweise für einen WGS-84-Längen- oder Breitengrad. *maptoy* unterstützt
+drei Notationen: **DD** (Decimal Degrees, z. B. `53.548333°, 9.978889°`), **DMS**
+(Degrees, Minutes, and Seconds, z. B. `53° 32'54.0"N 9°58'44.0"E`) und **DMM**
+(Degrees and Decimal Minutes, z. B. `53° 32.900'N 9°58.733'E`).
 
 ## Coordinate reference system
 
-Regeln, durch die Koordinaten eine definierte Lage auf der Erde erhalten. maptoy
+Regeln, durch die Koordinaten eine definierte Lage auf der Erde erhalten. *maptoy*
 bezeichnet unterstützte Koordinatenreferenzsysteme mit EPSG-Codes.
 
 ## Coverage
@@ -62,7 +69,7 @@ importieren.
 ## Layer
 
 Informationen, die über der Basiskarte gezeichnet werden. Eine Layer-Instanz wird in
-maptoy von einem registrierten Layer-Plugin verwaltet und kann Tracks, positionierte
+*maptoy* von einem registrierten Layer-Plugin verwaltet und kann Tracks, positionierte
 Bilder oder andere Daten enthalten.
 
 ## Logical tile
@@ -73,7 +80,7 @@ Tile-Revisionen geben.
 
 ## Map Set
 
-Eine maptoy-Konfiguration, die Kartenquelle, Renderer-Adapter, Darstellung,
+Eine *maptoy*-Konfiguration, die Kartenquelle, Renderer-Adapter, Darstellung,
 Cache- und Download-Regeln sowie zugeordnete Layer zusammenfasst. Geheimwerte
 werden aus der Umgebung referenziert und nicht im Map Set gespeichert.
 
@@ -85,7 +92,7 @@ und zulässigen Nutzungen zu prüfen und einzuhalten.
 
 ## Renderer adapter
 
-Komponente, die maptoys neutrale Kartenschnittstelle mit einem konkreten
+Komponente, die *maptoy*s neutrale Kartenschnittstelle mit einem konkreten
 Browser-Renderer verbindet. Version 1.0 liefert den Leaflet-/XYZ-Adapter aus.
 
 ## Reprojection
@@ -107,7 +114,7 @@ und spätere Inhalte.
 
 ## URL template
 
-Provider-URL mit Platzhaltern wie `{z}`, `{x}` und `{y}`. maptoy setzt sie für das
+Provider-URL mit Platzhaltern wie `{z}`, `{x}` und `{y}`. *maptoy* setzt sie für das
 angeforderte Tile ein und verarbeitet konfigurierte Secret-Referenzen, ohne deren
 Werte im Map Set zu speichern.
 

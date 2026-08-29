@@ -21,6 +21,8 @@ import { useRouter } from "vue-router";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import AppContextMenu from "../components/AppContextMenu.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import AppMenuSelect from "../components/AppMenuSelect.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import GotoCoordinatesDialog from "../components/GotoCoordinatesDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
@@ -36,11 +38,20 @@ import TileCalculatorDialog from "../components/TileCalculatorDialog.vue";
 import TogglePanel from "../components/TogglePanel.vue";
 import { loadDocumentationLanguage } from "../documentationLanguage.js";
 import {
+  type CoordinateFormat,
+  coordinateFormats,
+  formatLatitude,
+  formatLongitude,
+  isCoordinateFormat,
+} from "../coordinateFormat.js";
+import {
   loadCachedTilesOnly,
+  loadCoordinateFormat,
   loadShowAttribution,
   loadShowCoordinates,
   loadShowMapSelector,
   saveCachedTilesOnly,
+  saveCoordinateFormat,
   saveShowAttribution,
   saveShowCoordinates,
   saveShowMapSelector,
@@ -85,6 +96,9 @@ const zoom = ref<number | null>(null);
 const browserStorage = availableLocalStorage();
 const cachedTilesOnly = ref(loadCachedTilesOnly(browserStorage));
 const showCoordinates = ref(loadShowCoordinates(browserStorage));
+const coordinateFormat = ref<CoordinateFormat>(
+  loadCoordinateFormat(browserStorage),
+);
 const showAttribution = ref(loadShowAttribution(browserStorage));
 const showMapSelector = ref(loadShowMapSelector(browserStorage));
 const displayOptionsPanel = ref<{ close: () => void } | null>(null);
@@ -105,6 +119,16 @@ const documentationLanguage = loadDocumentationLanguage(
   documentation.defaultLanguage,
 );
 const mapContextMenu = ref<{ openAt(x: number, y: number): void } | null>(null);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const coordinateFormatOptions: readonly MenuItem[] = coordinateFormats.map(
+  (format) => ({ id: format, label: format.toUpperCase() }),
+);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const formattedPointer = computed(() =>
+  pointer.value === null
+    ? ""
+    : `${formatLatitude(pointer.value.latitude, coordinateFormat.value)}, ${formatLongitude(pointer.value.longitude, coordinateFormat.value)}`,
+);
 const showTitleBar = computed({
   get: () => uiPreferences.showTitleBar,
   set: (value) => uiPreferences.setShowTitleBar(value),
@@ -148,6 +172,7 @@ const publishedLayers = new Map<string, MapLayerDescriptor>();
 let layerOperation: Promise<void> = Promise.resolve();
 
 watch(showCoordinates, (value) => saveShowCoordinates(value, browserStorage));
+watch(coordinateFormat, (value) => saveCoordinateFormat(value, browserStorage));
 watch(showMapSelector, (value) => saveShowMapSelector(value, browserStorage));
 watch(cachedTilesOnly, (value) => {
   saveCachedTilesOnly(value, browserStorage);
@@ -557,6 +582,13 @@ function openTileCalculator(): void {
   displayOptionsPanel.value?.close();
   tileCalculatorOpen.value = true;
 }
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function selectCoordinateFormat(value: string): void {
+  if (isCoordinateFormat(value)) {
+    coordinateFormat.value = value;
+  }
+}
 </script>
 
 <template>
@@ -668,18 +700,23 @@ function openTileCalculator(): void {
             <span>Show Attribution</span>
           </label>
         </TogglePanel>
-        <p
-          class="viewport-status"
+        <div
+          class="coordinate-format-toggle"
           :style="{
             visibility: showCoordinates && pointer ? 'visible' : 'hidden',
           }"
-          aria-label="Map coordinates"
         >
-          <span v-if="pointer" class="coordinates">
-            {{ pointer.latitude.toFixed(5) }}, {{ pointer.longitude.toFixed(5) }}
-          </span>
-          <span v-else class="coordinates" aria-hidden="true">&nbsp;</span>
-        </p>
+          <AppMenuSelect
+            :model-value="coordinateFormat"
+            :items="coordinateFormatOptions"
+            aria-label="Map coordinates"
+            align="start"
+            variant="coordinates"
+            @update:model-value="selectCoordinateFormat"
+          >
+            <template #selected>{{ formattedPointer }}</template>
+          </AppMenuSelect>
+        </div>
       </div>
 
       <div v-if="store.loading" class="map-overlay">Loading Map Sets…</div>
@@ -813,19 +850,8 @@ function openTileCalculator(): void {
   align-items: flex-start;
 }
 
-.viewport-status {
-  display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
-  margin: 0;
-  padding: 0.4rem 0.65rem;
-  border-radius: 0.4rem;
-  color: #f7faf8;
-  background: rgb(20 44 40 / 86%);
-  box-shadow: 0 0.25rem 0.8rem rgb(24 54 45 / 18%);
-  font-size: 0.8rem;
-  pointer-events: none;
-  white-space: nowrap;
+.coordinate-format-toggle {
+  display: inline-flex;
 }
 
 .check-field {
@@ -877,11 +903,6 @@ function openTileCalculator(): void {
 .display-tool-action:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-.coordinates,
-.viewport-status {
-  font-family: ui-monospace, monospace;
 }
 
 .map-stage {

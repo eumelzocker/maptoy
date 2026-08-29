@@ -4,6 +4,12 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Clicking the Map view's coordinate overlay opens a popup to choose the DD,
+  DMS, or DMM coordinate notation; the choice is remembered in browser-local
+  preferences.
+
 ## [0.2.1] - 2026-08-29
 
 ### Added

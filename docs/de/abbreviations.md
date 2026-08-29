@@ -16,6 +16,9 @@ Abkürzungen. Produkt- und Formatnamen, die keine Abkürzungen sind, werden im
 | API | Application Programming Interface | HTTP-Schnittstelle, die von der Webanwendung und anderen Clients verwendet wird. |
 | CSP | Content Security Policy | Browser-Richtlinie, die zulässige Ressourcen und Ursprünge der Anwendung einschränkt. |
 | CRS | Coordinate Reference System | Koordinatensystem zusammen mit den Angaben, die Koordinaten auf der Erde verorten. |
+| DD | Decimal Degrees | Koordinatennotation, die Breite und Länge als vorzeichenbehaftete Dezimalzahlen angibt, z. B. `53.548333°, 9.978889°`. |
+| DMM | Degrees and Decimal Minutes | Koordinatennotation, die Breite und Länge als ganze Grad plus Dezimalminuten angibt, z. B. `53° 32.900'N 9°58.733'E`. |
+| DMS | Degrees, Minutes, and Seconds | Koordinatennotation, die Breite und Länge als ganze Grad, Minuten und Sekunden angibt, z. B. `53° 32'54.0"N 9°58'44.0"E`. |
 | DPI | Dots per inch | Metadatum zur Ausgabeauflösung eines exportierten Rasterbilds; es erzeugt allein keine zusätzlichen Kartendetails. |
 | EPSG | European Petroleum Survey Group | Namensursprung der gebräuchlichen numerischen Kennungen für Koordinatenreferenzsysteme, etwa `EPSG:3857`. |
 | EXIF | Exchangeable image file format | Metadaten in Bilddateien, die unter anderem Ausrichtung, Aufnahmezeit und GPS-Koordinaten enthalten können. |

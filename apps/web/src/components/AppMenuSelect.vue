@@ -13,7 +13,7 @@ const props = withDefaults(
     ariaLabel?: string;
     placeholder?: string;
     align?: "start" | "end";
-    variant?: "field" | "topbar";
+    variant?: "field" | "topbar" | "coordinates";
   }>(),
   {
     ariaLabel: "Select option",
@@ -178,13 +178,23 @@ onBeforeUnmount(() => {
         :class="selected.icon"
         aria-hidden="true"
       ></i>
-      <span class="selected-label">{{ selected?.label ?? placeholder }}</span>
+      <span class="selected-label">
+        <slot name="selected" :selected="selected">
+          {{ selected?.label ?? placeholder }}
+        </slot>
+      </span>
       <i class="mdi mdi-chevron-down chevron" aria-hidden="true"></i>
     </button>
   </span>
 
   <Teleport v-if="open" to="body">
-    <div :id="contentId" ref="content" class="app-menu-select-overlay" :style="style">
+    <div
+      :id="contentId"
+      ref="content"
+      class="app-menu-select-overlay"
+      :class="`variant-${variant}`"
+      :style="style"
+    >
       <AppMenu
         ref="menu"
         :items="menuItems"
@@ -252,6 +262,33 @@ onBeforeUnmount(() => {
   outline-color: #f2c96e;
 }
 
+.variant-coordinates .select-trigger {
+  display: flex;
+  min-height: 0;
+  padding: 0.4rem 0.65rem;
+  border: 0;
+  border-radius: 0.4rem;
+  color: #f7faf8;
+  background: rgb(20 44 40 / 86%);
+  box-shadow: 0 0.25rem 0.8rem rgb(24 54 45 / 18%);
+  font-size: 0.8rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.variant-coordinates .select-trigger:hover,
+.variant-coordinates.open .select-trigger {
+  background: rgb(20 44 40 / 96%);
+}
+
+.variant-coordinates .chevron {
+  display: none;
+}
+
+.variant-coordinates .selected-label {
+  font-family: ui-monospace, monospace;
+}
+
 .select-trigger:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -282,5 +319,9 @@ onBeforeUnmount(() => {
 .app-menu-select-overlay {
   position: fixed;
   z-index: 4000;
+}
+
+.app-menu-select-overlay.variant-coordinates .app-menu {
+  min-width: 5rem;
 }
 </style>

@@ -4,6 +4,8 @@ import { WEB_MERCATOR_MAX_LATITUDE } from "@maptoy/map-core";
 import { ref, useId, watch } from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import CenteredDialog from "./CenteredDialog.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import CoordinateDmsReadout from "./CoordinateDmsReadout.vue";
 
 const props = defineProps<{
   open: boolean;
@@ -68,6 +70,7 @@ function apply(): void {
             required
             autofocus
           />
+          <CoordinateDmsReadout axis="longitude" :value="longitude" />
         </label>
         <label>
           <span>Latitude</span>
@@ -79,6 +82,7 @@ function apply(): void {
             step="any"
             required
           />
+          <CoordinateDmsReadout axis="latitude" :value="latitude" />
         </label>
       </div>
       <small>Latitude is limited to the Web Mercator map extent.</small>

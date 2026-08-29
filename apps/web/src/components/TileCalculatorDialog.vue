@@ -8,6 +8,8 @@ import {
 } from "../mapTileCalculator.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import CenteredDialog from "./CenteredDialog.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import CoordinateDmsReadout from "./CoordinateDmsReadout.vue";
 
 interface TileCalculatorMapSet {
   id: string;
@@ -119,6 +121,7 @@ async function loadTile(): Promise<void> {
             step="any"
             required
           />
+          <CoordinateDmsReadout axis="longitude" :value="longitude" />
         </label>
         <label>
           <span>Latitude</span>
@@ -130,6 +133,7 @@ async function loadTile(): Promise<void> {
             step="any"
             required
           />
+          <CoordinateDmsReadout axis="latitude" :value="latitude" />
         </label>
       </div>
 

@@ -1,3 +1,7 @@
+import {
+  type CoordinateFormat,
+  isCoordinateFormat,
+} from "./coordinateFormat.js";
 import { getItem, setItem } from "./localStorage.js";
 
 type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
@@ -7,6 +11,7 @@ const showAttributionKey = "maptoy:show-attribution";
 const showTitleBarKey = "maptoy:show-title-bar";
 const showMapSelectorKey = "maptoy:show-map-selector";
 const cachedTilesOnlyKey = "maptoy:cached-tiles-only";
+const coordinateFormatKey = "maptoy:coordinate-format";
 
 function loadBooleanPreference(
   key: string,
@@ -73,6 +78,20 @@ export function saveShowMapSelector(
   storage?: PreferenceStorage | null,
 ): void {
   saveBooleanPreference(showMapSelectorKey, value, storage);
+}
+
+export function loadCoordinateFormat(
+  storage?: PreferenceStorage | null,
+): CoordinateFormat {
+  const stored = getItem(coordinateFormatKey, storage);
+  return isCoordinateFormat(stored) ? stored : "dd";
+}
+
+export function saveCoordinateFormat(
+  value: CoordinateFormat,
+  storage?: PreferenceStorage | null,
+): void {
+  setItem(coordinateFormatKey, value, storage);
 }
 
 export function loadCachedTilesOnly(
