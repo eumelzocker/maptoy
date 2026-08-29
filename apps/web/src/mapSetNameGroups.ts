@@ -8,14 +8,26 @@ export interface MapSetNameGroupItem<T extends NamedMapSet> {
   label: string;
 }
 
-export interface MapSetNameGroup<T extends NamedMapSet> {
+export interface MapSetNameFolder<T extends NamedMapSet> {
+  kind: "folder";
   key: string;
   label: string;
-  ungrouped: boolean;
+  virtual: boolean;
   items: MapSetNameGroupItem<T>[];
 }
 
+export interface MapSetNameRootItem<T extends NamedMapSet>
+  extends MapSetNameGroupItem<T> {
+  kind: "map-set";
+  key: string;
+}
+
+export type MapSetNameEntry<T extends NamedMapSet> =
+  | MapSetNameFolder<T>
+  | MapSetNameRootItem<T>;
+
 const groupNameCollator = new Intl.Collator(undefined, { sensitivity: "base" });
+const maximumDirectRootMapSets = 8;
 
 export interface MapSetNameParts {
   group: string | null;
@@ -33,10 +45,10 @@ export function splitMapSetName(name: string): MapSetNameParts {
   };
 }
 
-export function groupMapSetsByFirstNameSegment<T extends NamedMapSet>(
+export function createMapSetNameEntries<T extends NamedMapSet>(
   mapSets: readonly T[],
-): MapSetNameGroup<T>[] {
-  const namedGroups = new Map<string, MapSetNameGroup<T>>();
+): MapSetNameEntry<T>[] {
+  const namedGroups = new Map<string, MapSetNameFolder<T>>();
   const ungroupedItems: MapSetNameGroupItem<T>[] = [];
 
   for (const mapSet of mapSets) {
@@ -55,9 +67,10 @@ export function groupMapSetsByFirstNameSegment<T extends NamedMapSet>(
 
     if (group === undefined) {
       namedGroups.set(name.group, {
+        kind: "folder",
         key: `named:${name.group}`,
         label: name.group,
-        ungrouped: false,
+        virtual: false,
         items: [item],
       });
     } else {
@@ -65,18 +78,40 @@ export function groupMapSetsByFirstNameSegment<T extends NamedMapSet>(
     }
   }
 
-  const groups = [...namedGroups.values()].sort((left, right) =>
-    groupNameCollator.compare(left.label, right.label),
-  );
-
-  if (ungroupedItems.length > 0) {
-    groups.push({
-      key: "ungrouped",
-      label: "Other Map Sets",
-      ungrouped: true,
-      items: ungroupedItems,
-    });
+  const entries: MapSetNameEntry<T>[] = [...namedGroups.values()];
+  for (const group of entries) {
+    if (group.kind === "folder") {
+      group.items.sort((left, right) =>
+        groupNameCollator.compare(left.label, right.label),
+      );
+    }
   }
 
-  return groups;
+  ungroupedItems.sort((left, right) =>
+    groupNameCollator.compare(left.label, right.label),
+  );
+  if (ungroupedItems.length > maximumDirectRootMapSets) {
+    entries.push({
+      kind: "folder",
+      key: "ungrouped",
+      label: "Other Maps",
+      virtual: true,
+      items: ungroupedItems,
+    });
+  } else {
+    entries.push(
+      ...ungroupedItems.map(({ mapSet, label }) => ({
+        kind: "map-set" as const,
+        key: `map-set:${mapSet.id}`,
+        mapSet,
+        label,
+      })),
+    );
+  }
+
+  return entries.sort(
+    (left, right) =>
+      (left.kind === right.kind ? 0 : left.kind === "folder" ? -1 : 1) ||
+      groupNameCollator.compare(left.label, right.label),
+  );
 }

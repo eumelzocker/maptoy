@@ -747,6 +747,7 @@ function selectCoordinateFormat(value: string): void {
       :open="tileCalculatorOpen"
       :map-set="selected"
       :initial-input="tileCalculatorInitialInput"
+      :cached-tiles-only="cachedTilesOnly"
       @close="tileCalculatorOpen = false"
     />
   </main>

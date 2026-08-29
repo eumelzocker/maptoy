@@ -29,7 +29,7 @@ docker compose up --build
 
 Open <http://localhost:4004>.
 
-Compose bind-mounts the host directory configured by `MAPTOY_DATA_DIR` and the two traffic-log directories. They must exist and be writable by the container user (UID `1000`). The defaults created above keep all of them below `.data`.
+Compose bind-mounts the host directory configured by `MAPTOY_DATA_DIR` and the two traffic-log directories. They must exist and be writable by the container user. The defaults created above keep all of them below `.data`.
 
 Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](http://localhost:4004/docs/en/getting-started)** and **[Map Sets](http://localhost:4004/docs/en/map-sets)** documentation.
 

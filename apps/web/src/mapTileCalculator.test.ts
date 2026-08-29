@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { tileCoordinateForLocation } from "./mapTileCalculator.js";
+import {
+  tileCalculatorPreviewUrl,
+  tileCoordinateForLocation,
+} from "./mapTileCalculator.js";
 
 describe("Tile calculator", () => {
   it("calculates the XYZ tile containing a WGS84 location", () => {
@@ -22,5 +25,25 @@ describe("Tile calculator", () => {
     expect(
       tileCoordinateForLocation({ zoom: 10, longitude: 0, latitude: 86 }),
     ).toBeNull();
+  });
+
+  it("loads previews through automatic cached tile retrieval", () => {
+    expect(
+      tileCalculatorPreviewUrl(
+        "map set/id",
+        {
+          zoom: 10,
+          x: 550,
+          y: 335,
+        },
+        false,
+      ),
+    ).toBe("api/map-sets/map%20set%2Fid/tiles/10/550/335?refresh=auto");
+  });
+
+  it("requests only cached previews when the Map view option is enabled", () => {
+    expect(
+      tileCalculatorPreviewUrl("map-set-id", { zoom: 8, x: 138, y: 82 }, true),
+    ).toBe("api/map-sets/map-set-id/tiles/8/138/82?refresh=cache-only");
   });
 });

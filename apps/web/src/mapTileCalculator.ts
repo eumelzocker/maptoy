@@ -31,3 +31,12 @@ export function tileCoordinateForLocation(
   );
   return { zoom: tile.zoom, x: Math.floor(tile.x), y: Math.floor(tile.y) };
 }
+
+export function tileCalculatorPreviewUrl(
+  mapSetId: string,
+  tile: TileCoordinate,
+  cachedTilesOnly: boolean,
+): string {
+  const refresh = cachedTilesOnly ? "cache-only" : "auto";
+  return `api/map-sets/${encodeURIComponent(mapSetId)}/tiles/${tile.zoom}/${tile.x}/${tile.y}?refresh=${refresh}`;
+}

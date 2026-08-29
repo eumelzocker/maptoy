@@ -9,6 +9,16 @@ All notable changes to maptoy are documented in this file.
 - Clicking the Map view's coordinate overlay opens a popup to choose the DD,
   DMS, or DMM coordinate notation; the choice is remembered in browser-local
   preferences.
+- The Tile Calculator now loads every valid Tile preview automatically through
+  normal cached Tile retrieval instead of requiring a separate Load Tile action,
+  respects the Map view's Cached Tiles only option, and uses a centered,
+  column-aligned cache-miss placeholder.
+
+### Changed
+
+- Root-level Map Sets are sorted below named folders in selectors, the Map
+  context menu, and the Map Sets view. Only collections with more than eight
+  root-level Map Sets are grouped in a virtual `Other Maps` folder.
 
 ## [0.2.1] - 2026-08-29
 

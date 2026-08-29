@@ -18,7 +18,7 @@ import { onBeforeRouteLeave, useRoute } from "vue-router";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetForm from "../components/MapSetForm.vue";
 import { apiRequest } from "../api.js";
-import { groupMapSetsByFirstNameSegment } from "../mapSetNameGroups.js";
+import { createMapSetNameEntries } from "../mapSetNameGroups.js";
 import { mapSetInput } from "../mapSetModels.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
 
@@ -37,9 +37,7 @@ const sourceLocked = ref(false);
 const editorDirty = ref(false);
 const editorPanel = ref<HTMLElement | null>(null);
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const mapSetGroups = computed(() =>
-  groupMapSetsByFirstNameSegment(store.items),
-);
+const mapSetEntries = computed(() => createMapSetNameEntries(store.items));
 const collapsedGroupKeys = ref<Set<string>>(new Set());
 let routeReady = false;
 
@@ -300,46 +298,54 @@ async function test(mapSet: MapSet): Promise<void> {
 
     <section v-if="store.items.length > 0" class="map-set-groups" aria-label="Map Sets">
       <section
-        v-for="(group, groupIndex) in mapSetGroups"
-        :key="group.key"
+        v-for="(entry, entryIndex) in mapSetEntries"
+        :key="entry.key"
         class="map-set-group"
-        :class="{ ungrouped: group.ungrouped }"
-        :aria-labelledby="`map-set-group-${groupIndex}`"
+        :class="{
+          direct: entry.kind === 'map-set',
+          virtual: entry.kind === 'folder' && entry.virtual,
+        }"
+        :aria-labelledby="entry.kind === 'folder' ? `map-set-group-${entryIndex}` : undefined"
       >
         <header
+          v-if="entry.kind === 'folder'"
           class="group-heading"
           role="button"
           tabindex="0"
-          :aria-expanded="!isGroupCollapsed(group.key)"
-          :aria-controls="`map-set-group-list-${groupIndex}`"
-          @click="toggleGroup(group.key)"
-          @keydown.enter.prevent="toggleGroup(group.key)"
-          @keydown.space.prevent="toggleGroup(group.key)"
+          :aria-expanded="!isGroupCollapsed(entry.key)"
+          :aria-controls="`map-set-group-list-${entryIndex}`"
+          @click="toggleGroup(entry.key)"
+          @keydown.enter.prevent="toggleGroup(entry.key)"
+          @keydown.space.prevent="toggleGroup(entry.key)"
         >
           <div class="group-title">
             <i
               class="mdi group-caret"
-              :class="isGroupCollapsed(group.key) ? 'mdi-chevron-right' : 'mdi-chevron-down'"
+              :class="isGroupCollapsed(entry.key) ? 'mdi-chevron-right' : 'mdi-chevron-down'"
               aria-hidden="true"
             ></i>
             <i
               class="mdi"
-              :class="group.ungrouped ? 'mdi-format-list-bulleted' : 'mdi-folder-outline'"
+              :class="entry.virtual ? 'mdi-format-list-bulleted' : 'mdi-folder-outline'"
               aria-hidden="true"
             ></i>
-            <h2 :id="`map-set-group-${groupIndex}`">{{ group.label }}</h2>
+            <h2 :id="`map-set-group-${entryIndex}`">{{ entry.label }}</h2>
           </div>
           <span class="group-count">
-            {{ group.items.length }} {{ group.items.length === 1 ? "Map Set" : "Map Sets" }}
+            {{ entry.items.length }} {{ entry.items.length === 1 ? "Map Set" : "Map Sets" }}
           </span>
         </header>
 
         <div
-          v-show="!isGroupCollapsed(group.key)"
-          :id="`map-set-group-list-${groupIndex}`"
+          v-show="entry.kind === 'map-set' || !isGroupCollapsed(entry.key)"
+          :id="entry.kind === 'folder' ? `map-set-group-list-${entryIndex}` : undefined"
           class="map-set-list"
         >
-          <article v-for="item in group.items" :key="item.mapSet.id" class="map-set-card">
+          <article
+            v-for="item in entry.kind === 'folder' ? entry.items : [entry]"
+            :key="item.mapSet.id"
+            class="map-set-card"
+          >
             <div>
               <h3 :title="item.mapSet.name">{{ item.label }}</h3>
               <p class="source-template">{{ item.mapSet.urlTemplate }}</p>
@@ -534,8 +540,17 @@ h1 {
   border-left: 0.2rem solid #b9cfc3;
 }
 
-.map-set-group.ungrouped .map-set-list {
+.map-set-group.virtual .map-set-list {
   border-left-color: #d4c9b6;
+}
+
+.map-set-group.direct {
+  gap: 0;
+}
+
+.map-set-group.direct .map-set-list {
+  padding-left: 0;
+  border-left: 0;
 }
 
 .map-set-card,

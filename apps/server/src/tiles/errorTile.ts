@@ -26,6 +26,14 @@ function errorTileSvg({
 
   const fontSize = tileSize / 16;
   const lineHeight = fontSize * 1.25;
+  const values = [String(zoom), String(x), String(y)] as const;
+  const valueWidth = Math.max(...values.map((value) => value.length));
+  const rows = [
+    `z ${values[0].padStart(valueWidth, " ")}`,
+    `x ${values[1].padStart(valueWidth, " ")}`,
+    `y ${values[2].padStart(valueWidth, " ")}`,
+  ] as const;
+  const center = tileSize / 2;
   return Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${tileSize}" height="${tileSize}" viewBox="0 0 ${tileSize} ${tileSize}">
       <defs>
@@ -36,11 +44,11 @@ function errorTileSvg({
       </defs>
       <rect width="${tileSize}" height="${tileSize}" fill="url(#no-cache)" />
       <rect x="22%" y="32%" width="56%" height="36%" rx="${tileSize / 32}" fill="#163832" fill-opacity="0.9" />
-      <text x="50%" y="50%" fill="#f5f7ed" font-family="monospace" font-size="${fontSize}" font-weight="700" text-anchor="middle">
-        <tspan x="50%" dy="-${lineHeight}">z ${zoom}</tspan>
-        <tspan x="50%" dy="${lineHeight}">x ${x}</tspan>
-        <tspan x="50%" dy="${lineHeight}">y ${y}</tspan>
-      </text>
+      <g fill="#f5f7ed" font-family="monospace" font-size="${fontSize}" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        <text x="${center}" y="${center - lineHeight}" xml:space="preserve">${rows[0]}</text>
+        <text x="${center}" y="${center}" xml:space="preserve">${rows[1]}</text>
+        <text x="${center}" y="${center + lineHeight}" xml:space="preserve">${rows[2]}</text>
+      </g>
     </svg>
   `);
 }

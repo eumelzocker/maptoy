@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import { WEB_MERCATOR_MAX_LATITUDE } from "@maptoy/map-core";
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   type TileCalculatorInput,
+  tileCalculatorPreviewUrl,
   tileCoordinateForLocation,
 } from "../mapTileCalculator.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
@@ -21,6 +22,7 @@ const props = defineProps<{
   open: boolean;
   mapSet: TileCalculatorMapSet | null;
   initialInput: TileCalculatorInput;
+  cachedTilesOnly: boolean;
 }>();
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
@@ -28,18 +30,15 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const formId = `tile-calculator-form-${useId()}`;
 const zoom = ref(0);
 const longitude = ref(0);
 const latitude = ref(0);
 const previewUrl = ref<string | null>(null);
 const previewStatus = ref<"idle" | "loading" | "loaded" | "error">("idle");
-const previewKey = ref(0);
-const activeMapSet = ref<TileCalculatorMapSet | null>(null);
+let previewTimer: ReturnType<typeof setTimeout> | null = null;
 
 const calculatedTile = computed(() => {
-  const mapSet = activeMapSet.value;
+  const mapSet = props.mapSet;
   if (mapSet === null) {
     return null;
   }
@@ -55,38 +54,45 @@ const calculatedTile = computed(() => {
     : null;
 });
 
+const previewTargetUrl = computed(() => {
+  const mapSet = props.mapSet;
+  const tile = calculatedTile.value;
+  return props.open && mapSet !== null && tile !== null
+    ? tileCalculatorPreviewUrl(mapSet.id, tile, props.cachedTilesOnly)
+    : null;
+});
+
 watch(
   () => props.open,
   (open) => {
     if (open) {
-      activeMapSet.value = props.mapSet === null ? null : { ...props.mapSet };
       zoom.value = props.initialInput.zoom;
       longitude.value = props.initialInput.longitude;
       latitude.value = props.initialInput.latitude;
-      previewUrl.value = null;
-      previewStatus.value = "idle";
     }
   },
 );
 
-watch([zoom, longitude, latitude], () => {
-  previewUrl.value = null;
-  previewStatus.value = "idle";
-});
-
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-async function loadTile(): Promise<void> {
-  const mapSet = activeMapSet.value;
-  const tile = calculatedTile.value;
-  if (mapSet === null || tile === null) {
-    return;
+watch(previewTargetUrl, (url) => {
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer);
+    previewTimer = null;
   }
   previewUrl.value = null;
-  previewStatus.value = "loading";
-  previewKey.value += 1;
-  await nextTick();
-  previewUrl.value = `api/map-sets/${encodeURIComponent(mapSet.id)}/tiles/${tile.zoom}/${tile.x}/${tile.y}`;
-}
+  previewStatus.value = url === null ? "idle" : "loading";
+  if (url !== null) {
+    previewTimer = setTimeout(() => {
+      previewTimer = null;
+      previewUrl.value = url;
+    }, 200);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer);
+  }
+});
 </script>
 
 <template>
@@ -96,16 +102,20 @@ async function loadTile(): Promise<void> {
     :is-modal="false"
     @close="emit('close')"
   >
-    <form :id="formId" class="map-tool-form" @submit.prevent="loadTile">
+    <form class="map-tool-form" @submit.prevent>
       <p>Find the XYZ tile containing a WGS84 coordinate.</p>
+      <p v-if="cachedTilesOnly" class="cached-only-note">
+        The preview follows the Map view's <i>Cached Tiles only</i> option;
+        cache misses appear as placeholder Tiles.
+      </p>
       <div class="tile-fields">
         <label>
           <span>Zoom</span>
           <input
             v-model.number="zoom"
             type="number"
-            :min="activeMapSet?.minZoom ?? 0"
-            :max="activeMapSet?.maxZoom ?? 24"
+            :min="mapSet?.minZoom ?? 0"
+            :max="mapSet?.maxZoom ?? 24"
             step="1"
             required
             autofocus
@@ -121,7 +131,11 @@ async function loadTile(): Promise<void> {
             step="any"
             required
           />
-          <CoordinateDmsReadout axis="longitude" :value="longitude" />
+          <CoordinateDmsReadout
+            class="coordinate-readout"
+            axis="longitude"
+            :value="longitude"
+          />
         </label>
         <label>
           <span>Latitude</span>
@@ -133,7 +147,11 @@ async function loadTile(): Promise<void> {
             step="any"
             required
           />
-          <CoordinateDmsReadout axis="latitude" :value="latitude" />
+          <CoordinateDmsReadout
+            class="coordinate-readout"
+            axis="latitude"
+            :value="latitude"
+          />
         </label>
       </div>
 
@@ -149,11 +167,12 @@ async function loadTile(): Promise<void> {
         −180°.
       </p>
 
-      <figure v-if="previewUrl" class="tile-preview">
+      <figure class="tile-preview">
         <div class="tile-preview-frame">
           <span v-if="previewStatus === 'loading'">Loading Tile…</span>
           <img
-            :key="previewKey"
+            v-if="previewUrl"
+            :key="previewUrl"
             v-show="previewStatus !== 'error'"
             :src="previewUrl"
             :alt="calculatedTile
@@ -172,14 +191,6 @@ async function loadTile(): Promise<void> {
       <button type="button" class="dialog-button" @click="emit('close')">
         Close
       </button>
-      <button
-        type="submit"
-        :form="formId"
-        class="dialog-button primary"
-        :disabled="calculatedTile === null"
-      >
-        Load Tile
-      </button>
     </template>
   </CenteredDialog>
 </template>
@@ -196,6 +207,10 @@ async function loadTile(): Promise<void> {
   line-height: 1.45;
 }
 
+.map-tool-form > .cached-only-note {
+  font-size: 0.78rem;
+}
+
 .tile-fields {
   display: grid;
   grid-template-columns: 0.7fr 1fr 1fr;
@@ -206,9 +221,14 @@ async function loadTile(): Promise<void> {
   display: grid;
   min-width: 0;
   gap: 0.35rem;
+  align-content: start;
   color: #314f47;
   font-size: 0.84rem;
   font-weight: 700;
+}
+
+.coordinate-readout {
+  text-align: center;
 }
 
 .map-tool-form input,
@@ -229,17 +249,6 @@ async function loadTile(): Promise<void> {
 
 .dialog-button {
   cursor: pointer;
-}
-
-.dialog-button.primary {
-  border-color: #163832;
-  color: #fff;
-  background: #163832;
-}
-
-.dialog-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .tile-result {
@@ -277,6 +286,7 @@ async function loadTile(): Promise<void> {
 .tile-preview-frame {
   position: relative;
   display: grid;
+  height: clamp(10rem, 50dvh, 25rem);
   min-height: 10rem;
   overflow: hidden;
   place-items: center;
@@ -299,7 +309,7 @@ async function loadTile(): Promise<void> {
 .tile-preview img {
   display: block;
   max-width: 100%;
-  max-height: min(25rem, 50dvh);
+  max-height: 100%;
 }
 
 .tile-preview-frame > span + img {

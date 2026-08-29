@@ -11,6 +11,7 @@ describe("Map context menu items", () => {
       mapSets: [
         { id: "streets", name: "Provider/Streets" },
         { id: "satellite", name: "Provider/Satellite" },
+        { id: "root", name: "Root Map" },
       ] as MapSetListItem[],
       selectedMapSetId: "satellite",
       minimumZoom: 2,
@@ -38,16 +39,22 @@ describe("Map context menu items", () => {
     ]);
     expect(items[0]?.children?.[0]?.children).toMatchObject([
       {
-        id: `${mapContextMenuIds.mapSetPrefix}streets`,
-        label: "Streets",
-        selected: false,
-      },
-      {
         id: `${mapContextMenuIds.mapSetPrefix}satellite`,
         label: "Satellite",
         selected: true,
       },
+      {
+        id: `${mapContextMenuIds.mapSetPrefix}streets`,
+        label: "Streets",
+        selected: false,
+      },
     ]);
+    expect(items[0]?.children?.[1]).toMatchObject({
+      id: `${mapContextMenuIds.mapSetPrefix}root`,
+      label: "Root Map",
+      selected: false,
+    });
+    expect(items[0]?.children?.[1]?.children).toBeUndefined();
     expect(items[1]?.children).toMatchObject([
       { id: `${mapContextMenuIds.zoomPrefix}2`, label: "2", selected: false },
       { id: `${mapContextMenuIds.zoomPrefix}3`, label: "3", selected: true },

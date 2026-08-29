@@ -46,14 +46,21 @@ export function createMapContextMenuItems(
   const mapSetItems = createMapSetMenuItems(
     state.mapSets,
     state.selectedMapSetId,
-  ).map((group) => ({
-    ...group,
-    id: `map-set-group:${group.id}`,
-    children: (group.children ?? []).map((item) => ({
-      ...item,
-      id: `${mapContextMenuIds.mapSetPrefix}${item.id}`,
-    })),
-  }));
+  ).map((item) =>
+    item.children === undefined
+      ? {
+          ...item,
+          id: `${mapContextMenuIds.mapSetPrefix}${item.id}`,
+        }
+      : {
+          ...item,
+          id: `map-set-group:${item.id}`,
+          children: item.children.map((child) => ({
+            ...child,
+            id: `${mapContextMenuIds.mapSetPrefix}${child.id}`,
+          })),
+        },
+  );
   const zoomValues: number[] = [];
   if (
     state.minimumZoom !== null &&

@@ -1,21 +1,32 @@
 import type { MapSetListItem } from "@maptoy/contracts";
-import { groupMapSetsByFirstNameSegment } from "./mapSetNameGroups.js";
+import { createMapSetNameEntries } from "./mapSetNameGroups.js";
 import type { MenuItem } from "./menuModels.js";
 
 export function createMapSetMenuItems(
   mapSets: readonly MapSetListItem[],
   selectedId: string | null,
 ): MenuItem[] {
-  return groupMapSetsByFirstNameSegment(mapSets).map((group) => ({
-    id: group.key,
-    label: group.label,
-    icon: group.ungrouped ? "mdi-format-list-bulleted" : "mdi-folder-outline",
-    selected: group.items.some(({ mapSet }) => mapSet.id === selectedId),
-    children: group.items.map(({ mapSet, label }) => ({
-      id: mapSet.id,
-      label,
-      title: mapSet.name,
-      selected: mapSet.id === selectedId,
-    })),
-  }));
+  return createMapSetNameEntries(mapSets).map((entry) =>
+    entry.kind === "map-set"
+      ? {
+          id: entry.mapSet.id,
+          label: entry.label,
+          title: entry.mapSet.name,
+          selected: entry.mapSet.id === selectedId,
+        }
+      : {
+          id: entry.key,
+          label: entry.label,
+          icon: entry.virtual
+            ? "mdi-format-list-bulleted"
+            : "mdi-folder-outline",
+          selected: entry.items.some(({ mapSet }) => mapSet.id === selectedId),
+          children: entry.items.map(({ mapSet, label }) => ({
+            id: mapSet.id,
+            label,
+            title: mapSet.name,
+            selected: mapSet.id === selectedId,
+          })),
+        },
+  );
 }
