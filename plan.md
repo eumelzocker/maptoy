@@ -23,7 +23,12 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Die erste Version konzentriert sich auf Raster-Tiles nach dem XYZ-Schema. Vector Tiles und WMTS-Sonderfälle sind mögliche spätere Erweiterungen.
 - Die Kartenansicht verwendet eine Frontend-Adapter-Schnittstelle. v1.0 implementiert ausschließlich den Leaflet-/XYZ-Adapter; ein späterer Adapter für die Google Maps JavaScript API und weitere Karten-APIs ist architektonisch vorgesehen, aber ausdrücklich nicht Bestandteil von v1.0.
 - Provider- und Renderer-Fähigkeiten wie interaktive Anzeige, Tile-Cache, Batch-Download, Export und Layer-Unterstützung werden getrennt ausgewiesen und nicht für jeden Adapter vorausgesetzt.
-- Zusatzlayer verwenden eine allgemeine Plugin-Architektur. Track- und Bildlayer sind die Referenzimplementierungen und verwenden dieselben fachlichen Daten in interaktiver Karte und Bitmapexport.
+- Zusatzlayer verwenden eine allgemeine Plugin-Architektur. Track- und Bildlayer
+  sind die datenbasierten Referenzimplementierungen und verwenden dieselben
+  fachlichen Daten in interaktiver Karte und Bitmapexport. Zustandsabgeleitete
+  dekorative Layer verwenden denselben Lebenszyklus, erzeugen ihre Darstellung
+  jedoch ohne persistierte Features oder Assets aus Viewport, Projektion und aktiver
+  Tile-Matrix.
 - v1.0 lädt ausschließlich vertrauenswürdige Layer-Plugins, die beim Build beziehungsweise Deployment registriert werden. Installation oder Upload beliebigen ausführbaren Plugin-Codes über die Weboberfläche ist nicht vorgesehen.
 - Das Backend dient gleichzeitig als API, Tile-Proxy und statischer Webserver für das gebaute Frontend.
 - Eine optionale, generische Firefox-Erweiterung kann passende Browserantworten unverändert an frei konfigurierte HTTP-Ziele weiterleiten. Sie ist ein eigenständig versioniertes Workspace-Paket mit eigenen Build- und Testabläufen und wird weder im maptoy-Container gebaut noch ausgeliefert.
@@ -49,6 +54,9 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Track- und Bildlayer als vollständige Referenz-Plugins einschließlich
   GPS-getaggter Bilder und inkrementell scanbarer externer Bildverzeichnisse
   bereitstellen
+- einen dekorativen Tile-Grid-Layer ohne importierte Fachdaten bereitstellen, der
+  sichtbare XYZ-Tiles mit `z/x/y` beschriftet und eine koordinatenabhängige
+  metrische Maßstabsleiste einblendet
 - Kartenbilder aus Kartenausschnitt, Größe, Projektion und optionalen Plugin-Layern erzeugen
 - integrierte, über die Hauptnavigation erreichbare Dokumentation mit vollständiger englischer Fassung, Deutsch, Thai, Fallback, Suche, Sprachwechsel und externen Referenzlinks
 - Konfiguration über Environment und `.env` für die Entwicklung
@@ -151,7 +159,7 @@ Nur tatsächlich gemeinsam verwendeter Code gehört in ein Package. Job-Ausführ
 
 #### Frontend-Renderer-Adapter
 
-Die Vue-Anwendung greift nicht direkt aus fachlichen Komponenten auf Leaflet zu. Ein `MapRendererAdapter` kapselt mindestens Erzeugung und Zerstörung der Karte, Viewport und Zoom, Ereignisse, Basiskarte, Layer-Anbindung, Screenspace-/Geo-Koordinaten sowie verfügbare Fähigkeiten. Ein Adapter-Manifest enthält stabile ID, Version, kompatible SDK-Version, Konfigurationsschema und Capability-Flags.
+Die Vue-Anwendung greift nicht direkt aus fachlichen Komponenten auf Leaflet zu. Ein `MapRendererAdapter` kapselt mindestens Erzeugung und Zerstörung der Karte, Viewport und Zoom, Ereignisse, Basiskarte, Layer-Anbindung, Screenspace-/Geo-Koordinaten sowie verfügbare Fähigkeiten. Ein Adapter-Manifest enthält stabile ID, Version, kompatible SDK-Version, Konfigurationsschema, Capability-Flags und die unterstützten Layer-Deskriptorarten. Plugins deklarieren die von ihnen benötigten Deskriptorarten; ein allgemeines `layerRendering`-Flag ersetzt diese feingranulare Kompatibilitätsprüfung nicht.
 
 Der in v1.0 enthaltene Adapter `leaflet-xyz` bildet das bestehende XYZ-, Cache- und Exportmodell vollständig ab. Ein kleiner Fake-Adapter dient ausschließlich Vertragstests und beweist, dass zentrale UI-Komponenten nicht von Leaflet-Klassen abhängen. Für Google Maps wird in v1.0 weder Abhängigkeit noch Loader noch API-Key-Konfiguration ausgeliefert; die dokumentierte Adaptergrenze berücksichtigt jedoch, dass ein späterer Adapter clientseitig laden kann und möglicherweise weder Tile-Cache noch Batch-Download oder Serverexport anbietet.
 
@@ -182,12 +190,31 @@ Bild mit Bounds ist kein gewöhnlicher Flächenstil, sondern ein eigener
 Raster-Overlay-Deskriptor mit verwalteter Asset-ID und geografischer Ausdehnung; sein
 Footprint kann bei Bedarf als Fläche abgeleitet werden.
 
+Neben Deskriptoren für persistierte Geometrie und Rasterdaten unterstützt das SDK
+zustandsabgeleitete Dekorationsdeskriptoren. Deren sichtbarer Inhalt wird aus
+Viewport, Projektion und aktiver Tile-Matrix berechnet und nicht als Feature- oder
+Assetdaten persistiert. Initial stehen `xyz-tile-grid` für ein weltbezogenes Raster
+der tatsächlich verwendeten Source-Tiles und `scale-bar` für eine
+bildschirmbezogene Maßstabsleiste bereit. Ein Plugin veröffentlicht nur die
+deklarative Konfiguration; der Renderer aktualisiert die Darstellung bei Pan, Zoom
+und Basiskartenwechsel selbstständig. Plugins erhalten dafür weder Zugriff auf
+Leaflet noch auf Map-Set- oder globale UI-Stores.
+
+Einfache Plugin-Konfigurationen werden aus validiertem Konfigurationsschema und
+typisierten UI-Hinweisen in einem gemeinsamen Editor dargestellt. Plugins mit
+Import-, Scan- oder vergleichbaren Spezialabläufen dürfen einen bei der
+Frontend-Registry registrierten Spezialeditor bereitstellen. Die gemeinsame
+Layer-Editor-Shell löst Editoren über die Registry auf und enthält keine wachsende
+Fallunterscheidung nach Plugin-IDs.
+
 Die Registry wird beim Build aus explizit zugelassenen Paketen erzeugt. Ein Plugin erhält nur den benötigten Kontext statt direkten Zugriff auf Fastify, Pinia, Datenbank oder beliebige Dateipfade. Persistente Layer-Instanzen speichern Plugin-ID, Schema-Version und validierte Konfiguration. Fehlt ein Plugin nach einem Upgrade, bleiben seine Daten erhalten, der Layer wird jedoch deaktiviert und mit einer verständlichen Diagnose angezeigt.
 
 Die Referenz-Plugins definieren die Mindestqualität der Schnittstelle:
 
 - `track-layer`: Import von GPX und GeoJSON, normalisierte Geometrie, Linien-/Punktstil, interaktive Anzeige und Export
 - `image-layer`: sichere Bilddekodierung, EXIF-Ausrichtung, optionale GPS-Extraktion, explizite Punktkoordinate oder geografische Bounds, Vorschaubild, Marker-/Popup-Anzeige und Export
+- `tile-grid-layer`: assetfreie, zustandsabgeleitete Darstellung sichtbarer
+  XYZ-Tile-Grenzen und `z/x/y`-Koordinaten sowie einer metrischen Maßstabsleiste
 
 Die Plugin-Schnittstelle wird für v1 semantisch versioniert und durch Contract-Tests abgesichert. Eine öffentliche Plugin-Distribution, dynamische Codeinstallation oder langfristige Binärkompatibilitätsgarantie ist damit noch nicht verbunden.
 
@@ -284,13 +311,23 @@ Eine Layer-Instanz ist eine persistente Verwendung eines registrierten Plugins u
 
 - stabile ID, verpflichtender Anzeigename als `/`-segmentierbarer Hierarchiepfad und Plugin-ID
 - eine vom Plugin-Manifest deklarierte Kategorie als erste Hierarchieebene, zum
-  Beispiel `Tracks`, `Images` oder künftig `POIs`
+  Beispiel `Tracks`, `Images`, `Decorations` oder künftig `POIs`
 - Plugin- und Schema-Version
 - globale Verfügbarkeit unabhängig vom aktuell gewählten Map Set
 - validierte, pluginabhängige Konfiguration
 - Sichtbarkeit, Reihenfolge, Deckkraft und gegebenenfalls zoombasierte Grenzen
-- Referenzen auf kontrollierte Asset-IDs statt frei zusammengesetzter Dateipfade
+- optionale Referenzen auf kontrollierte Asset-IDs statt frei zusammengesetzter
+  Dateipfade
 - Erstellungs-/Änderungszeitpunkt und Migrationsstatus
+
+Persistente Feature-Daten und Assets sind für eine Layer-Instanz optional. Ein
+zustandsabgeleiteter Layer darf ein leeres validiertes Datenobjekt verwenden und
+seine Laufzeitdarstellung vollständig aus Rendererzustand und persistierter
+Konfiguration erzeugen. Abgeleitete Tile-Grenzen, Koordinatenbeschriftungen und
+Maßstabswerte werden weder in SQLite noch über die Layer-API gespeichert. Damit
+nutzen dekorative Layer unverändert CRUD, Hierarchie, Sichtbarkeit, Reihenfolge,
+Deckkraft, Zoomgrenzen, Migration und Diagnose des allgemeinen Layer-Modells, ohne
+ein paralleles Persistenz- oder Verwaltungssystem einzuführen.
 
 Die generische Assetverwaltung unterscheidet verwaltete Assets, externe
 Quelldateien und abgeleitete Assets. Verwaltete Nicht-Bild-Assets können über
@@ -363,7 +400,7 @@ Ein Exportauftrag enthält:
 - Verhalten bei fehlenden Tiles: abbrechen, transparent darstellen oder online nachladen
 - ausgewählte Layer-Instanzen mit Reihenfolge, Deckkraft und exportbezogener Konfiguration
 
-Der XYZ-Renderer bestimmt die benötigten Tiles, lädt sie bevorzugt aus dem gewählten Cache, setzt sie in der Quellprojektion zusammen, transformiert bei Bedarf und ruft danach die Server-Rendering-Hooks der ausgewählten Layer-Plugins auf. Maßstabsleiste und Attribution bleiben Bestandteile des Kernrenderers. Attribution muss im Ergebnis optional sichtbar und in den Exportmetadaten nachvollziehbar sein. Adapter ohne Capability `serverExport` dürfen keinen solchen Exportauftrag starten.
+Der XYZ-Renderer bestimmt die benötigten Tiles, lädt sie bevorzugt aus dem gewählten Cache, setzt sie in der Quellprojektion zusammen, transformiert bei Bedarf und ruft danach die Server-Rendering-Hooks der ausgewählten Layer-Plugins auf. Attribution bleibt Bestandteil des Kernrenderers und muss im Ergebnis optional sichtbar sowie in den Exportmetadaten nachvollziehbar sein. Eine Maßstabsleiste wird dagegen ausschließlich als ausgewählter dekorativer Layer dargestellt und exportiert, damit Konfiguration und Sichtbarkeit demselben Layer-Lebenszyklus wie in der interaktiven Karte folgen. Adapter ohne Capability `serverExport` dürfen keinen solchen Exportauftrag starten.
 
 ## 6. API-Entwurf
 
@@ -485,6 +522,15 @@ Plugin-Manifest deklarierten Kategorie. Weitere Ebenen entstehen ohne zusätzlic
 Persistenzmodell aus `/`-Segmenten des verpflichtenden Layernamens, beispielsweise
 `Tracks > Reisen > 2026 > Alpen` für den Namen `Reisen/2026/Alpen`.
 
+Der unter `Decorations` angebotene `tile-grid-layer` benötigt weder Import noch
+Assets. Sein Editor konfiguriert, ob Tile-Raster samt Koordinatenbeschriftung und die
+metrische Maßstabsleiste sichtbar sind, sowie deren Farben und die maximale Breite
+der Maßstabsleiste. Die allgemeinen Layerwerte steuern weiterhin Deckkraft und
+Zoomgrenzen. Die Maßstabsleiste liegt als Bildschirmdekoration in einer festen
+Renderer-Ebene über den weltbezogenen Layern; die Layer-Reihenfolge betrifft den
+weltbezogenen Rasteranteil, während Sichtbarkeit und Deckkraft auf beide Teile
+wirken.
+
 ### 7.2 Bedienprinzipien
 
 - Die Hauptnavigation markiert die aktive Ansicht dauerhaft und unterscheidet
@@ -516,7 +562,7 @@ Persistenzmodell aus `/`-Segmenten des verpflichtenden Layernamens, beispielswei
   und wirkt identisch in interaktiver Karte und Serverexport. Eine frühere
   Track-Konfiguration mit zusätzlicher Linien-Deckkraft wird verlustfrei migriert,
   indem beide bisherigen Faktoren in den allgemeinen Layerwert überführt werden.
-- Plugin-Editoren erscheinen innerhalb einer einheitlichen Layer-Oberfläche und dürfen Navigation, globale Stores oder andere Plugins nicht direkt manipulieren.
+- Plugin-Editoren erscheinen innerhalb einer einheitlichen Layer-Oberfläche und dürfen Navigation, globale Stores oder andere Plugins nicht direkt manipulieren. Einfache Konfigurationen verwenden den gemeinsamen schemabasierten Editor; Spezialeditoren werden über die Registry aufgelöst und nicht durch Plugin-ID-Verzweigungen in der Shell eingebaut.
 - Bildverzeichnisscans zeigen Fortschritt, neue, geänderte, fehlende und
   fehlgeschlagene Dateien, ohne pro EXIF-GPS-Position eine Bestätigung zu verlangen.
   Automatisch übernommene Positionen lassen sich anschließend einzeln korrigieren
@@ -720,6 +766,11 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
   Feature-/Stützpunkteigenschaften, Ringvalidierung und Trennung von Geometrie und Stil
 - adapterneutrale Darstellungsdeskriptoren und Symbolisierung für Punkt, Linie, Fläche
   sowie den gesonderten Raster-Overlay-Typ
+- zustandsabgeleitete Deskriptoren für XYZ-Tile-Raster und Maßstabsleiste,
+  Capability-Abgleich sowie kanonische Source-Tile-Auswahl bei Viertel-Zoom,
+  Tile-Größen-Offset und World-Wrapping
+- geodätische Distanz und Rundung metrischer Maßstabswerte für definierte
+  Bildschirmbreiten und Breitengrade
 - Plugin-Manifest, Schemas, Versionskompatibilität und Datenmigrationen
 - GPX-/GeoJSON-Normalisierung sowie EXIF-Ausrichtung und GPS-Extraktion
 - Bildscan-Fingerprints, inkrementelle Änderungsentscheidung und Regeln für
@@ -742,6 +793,10 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Datenbankmigration und Neustart mit laufendem Job
 - Abbruch, Pause, Wiederaufnahme und teilweise fehlgeschlagener Batch
 - Export mit Track- und Bildoverlay
+- persistenter, assetfreier Tile-Grid-Layer mit korrekten `z/x/y`-Beschriftungen
+  bei Pan, Viertel-Zoomstufen, 256-/512-Pixel-Tiles, Zoom-Offset und World-Wrapping
+- koordinatenabhängige Maßstabsleiste an mehreren Breitengraden sowie konsistente
+  Neuberechnung nach Viewport- und Map-Set-Wechsel
 - Plugin-Registry und isolierter Aufruf von Import-, Asset- und Export-Hooks
 - Verhalten bei fehlendem oder inkompatiblem Plugin ohne Verlust persistierter Layerdaten
 - Scan einer konfigurierten Read-only-Bildwurzel mit automatischer EXIF-Position,
@@ -1036,7 +1091,7 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
   optionaler Stützpunktmetadaten. Das Bild-Plugin verwendet für GPS- und manuell
   positionierte Bilder ausschließlich die allgemeine Punktbasis; Bilder mit Bounds
   verwenden den gesonderten Raster-Overlay-Vertrag.
-- Beide Referenz-Plugins verwenden ausschließlich die veröffentlichten Plugin-Schnittstellen und bestehen dieselbe Contract-Test-Suite.
+- Track- und Bild-Referenz-Plugin verwenden ausschließlich die veröffentlichten Plugin-Schnittstellen und bestehen dieselbe Contract-Test-Suite.
 - Ein deaktiviertes oder fehlendes Plugin verursacht keinen Datenverlust; ungültige beziehungsweise inkompatible Zustände werden verständlich angezeigt.
 - Es kann kein ausführbarer Plugin-Code über API oder Weboberfläche installiert werden.
 
@@ -1060,6 +1115,64 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
   Initialisieren sämtliche Assetseiten aller Layer abzurufen und anschließend nur
   einen Ausschnitt anzuzeigen. Verwaltung und Kartenanzeige bleiben auch bei großen
   konfigurierten Bildkatalogen kontrolliert nutzbar.
+
+### Phase 5a: Zustandsabgeleitete dekorative Layer
+
+**Aufgaben**
+
+- versionierte, adapterneutrale Deskriptoren `xyz-tile-grid` und `scale-bar` im
+  Map-Adapter- und Layer-Plugin-SDK ergänzen; Renderer-Manifeste weisen unterstützte
+  Deskriptorarten aus und Plugins deklarieren ihre Anforderungen
+- bestehende XYZ-Umrechnungen in `map-core` für sichtbare kanonische Tile-Bereiche
+  wiederverwenden und dort gemeinsame, projektionsunabhängig nutzbare Grundlagen für
+  geodätische Distanz sowie gut lesbar gerundete metrische Maßstabswerte ergänzen
+- den tatsächlichen ganzzahligen Source-Zoom der aktiven Basiskachel als Grundlage
+  des Rasters verwenden; Viertel-Zoomstufen, Tile-Größe `256` beziehungsweise `512`,
+  Renderer-Zoom-Offset und World-Wrapping dürfen Beschriftung und geladene Tile-URL
+  nicht auseinanderlaufen lassen
+- `xyz-tile-grid` im Leaflet-/XYZ-Adapter als dynamisch aktualisierte weltbezogene
+  Darstellung der sichtbaren Tile-Grenzen mit kanonischer Beschriftung `z/x/y`
+  implementieren; Pan und Zoom erzeugen keine persistierten Features und bauen die
+  Layer-Instanz nicht neu auf
+- `scale-bar` als feste Bildschirmdekoration implementieren, deren metrische Länge
+  aus Projektion, Ankerposition und Bildschirmbreite berechnet und auf einen gut
+  lesbaren Wert gerundet wird
+- beide Deskriptoren im Fake-Adapter und in gemeinsamen Adapter-Contract-Tests
+  abdecken; Anfügen, Aktualisieren, Sichtbarkeit, Deckkraft, Entfernen,
+  Renderer-Neuaufbau und vollständiges Aufräumen von Ereignis-Listenern prüfen
+- das vertrauenswürdige Plugin `tile-grid-layer` unter der Kategorie `Decorations`
+  registrieren; es veröffentlicht beide Deskriptoren als zusammengesetzten Layer,
+  verwendet ein leeres Datenobjekt und besitzt weder Asset-, Import- noch Job-Hooks
+- einen gemeinsamen schemabasierten Konfigurationseditor für einfache Plugins sowie
+  eine Registry-Auflösung für Spezialeditoren einführen; die Layer-Editor-Shell darf
+  für den neuen Plugin-Typ keine weitere Plugin-ID-Verzweigung erhalten
+- Tile-Raster, Beschriftung und Maßstabsleiste jeweils konfigurierbar machen;
+  Linien-/Textfarben und maximale Breite der Maßstabsleiste als Plugin-Konfiguration,
+  Deckkraft und Zoomgrenzen weiterhin ausschließlich als allgemeine Layerwerte führen
+- SDK- und Plugin-Dokumentation um zustandsabgeleitete Layer, Deskriptor-Capabilities
+  sowie die Trennung welt- und bildschirmbezogener Dekorationen ergänzen
+
+**Ergebnis/Akzeptanz**
+
+- Jedes sichtbare Basiskarten-Tile ist mit genau der kanonischen Koordinate `z/x/y`
+  seines tatsächlich verwendeten Source-Tiles beschriftet.
+- Raster und Beschriftungen bleiben bei Pan, Viertel-Zoomstufen,
+  256-/512-Pixel-Tiles, Renderer-Zoom-Offset, Datumsgrenzenüberschreitung und
+  World-Wrapping mit der Basiskarte deckungsgleich.
+- Die kleine metrische Maßstabsleiste reagiert ohne verzögerte Plugin-Neumontage auf
+  Zoom und geografische Breite und verwendet in interaktiver Ansicht und späterem
+  Export dieselbe Distanz- und Rundungslogik.
+- Der dekorative Layer wird über den vorhandenen Add-Layer-Dialog angelegt und nutzt
+  unverändert Name, Hierarchie, Persistenz, Sichtbarkeit, Reihenfolge, Deckkraft,
+  Zoomgrenzen, Diagnose und Löschen des allgemeinen Layer-Systems.
+- Anlegen, Anzeigen und Aktualisieren des Layers erzeugen keine Assets, Importe,
+  Jobs, zusätzlichen API-Endpunkte oder persistierten Laufzeitfeatures.
+- Ein Map-Set-Wechsel berechnet Raster und Maßstab für die neue Basiskarte neu, ohne
+  die Layer-Instanz oder ihre Konfiguration zu ersetzen.
+- Bei einem Renderer ohne benötigte Deskriptorarten bleiben Instanz und Konfiguration
+  erhalten; das Layer-Panel zeigt eine verständliche Inkompatibilitätsdiagnose.
+- Wiederholter Renderer-Aufbau hinterlässt keine mehrfachen Event-Listener oder
+  verwaisten Raster- beziehungsweise Maßstabselemente.
 
 ### Phase 6: Batch-Downloads und Erweiterung des Job-Systems
 
@@ -1093,6 +1206,10 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 - gewählte Zielprojektionen ergänzen
 - serverseitige Layer-Plugin-Hooks in den Exportablauf integrieren
 - Track- und Bild-Referenz-Plugins für alle unterstützten Zielprojektionen rendern
+- die Deskriptoren `xyz-tile-grid` und `scale-bar` serverseitig rendern; das
+  XYZ-Raster bezeichnet weiterhin die Source-Tiles und wird in die Zielprojektion
+  abgebildet, während die Maßstabsleiste als Bildschirmdekoration aus dem
+  Exportausschnitt berechnet wird
 - externe Bildoriginale für hochauflösende Raster-Overlays nur über den
   kontrollierten Asset-Resolver und bei passendem gespeicherten Fingerprint lesen;
   für fehlende oder geänderte Quellen eine konfigurierbare, verständliche
@@ -1104,6 +1221,9 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 
 - Ein Kartenausschnitt wird in jeder unterstützten Ausgabeart und Projektion korrekt erzeugt.
 - Testtrack, GPS-Bild und Bounds-Bild liegen nach Projektion visuell und numerisch an den erwarteten Koordinaten.
+- Tile-Grenzen und `z/x/y`-Beschriftungen entsprechen in allen unterstützten
+  Zielprojektionen denselben Source-Tiles; die Maßstabsleiste zeigt für definierte
+  Ausschnitte und Breitengrade numerisch korrekte, gut lesbar gerundete Werte.
 - Der Export nutzt Plugin-Daten und -Stile konsistent zur interaktiven Ansicht, soweit die Ausgabemedien dies zulassen.
 - Fehlende Tiles, inkompatible Plugins und zu große Exporte führen zu einer vorhersehbaren, verständlichen Reaktion.
 
@@ -1183,17 +1303,19 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 ### 13.2 Weitere Releases
 
 Mit `0.2.0` ist der nutzbare Kernumfang von Phase 5 veröffentlicht. Vor Beginn von
-Phase 6 werden die bei Phase 5 dokumentierten Restarbeiten abgeschlossen. Die
-weitere fachliche Reihenfolge erhält erst beim tatsächlichen Release konkrete
-Patchnummern:
+Phase 6 werden die bei Phase 5 dokumentierten Restarbeiten und anschließend Phase
+5a abgeschlossen. Die weitere fachliche Reihenfolge erhält erst beim tatsächlichen
+Release konkrete Patchnummern:
 
 1. Abschluss Phase 5: konsistente Job-Recovery, gemessene Bildlimits,
    Job-Aufbewahrung und skalierbares Laden des Bildkatalogs
-2. Phase 6: kontrollierter Batch-Download, Provider-Limits und Erweiterung des
+2. Phase 5a: zustandsabgeleitete dekorative Layer, XYZ-Tile-Grid und metrische
+   Maßstabsleiste
+3. Phase 6: kontrollierter Batch-Download, Provider-Limits und Erweiterung des
    gemeinsamen Job-Systems
-3. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
-4. Phase 8: vollständige Dokumentation und lokalisierte Suche
-5. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
+4. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
+5. Phase 8: vollständige Dokumentation und lokalisierte Suche
+6. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
 
 Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als eigene Versionen erscheinen.
 
@@ -1218,7 +1340,9 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 | Nutzer konfiguriert Limits zu hoch oder mehrere Jobs addieren ihre Last | Providerfehler, Sperrung oder Terms-Verstoß | zentraler Limiter pro Provider, sichtbare Schätzung und Verantwortungshinweis statt vermeintlicher Rechtsprüfung |
 | Geheimnisse erscheinen in Logs oder DB | Credential-Leak | Secret-Referenzen, redigierte Logs und Tests für Fehlermeldungen |
 | Leaflet-Details gelangen in fachliche Komponenten | späterer Renderer-Adapter erfordert großen Umbau | eigene Adapter-Schnittstelle, Importgrenzen und Contract-Test mit Fake-Adapter |
-| Plugin-Schnittstelle ist zu eng oder instabil | weitere Layertypen benötigen Kernänderungen | versionierte Geometriegrundlagen für Punkt, Linie und Fläche, getrennte Feature-/Stützpunkteigenschaften und Symbolisierung, Track/Bild als Spezialisierungen sowie Contract-Tests |
+| Plugin-Schnittstelle ist zu eng oder instabil | weitere Layertypen benötigen Kernänderungen | versionierte Geometriegrundlagen und zustandsabgeleitete Dekorationsdeskriptoren, getrennte Feature-/Stützpunkteigenschaften und Symbolisierung, explizite Descriptor-Capabilities, datenbasierte und assetfreie Referenz-Plugins sowie Contract-Tests |
+| Tile-Grid zeigt bei Viertel-Zoom, 512-Pixel-Tiles oder World-Wrapping andere Koordinaten als die Basiskarte tatsächlich lädt | Diagnose und gezielter Tile-Abruf verwenden falsche `z/x/y`-Werte | tatsächlichen ganzzahligen Source-Zoom und kanonische Tile-Koordinaten im Renderer bestimmen, gemeinsame XYZ-Mathematik aus `map-core` verwenden und alle Offset-/Wrap-Fälle testen |
+| Maßstabsleiste unterscheidet sich zwischen Browser und Export oder ist in hohen Breitengraden falsch | kartografisch irreführende Längenangabe | gemeinsame geodätische Distanz- und Rundungslogik, Berechnung an einer definierten Ankerposition sowie numerische Tests über mehrere Breitengrade und Projektionen |
 | Plugin oder Dateiimport verarbeitet schädliche Inhalte | Codeausführung, Datenleck oder Ressourcenverbrauch | nur vertrauenswürdige Buildzeit-Plugins, kontrollierte Hooks, sichere Decoder und harte Limits |
 | Konfigurierte Bildwurzel oder Originalbild fehlt beziehungsweise wurde geändert | Bildanzeige oder reproduzierbarer hochauflösender Export ist eingeschränkt | Metadaten und Vorschau erhalten, Fingerprint prüfen, Zustand `missing`/`changed` anzeigen und keine automatische Löschung oder unbemerkte Ersetzung |
 | Bildscan verlässt über Pfad oder Symlink die konfigurierte Wurzel | Zugriff auf nicht freigegebene Hostdateien | nur Wurzel-IDs und normalisierte relative Pfade akzeptieren, reale Zielpfade gegen die Read-only-Wurzel prüfen und absolute Pfade nicht offenlegen |
@@ -1250,6 +1374,13 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 - Punkt, Linie und Fläche als pluginunabhängige, versionierte Geometriegrundlagen mit
   getrennten Feature-/Stützpunkteigenschaften und Darstellungsstilen im
   Layer-Plugin-SDK vorliegen und über adapterneutrale Deskriptoren dargestellt werden;
+- zustandsabgeleitete, assetfreie Layer über dieselbe Persistenz, Hierarchie,
+  Sichtbarkeit, Deckkraft, Zoomgrenzen und Diagnose wie datenbasierte Layer laufen,
+  ohne Laufzeitfeatures oder ein paralleles Layer-System zu speichern;
+- der Tile-Grid-Layer die tatsächlich verwendeten Source-Tiles bei Viertel-Zoom,
+  256-/512-Pixel-Tiles und World-Wrapping korrekt als `z/x/y` bezeichnet und seine
+  metrische Maßstabsleiste abhängig von Ausschnitt und geografischer Breite korrekt
+  berechnet;
 - verwaltete Nicht-Bild-Assets über Frontend und API hochgeladen und validiert werden
   können und sämtliche Layer ausschließlich kontrollierte Asset-IDs statt frei
   zusammengesetzter Dateipfade referenzieren;
@@ -1263,7 +1394,9 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 - Track- und Bild-Referenz-Plugins die gemeinsame Linien- beziehungsweise Punktbasis
   verwenden, Bilder mit geografischen Bounds den gesonderten Raster-Overlay-Vertrag
   nutzen und alle Varianten interaktiv sowie im Export funktionieren;
-- Kartenbilder mit den dokumentierten Projektionen und Plugin-Layern korrekt exportiert werden;
+- Kartenbilder mit den dokumentierten Projektionen und Plugin-Layern einschließlich
+  projiziertem XYZ-Tile-Grid und koordinatenabhängiger Maßstabsleiste korrekt
+  exportiert werden;
 - das vollständige englische App-Handbuch, die zur Serverversion passende API-Referenz, Provider-/Plugin-/Projektionsseiten und das Glossar integriert, englisch/deutsch durchsuchbar und kontextbezogen verlinkt sind;
 - Deutsch und Thai auswählbar sind und fehlende Übersetzungen sichtbar und funktionsfähig auf Englisch zurückfallen;
 - Thai-Suche entweder zuverlässig funktioniert oder ausdrücklich deaktiviert ist und auf die englische Suche verweist;
