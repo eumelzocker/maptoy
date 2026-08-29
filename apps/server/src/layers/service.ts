@@ -212,7 +212,9 @@ export class LayerService {
       }
       return;
     }
+    let configuration: unknown = layer.configuration;
     let data: unknown = layer.data;
+    let opacity = layer.opacity;
     let schemaVersion = layer.schemaVersion;
     try {
       while (schemaVersion < plugin.manifest.schemaVersion) {
@@ -222,22 +224,44 @@ export class LayerService {
         if (migration === undefined) {
           throw new Error(`Missing migration from schema ${schemaVersion}.`);
         }
-        const first = await migration.migrate(data);
-        const second = await migration.migrate(data);
+        const migrationState = { configuration, data, opacity };
+        const first =
+          migration.migrateLayer === undefined
+            ? {
+                ...migrationState,
+                data: await migration.migrate?.(data),
+              }
+            : await migration.migrateLayer(migrationState);
+        const second =
+          migration.migrateLayer === undefined
+            ? {
+                ...migrationState,
+                data: await migration.migrate?.(data),
+              }
+            : await migration.migrateLayer(migrationState);
         if (JSON.stringify(first) !== JSON.stringify(second)) {
           throw new Error(
             `Migration from schema ${schemaVersion} is not deterministic.`,
           );
         }
-        data = first;
+        if (
+          !Number.isFinite(first.opacity) ||
+          first.opacity < 0 ||
+          first.opacity > 1
+        ) {
+          throw new Error("Migration produced invalid Layer opacity.");
+        }
+        configuration = first.configuration;
+        data = first.data;
+        opacity = first.opacity;
         schemaVersion = migration.toSchemaVersion;
       }
       const validated = requireRecord(
         await plugin.shared.validateData(data),
         "Layer data",
       );
-      const configuration = requireRecord(
-        await plugin.shared.validateConfiguration(layer.configuration),
+      const validatedConfiguration = requireRecord(
+        await plugin.shared.validateConfiguration(configuration),
         "Layer configuration",
       );
       if (
@@ -247,8 +271,9 @@ export class LayerService {
       ) {
         const updated: Layer = {
           ...layer,
-          configuration,
+          configuration: validatedConfiguration,
           data: validated,
+          opacity,
           pluginVersion: plugin.manifest.version,
           schemaVersion,
           status: "ready",

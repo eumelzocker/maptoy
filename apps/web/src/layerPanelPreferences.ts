@@ -2,7 +2,9 @@ import { getItem, setItem } from "./localStorage.js";
 
 type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 
-const expandedLayerConfigurationsKey = "maptoy:expanded-layer-configurations";
+const selectedLayerIdKey = "maptoy:selected-layer";
+const legacyExpandedLayerConfigurationsKey =
+  "maptoy:expanded-layer-configurations";
 const collapsedLayerHierarchyKey = "maptoy:collapsed-layer-hierarchy";
 const legacyCollapsedLayerCategoriesKey = "maptoy:collapsed-layer-categories";
 
@@ -37,17 +39,23 @@ function saveStringArray(
   setItem(key, JSON.stringify([...new Set(values)]), storage);
 }
 
-export function loadExpandedLayerConfigurations(
+export function loadSelectedLayerId(
   storage?: PreferenceStorage | null,
-): string[] {
-  return loadStringArray(expandedLayerConfigurationsKey, storage);
+): string | null {
+  const selected = getItem(selectedLayerIdKey, storage);
+  if (selected !== null) {
+    return selected === "" ? null : selected;
+  }
+  return (
+    loadStringArray(legacyExpandedLayerConfigurationsKey, storage)[0] ?? null
+  );
 }
 
-export function saveExpandedLayerConfigurations(
-  layerIds: readonly string[],
+export function saveSelectedLayerId(
+  layerId: string | null,
   storage?: PreferenceStorage | null,
 ): void {
-  saveStringArray(expandedLayerConfigurationsKey, layerIds, storage);
+  setItem(selectedLayerIdKey, layerId ?? "", storage);
 }
 
 export function loadCollapsedLayerHierarchy(

@@ -24,7 +24,13 @@ describe("database migrations", () => {
     const database = await openDatabase(databasePath);
     expect(
       database.sqlite.prepare("SELECT version FROM schema_migrations").all(),
-    ).toEqual([{ version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }]);
+    ).toEqual([
+      { version: 4 },
+      { version: 5 },
+      { version: 6 },
+      { version: 7 },
+      { version: 8 },
+    ]);
     expect(
       database.sqlite
         .prepare(
@@ -63,6 +69,12 @@ describe("database migrations", () => {
         .all()
         .map((column) => (column as { name: string }).name),
     ).not.toContain("map_set_id");
+    expect(
+      database.sqlite
+        .prepare("PRAGMA table_info(layer_instance_versions)")
+        .all()
+        .map((column) => (column as { name: string }).name),
+    ).toContain("opacity");
     database.close();
   });
 
@@ -162,7 +174,13 @@ describe("database migrations", () => {
       reopened.sqlite
         .prepare("SELECT version FROM schema_migrations ORDER BY version")
         .all(),
-    ).toEqual([{ version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }]);
+    ).toEqual([
+      { version: 4 },
+      { version: 5 },
+      { version: 6 },
+      { version: 7 },
+      { version: 8 },
+    ]);
     expect(
       reopened.sqlite
         .prepare("SELECT name FROM map_sets WHERE id = ?")

@@ -89,7 +89,7 @@ export const useLayersStore = defineStore("layers", {
         data: pluginId === "track-layer" ? { features: [] } : {},
         visible: true,
         displayOrder: this.items.length,
-        opacity: 1,
+        opacity: pluginId === "track-layer" ? 0.9 : 1,
         minimumZoom: null,
         maximumZoom: null,
       };

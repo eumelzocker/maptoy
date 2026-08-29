@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   loadCollapsedLayerHierarchy,
-  loadExpandedLayerConfigurations,
+  loadSelectedLayerId,
   saveCollapsedLayerHierarchy,
-  saveExpandedLayerConfigurations,
+  saveSelectedLayerId,
 } from "./layerPanelPreferences.js";
 
 function memoryStorage(): Pick<Storage, "getItem" | "setItem"> {
@@ -15,9 +15,9 @@ function memoryStorage(): Pick<Storage, "getItem" | "setItem"> {
 }
 
 describe("Layer panel preferences", () => {
-  it("defaults every Layer configuration to collapsed", () => {
+  it("defaults to no selected Layer and an expanded hierarchy", () => {
     const storage = memoryStorage();
-    expect(loadExpandedLayerConfigurations(storage)).toEqual([]);
+    expect(loadSelectedLayerId(storage)).toBeNull();
     expect(loadCollapsedLayerHierarchy(storage)).toEqual([]);
   });
 
@@ -43,27 +43,30 @@ describe("Layer panel preferences", () => {
     ).toEqual(["category:tracks"]);
   });
 
-  it("round-trips expanded Layer IDs without duplicates", () => {
+  it("round-trips the selected Layer ID", () => {
     const storage = memoryStorage();
-    saveExpandedLayerConfigurations(["track", "images", "track"], storage);
-    expect(loadExpandedLayerConfigurations(storage)).toEqual([
-      "track",
-      "images",
-    ]);
+    saveSelectedLayerId("track", storage);
+    expect(loadSelectedLayerId(storage)).toBe("track");
+    saveSelectedLayerId(null, storage);
+    expect(loadSelectedLayerId(storage)).toBeNull();
   });
 
-  it("ignores malformed or non-string stored entries", () => {
+  it("migrates the first formerly expanded Layer", () => {
     expect(
-      loadExpandedLayerConfigurations({
-        getItem: () => "not-json",
+      loadSelectedLayerId({
+        getItem: (key) =>
+          key === "maptoy:expanded-layer-configurations"
+            ? '["track", "images"]'
+            : null,
         setItem: () => undefined,
       }),
-    ).toEqual([]);
+    ).toBe("track");
     expect(
-      loadExpandedLayerConfigurations({
-        getItem: () => '["track", 42, null]',
+      loadSelectedLayerId({
+        getItem: (key) =>
+          key === "maptoy:expanded-layer-configurations" ? "not-json" : null,
         setItem: () => undefined,
       }),
-    ).toEqual(["track"]);
+    ).toBeNull();
   });
 });

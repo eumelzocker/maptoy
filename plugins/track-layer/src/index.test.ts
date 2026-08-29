@@ -60,6 +60,7 @@ describe("track layer plugin", () => {
             ],
           },
           assets: [],
+          opacity: 0.6,
           project: ({ longitude, latitude }) => ({
             x: longitude,
             y: latitude,
@@ -72,6 +73,92 @@ describe("track layer plugin", () => {
         },
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("migrates the former line opacity into the general Layer opacity", async () => {
+    const migration = trackLayerPlugin.shared.migrations[0];
+    expect(migration?.migrateLayer).toBeDefined();
+
+    const migrated = await migration?.migrateLayer?.({
+      configuration: {
+        lineColor: "#123456",
+        lineWidth: 5,
+        lineOpacity: 0.5,
+      },
+      data: { features: [] },
+      opacity: 0.8,
+    });
+
+    expect(migrated).toEqual({
+      configuration: { lineColor: "#123456", lineWidth: 5 },
+      data: { features: [] },
+      opacity: 0.4,
+    });
+  });
+
+  it("uses the general Layer opacity as the only Track opacity", async () => {
+    const publishLayer = vi.fn();
+    const data = {
+      features: [
+        {
+          id: "track",
+          geometry: {
+            type: "LineString" as const,
+            vertices: [
+              { coordinate: { longitude: 13.4, latitude: 52.5 } },
+              { coordinate: { longitude: 13.5, latitude: 52.6 } },
+            ],
+          },
+          properties: {},
+        },
+      ],
+    };
+    const handle = await trackLayerPlugin.frontend.mount(
+      {
+        instanceId: "track",
+        publishLayer,
+        clearLayer: vi.fn(),
+        resolveAssetUrl: (assetId) => `api/assets/${assetId}`,
+      },
+      {
+        configuration: {},
+        data,
+        assets: [],
+        opacity: 0.35,
+        visible: true,
+      },
+    );
+
+    expect(publishLayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          features: [
+            expect.objectContaining({
+              symbolizer: expect.objectContaining({ opacity: 1 }),
+            }),
+          ],
+        }),
+      }),
+    );
+
+    const drawPolyline = vi.fn();
+    await trackLayerPlugin.server.render({
+      configuration: {},
+      data,
+      assets: [],
+      opacity: 0.35,
+      project: ({ longitude, latitude }) => ({ x: longitude, y: latitude }),
+      surface: {
+        drawPolyline,
+        drawPoint: vi.fn(),
+        drawManagedImage: vi.fn(),
+      },
+    });
+    expect(drawPolyline).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ opacity: 0.35 }),
+    );
+    await handle.destroy();
   });
 
   it("normalizes GPX elevation and timestamps as line vertex data", async () => {

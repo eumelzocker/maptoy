@@ -61,28 +61,6 @@ a {
   opacity: 0.7;
 }
 
-nav {
-  display: flex;
-  gap: 1.25rem;
-}
-
-nav a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  text-decoration: none;
-  transition: color 0.15s ease;
-}
-
-nav a:hover,
-nav a:focus-visible {
-  color: #9fd8c2;
-}
-
-nav a i {
-  font-size: 1.1rem;
-}
-
 .home {
   display: grid;
   grid-template-columns: minmax(18rem, 0.8fr) minmax(20rem, 1.2fr);
@@ -134,6 +112,19 @@ nav a i {
 
 .docs-sidebar nav a {
   width: 100%;
+  padding: 0.25rem 0.35rem;
+  border-radius: 0.3rem;
+  text-decoration: none;
+}
+
+.docs-sidebar nav a:hover,
+.docs-sidebar nav a:focus-visible {
+  outline: 0;
+  background: rgb(22 56 50 / 8%);
+}
+
+.docs-sidebar nav a:focus-visible {
+  box-shadow: 0 0 0 2px #a34521;
 }
 
 .docs-nav-icon {
@@ -144,14 +135,14 @@ nav a i {
   line-height: 1;
 }
 
-.docs-nav-app-icon {
-  width: 1.1rem;
-  height: 1.1rem;
-  flex: 0 0 auto;
+.docs-link-label {
+  min-width: 0;
 }
 
-.docs-fallback-icon {
-  color: #a34521;
+.docs-fallback-flag {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  line-height: 1;
 }
 
 .docs-current-page,
@@ -159,9 +150,55 @@ nav a i {
   font-weight: 700;
 }
 
-.docs-current-icon {
+.docs-nav-group {
+  width: 100%;
+}
+
+.docs-nav-group summary {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  padding: 0.35rem 0;
+  color: #405b54;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  list-style: none;
+}
+
+.docs-nav-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.docs-nav-group-chevron {
+  flex: 0 0 auto;
   color: #a34521;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  transition: transform 0.15s ease;
+}
+
+.docs-nav-group[open] > summary .docs-nav-group-chevron {
+  transform: rotate(90deg);
+}
+
+.docs-nav-group summary:hover,
+.docs-nav-group summary:focus-visible {
+  color: #163832;
+}
+
+.docs-nav-group summary:focus-visible {
+  outline: 2px solid #a34521;
+  outline-offset: 2px;
+}
+
+.docs-nav-group-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.15rem 0 0.55rem 0.35rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid #b6c6bc;
 }
 
 .docs-sidebar nav .docs-home-link {
@@ -176,6 +213,10 @@ nav a i {
   margin-top: 2rem;
   padding-top: 1.25rem;
   border-top: 1px solid #b6c6bc;
+}
+
+.language-switcher a {
+  text-decoration: none;
 }
 
 .docs-page {
@@ -208,6 +249,13 @@ nav a i {
 .docs-page li {
   color: #314f47;
   line-height: 1.7;
+}
+
+.docs-page img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
 }
 
 .docs-page code {

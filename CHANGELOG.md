@@ -4,6 +4,43 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-29
+
+### Added
+
+- Added a Screenshots documentation page using the existing local application
+  images.
+- Reusable searchable Tree Select and Checkbox Tree Vue components with retained
+  hierarchy state, tri-state group visibility, and independent Layer selection
+  and visibility actions.
+- Layer Plugin SDK 1.1 support for deterministic whole-Layer schema migrations
+  covering configuration, data, and opacity, plus SQLite schema version 8 backups
+  of pre-migration opacity values.
+
+### Changed
+
+- Grouped the Documentation table of contents into collapsible application and
+  general map sections, simplified its links, and replaced untranslated-page
+  glyphs with compact UK fallback flags and localized fallback notices.
+- Highlighted the active title-bar view independently from hover and replaced the
+  horizontal route links with an accessible view dropdown on narrow viewports.
+- Reworked the Map view's Layer tool around a hierarchy dropdown above exactly one
+  selected Layer editor. Layer-name clicks select the editor, while Layer, folder,
+  and category checkboxes keep the dropdown open for rapid visibility changes.
+- Split shared, Track, and Image editor responsibilities into focused Vue
+  components and retained the selected Layer in browser-local preferences.
+- Highlighted **Import track…** while a Track Layer is empty and changed the action
+  to **Replace track…** after import to clarify that a later GPX or GeoJSON file
+  replaces the normalized Track geometry.
+- Consolidated Track transparency into the general Layer opacity control. Existing
+  Track Layers migrate their former Layer and line-opacity factors into one value,
+  while new Track Layers retain the previous effective default of `0.9`.
+
+### Fixed
+
+- Applied general Layer opacity consistently to Track and Image plugin server
+  rendering instead of relying on the removed Track-only line-opacity setting.
+
 ## [0.2.0] - 2026-08-28
 
 ### Added

@@ -162,6 +162,7 @@ describe("layer plugin contract", () => {
           configuration: {},
           data: {},
           assets: [],
+          opacity: 0.6,
           project: ({ longitude, latitude }) => ({
             x: longitude,
             y: latitude,

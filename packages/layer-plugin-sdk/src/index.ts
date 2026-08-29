@@ -1,4 +1,4 @@
-export const LAYER_PLUGIN_SDK_VERSION = "1.0.0";
+export const LAYER_PLUGIN_SDK_VERSION = "1.1.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 export type JsonObject = Readonly<Record<string, unknown>>;
@@ -165,7 +165,16 @@ export interface LayerPluginManifest {
 export interface LayerPluginMigration {
   fromSchemaVersion: number;
   toSchemaVersion: number;
-  migrate: (value: unknown) => MaybePromise<unknown>;
+  migrate?: (value: unknown) => MaybePromise<unknown>;
+  migrateLayer?: (
+    value: LayerPluginMigrationState,
+  ) => MaybePromise<LayerPluginMigrationState>;
+}
+
+export interface LayerPluginMigrationState {
+  configuration: unknown;
+  data: unknown;
+  opacity: number;
 }
 
 export interface LayerPluginSharedHooks {
@@ -275,6 +284,7 @@ export interface LayerPluginServerRenderContext {
   configuration: unknown;
   data: unknown;
   assets: readonly LayerPluginServerAssetReference[];
+  opacity: number;
   project: (coordinate: GeographicCoordinate) => ScreenPoint;
   surface: LayerDrawingSurface;
 }
@@ -372,6 +382,11 @@ export function assertValidLayerPluginDefinition(
       migration.toSchemaVersion <= manifest.schemaVersion,
       "migration exceeds the current schema version",
     );
+    invariant(
+      (migration.migrate === undefined) !==
+        (migration.migrateLayer === undefined),
+      "migration must define exactly one migration function",
+    );
     previousTarget = migration.toSchemaVersion;
   }
 }
@@ -406,6 +421,8 @@ export interface LayerPluginContractFixture {
   migration?: {
     fromSchemaVersion: number;
     value: unknown;
+    configuration?: unknown;
+    opacity?: number;
   };
   frontendContext?: LayerPluginFrontendContext;
   asset?: ManagedAssetInput;
@@ -417,7 +434,11 @@ async function exerciseMigrations(
   fixture: NonNullable<LayerPluginContractFixture["migration"]>,
 ): Promise<void> {
   let schemaVersion = fixture.fromSchemaVersion;
-  let value = fixture.value;
+  let state: LayerPluginMigrationState = {
+    configuration: fixture.configuration ?? {},
+    data: fixture.value,
+    opacity: fixture.opacity ?? 1,
+  };
   while (schemaVersion < definition.manifest.schemaVersion) {
     const migration = definition.shared.migrations.find(
       (candidate) => candidate.fromSchemaVersion === schemaVersion,
@@ -426,16 +447,33 @@ async function exerciseMigrations(
       migration !== undefined,
       `missing migration from ${schemaVersion}`,
     );
-    const first = await migration.migrate(value);
-    const second = await migration.migrate(value);
+    const first =
+      migration.migrateLayer === undefined
+        ? {
+            ...state,
+            data: await migration.migrate?.(state.data),
+          }
+        : await migration.migrateLayer(state);
+    const second =
+      migration.migrateLayer === undefined
+        ? {
+            ...state,
+            data: await migration.migrate?.(state.data),
+          }
+        : await migration.migrateLayer(state);
     invariant(
       JSON.stringify(first) === JSON.stringify(second),
       `migration from ${schemaVersion} is not deterministic`,
     );
-    value = first;
+    state = first;
     schemaVersion = migration.toSchemaVersion;
   }
-  await definition.shared.validateData(value);
+  invariant(
+    Number.isFinite(state.opacity) && state.opacity >= 0 && state.opacity <= 1,
+    "migration produced invalid Layer opacity",
+  );
+  await definition.shared.validateConfiguration(state.configuration);
+  await definition.shared.validateData(state.data);
 }
 
 export async function exerciseLayerPluginContract(

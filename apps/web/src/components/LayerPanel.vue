@@ -10,7 +10,12 @@ import {
   onMounted,
   reactive,
   ref,
+  watch,
 } from "vue";
+import {
+  type CheckboxTreeNode,
+  checkboxTreeBranchIds,
+} from "../checkboxTree.js";
 import {
   buildLayerHierarchyRows,
   type LayerCategoryDefinition,
@@ -18,19 +23,20 @@ import {
   layerNameSegments,
   layerParentPath,
   nextNumberedLayerName,
-  visibleLayerHierarchyRows,
 } from "../layerHierarchy.js";
 import {
   loadCollapsedLayerHierarchy,
-  loadExpandedLayerConfigurations,
+  loadSelectedLayerId,
   saveCollapsedLayerHierarchy,
-  saveExpandedLayerConfigurations,
+  saveSelectedLayerId,
 } from "../layerPanelPreferences.js";
 import { availableLocalStorage } from "../localStorage.js";
 import { LAYER_PLUGIN_REGISTRY_KEY } from "../registries.js";
 import { useLayersStore } from "../stores/layers.js";
 import CenteredDialog from "./CenteredDialog.vue";
+import LayerEditor from "./LayerEditor.vue";
 import TogglePanel from "./TogglePanel.vue";
+import TreeSelectDropdown from "./TreeSelectDropdown.vue";
 
 defineProps<{ enabled: boolean }>();
 
@@ -55,7 +61,7 @@ const editingAsset = ref<LayerAsset | null>(null);
 const editLongitude = ref("");
 const editLatitude = ref("");
 const editBounds = reactive({ west: "", south: "", east: "", north: "" });
-const expandedLayerIds = ref(loadExpandedLayerConfigurations(browserStorage));
+const selectedLayerId = ref<string | null>(loadSelectedLayerId(browserStorage));
 const collapsedHierarchyKeys = ref(loadCollapsedLayerHierarchy(browserStorage));
 let jobPoll: number | null = null;
 let previousRunningJobs = new Set<string>();
@@ -82,15 +88,96 @@ const categoryIdByPlugin = new Map(
     category.pluginIds.map((pluginId) => [pluginId, category.id] as const),
   ),
 );
+
+interface LayerSelectorModel {
+  nodes: CheckboxTreeNode[];
+  layerIdsByNode: Map<string, string[]>;
+}
+
 const hierarchyRows = computed(() =>
   buildLayerHierarchyRows(store.items, categoryDefinitions),
 );
-const visibleHierarchyRows = computed(() =>
-  visibleLayerHierarchyRows(
-    hierarchyRows.value,
-    new Set(collapsedHierarchyKeys.value),
-  ),
+const selectorModel = computed<LayerSelectorModel>(() => {
+  const nodes: CheckboxTreeNode[] = [];
+  const stack: Array<{ depth: number; node: CheckboxTreeNode }> = [];
+  const layerIdsByNode = new Map<string, string[]>();
+
+  for (const row of hierarchyRows.value) {
+    while (stack.length > 0 && (stack.at(-1)?.depth ?? -1) >= row.depth) {
+      stack.pop();
+    }
+    const node: CheckboxTreeNode =
+      row.kind === "layer"
+        ? {
+            id: row.layer.id,
+            label: row.label,
+            checked: row.layer.visible,
+            checkDisabled: row.layer.status !== "ready",
+            selectable: true,
+            searchText: row.layer.name,
+            ...(row.layer.status === "ready"
+              ? {}
+              : { secondaryText: row.layer.status }),
+          }
+        : {
+            id: row.key,
+            label: row.label,
+            checked: false,
+            selectable: false,
+            children: [],
+          };
+    const parent = stack.at(-1)?.node;
+    if (parent === undefined) {
+      nodes.push(node);
+    } else {
+      parent.children?.push(node);
+    }
+    if (row.kind !== "layer") {
+      stack.push({ depth: row.depth, node });
+    }
+  }
+
+  function finalize(node: CheckboxTreeNode): string[] {
+    if (!node.children?.length) {
+      const layer = store.items.find(({ id }) => id === node.id);
+      const layerIds = layer?.status === "ready" ? [node.id] : [];
+      layerIdsByNode.set(node.id, layerIds);
+      return layerIds;
+    }
+    const layerIds = node.children.flatMap(finalize);
+    const layers = layerIds
+      .map((id) => store.items.find((layer) => layer.id === id))
+      .filter((layer): layer is Layer => layer !== undefined);
+    const visibleCount = layers.filter(({ visible }) => visible).length;
+    node.checked = layers.length > 0 && visibleCount === layers.length;
+    node.indeterminate = visibleCount > 0 && visibleCount < layers.length;
+    node.checkDisabled = layers.length === 0;
+    layerIdsByNode.set(node.id, layerIds);
+    return layerIds;
+  }
+  nodes.forEach(finalize);
+  return { nodes, layerIdsByNode };
+});
+const allHierarchyBranchIds = computed(() =>
+  checkboxTreeBranchIds(selectorModel.value.nodes),
 );
+const expandedHierarchyIds = computed({
+  get: () =>
+    allHierarchyBranchIds.value.filter(
+      (key) => !collapsedHierarchyKeys.value.includes(key),
+    ),
+  set: (expanded: string[]) => {
+    const expandedSet = new Set(expanded);
+    collapsedHierarchyKeys.value = allHierarchyBranchIds.value.filter(
+      (key) => !expandedSet.has(key),
+    );
+    saveCollapsedLayerHierarchy(collapsedHierarchyKeys.value, browserStorage);
+  },
+});
+const selectedLayer = computed(
+  () => store.items.find(({ id }) => id === selectedLayerId.value) ?? null,
+);
+
 const creatableLayerTypes = [
   {
     id: "track-layer" as const,
@@ -165,6 +252,24 @@ const filteredAssetCount = computed(() => {
   ).length;
 });
 
+watch(
+  () => store.items.map(({ id }) => id),
+  (layerIds) => {
+    if (
+      selectedLayerId.value === null ||
+      !layerIds.includes(selectedLayerId.value)
+    ) {
+      selectLayer(layerIds[0] ?? null);
+    }
+  },
+  { immediate: true },
+);
+
+function selectLayer(layerId: string | null): void {
+  selectedLayerId.value = layerId;
+  saveSelectedLayerId(layerId, browserStorage);
+}
+
 function imageAssets(layerId: string): LayerAsset[] {
   return (store.assetsByLayer[layerId] ?? []).filter(
     (asset) => asset.kind === "external-image",
@@ -200,10 +305,8 @@ async function run(action: () => Promise<unknown>): Promise<void> {
 
 async function focusPrimaryLayerAction(layerId: string): Promise<void> {
   await nextTick();
-  const layerElement = [
-    ...document.querySelectorAll<HTMLElement>("[data-layer-id]"),
-  ].find((element) => element.dataset.layerId === layerId);
-  layerElement
+  document
+    .querySelector<HTMLElement>(`[data-layer-editor-id="${layerId}"]`)
     ?.querySelector<HTMLElement>("[data-layer-primary-action]")
     ?.focus();
 }
@@ -241,9 +344,7 @@ function add(): void {
         (key) => !ancestorKeys.has(key),
       );
       saveCollapsedLayerHierarchy(collapsedHierarchyKeys.value, browserStorage);
-      if (!isLayerConfigurationExpanded(layer.id)) {
-        setExpandedLayerIds([...expandedLayerIds.value, layer.id]);
-      }
+      selectLayer(layer.id);
       busy.value = false;
       emit("changed");
       await focusPrimaryLayerAction(layer.id);
@@ -266,36 +367,13 @@ function openAddDialog(): void {
   addDialogOpen.value = true;
 }
 
-function layerConfigurationId(layerId: string): string {
-  return `layer-configuration-${layerId}`;
-}
-
-function isLayerConfigurationExpanded(layerId: string): boolean {
-  return expandedLayerIds.value.includes(layerId);
-}
-
-function setExpandedLayerIds(layerIds: string[]): void {
-  expandedLayerIds.value = layerIds;
-  saveExpandedLayerConfigurations(layerIds, browserStorage);
-}
-
-function toggleLayerConfiguration(layerId: string): void {
-  setExpandedLayerIds(
-    isLayerConfigurationExpanded(layerId)
-      ? expandedLayerIds.value.filter((id) => id !== layerId)
-      : [...expandedLayerIds.value, layerId],
-  );
-}
-
-function isHierarchyExpanded(key: string): boolean {
-  return !collapsedHierarchyKeys.value.includes(key);
-}
-
-function toggleHierarchy(key: string): void {
-  collapsedHierarchyKeys.value = isHierarchyExpanded(key)
-    ? [...collapsedHierarchyKeys.value, key]
-    : collapsedHierarchyKeys.value.filter((nodeKey) => nodeKey !== key);
-  saveCollapsedLayerHierarchy(collapsedHierarchyKeys.value, browserStorage);
+function setTreeVisibility(nodeId: string, visible: boolean): void {
+  const layerIds = selectorModel.value.layerIdsByNode.get(nodeId) ?? [];
+  if (layerIds.length > 0) {
+    void run(() =>
+      Promise.all(layerIds.map((id) => store.update(id, { visible }))),
+    );
+  }
 }
 
 function move(layer: Layer, direction: -1 | 1): void {
@@ -329,31 +407,41 @@ function canMove(layer: Layer, direction: -1 | 1): boolean {
   return siblings[index + direction] !== undefined;
 }
 
-function setVisibility(layer: Layer, event: Event): void {
-  void run(() =>
-    store.update(layer.id, {
-      visible: (event.target as HTMLInputElement).checked,
-    }),
-  );
+function setVisibility(layer: Layer, visible: boolean): void {
+  void run(() => store.update(layer.id, { visible }));
 }
 
-function setOpacity(layer: Layer, event: Event): void {
-  void run(() =>
-    store.update(layer.id, {
-      opacity: Number((event.target as HTMLInputElement).value),
-    }),
-  );
+function setSelectedVisibility(visible: boolean): void {
+  if (selectedLayer.value !== null) {
+    setVisibility(selectedLayer.value, visible);
+  }
+}
+
+function setOpacity(layer: Layer, opacity: number): void {
+  void run(() => store.update(layer.id, { opacity }));
+}
+
+function setSelectedOpacity(opacity: number): void {
+  if (selectedLayer.value !== null) {
+    setOpacity(selectedLayer.value, opacity);
+  }
 }
 
 function setZoom(
   layer: Layer,
   key: "minimumZoom" | "maximumZoom",
-  event: Event,
+  value: number | null,
 ): void {
-  const value = (event.target as HTMLInputElement).value;
-  void run(() =>
-    store.update(layer.id, { [key]: value === "" ? null : Number(value) }),
-  );
+  void run(() => store.update(layer.id, { [key]: value }));
+}
+
+function setSelectedZoom(
+  key: "minimumZoom" | "maximumZoom",
+  value: number | null,
+): void {
+  if (selectedLayer.value !== null) {
+    setZoom(selectedLayer.value, key, value);
+  }
 }
 
 function setConfiguration(
@@ -368,6 +456,21 @@ function setConfiguration(
   );
 }
 
+function setSelectedConfiguration(
+  key: string,
+  value: string | number | boolean,
+): void {
+  if (selectedLayer.value !== null) {
+    setConfiguration(selectedLayer.value, key, value);
+  }
+}
+
+function withSelectedLayer(action: (layer: Layer) => void): void {
+  if (selectedLayer.value !== null) {
+    action(selectedLayer.value);
+  }
+}
+
 function renameLayer(layer: Layer): void {
   const name = window.prompt("Layer name/path", layer.name)?.trim();
   if (name !== undefined && name !== "" && name !== layer.name) {
@@ -376,23 +479,20 @@ function renameLayer(layer: Layer): void {
 }
 
 function removeLayer(layer: Layer): void {
-  if (window.confirm(`Delete layer “${layer.name}”?`)) {
-    void run(async () => {
-      await store.remove(layer.id);
-      setExpandedLayerIds(
-        expandedLayerIds.value.filter((id) => id !== layer.id),
-      );
-    });
+  if (!window.confirm(`Delete layer “${layer.name}”?`)) {
+    return;
   }
+  const index = store.items.findIndex(({ id }) => id === layer.id);
+  const nextSelection =
+    store.items[index + 1]?.id ?? store.items[index - 1]?.id ?? null;
+  void run(async () => {
+    await store.remove(layer.id);
+    selectLayer(nextSelection);
+  });
 }
 
-function uploadTrack(layerId: string, event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (file !== undefined) {
-    void run(() => store.uploadTrack(layerId, file));
-  }
-  input.value = "";
+function uploadTrack(layerId: string, file: File): void {
+  void run(() => store.uploadTrack(layerId, file));
 }
 
 function startScan(layerId: string): void {
@@ -418,6 +518,13 @@ function openAsset(asset: LayerAsset): void {
   editBounds.south = asset.bounds?.south.toString() ?? "";
   editBounds.east = asset.bounds?.east.toString() ?? "";
   editBounds.north = asset.bounds?.north.toString() ?? "";
+}
+
+function openFirstImage(layerId: string): void {
+  const asset = imageAssets(layerId)[0];
+  if (asset !== undefined) {
+    openAsset(asset);
+  }
 }
 
 function controlJob(id: string, action: "pause" | "resume" | "cancel"): void {
@@ -504,11 +611,9 @@ onBeforeUnmount(() => {
     <section class="layer-panel" :aria-busy="busy">
       <header>
         <strong>Layers</strong>
-        <div class="add-actions">
-          <button type="button" :disabled="!enabled || busy" @click="openAddDialog">
-            <i class="mdi mdi-plus" aria-hidden="true"></i>Add layer
-          </button>
-        </div>
+        <button type="button" :disabled="!enabled || busy" @click="openAddDialog">
+          <i class="mdi mdi-plus" aria-hidden="true"></i>Add layer
+        </button>
       </header>
 
       <p v-if="!enabled" class="layer-note">Layer rendering is unavailable for this Map Set.</p>
@@ -518,272 +623,47 @@ onBeforeUnmount(() => {
         {{ localError || store.error }}
       </p>
 
-      <ol class="layer-list">
-        <li
-          v-for="row in visibleHierarchyRows"
-          :key="row.key"
-          :class="`hierarchy-${row.kind}`"
-          :style="{ marginLeft: `${row.depth * 0.8}rem` }"
-        >
-          <button
-            v-if="row.kind !== 'layer'"
-            type="button"
-            class="hierarchy-heading hierarchy-toggle"
-            :class="row.kind === 'category' ? 'category-toggle' : 'folder-toggle'"
-            :aria-expanded="isHierarchyExpanded(row.key)"
-            :aria-label="isHierarchyExpanded(row.key) ? `Collapse ${row.label}` : `Expand ${row.label}`"
-            @click="toggleHierarchy(row.key)"
-          >
-            <i
-              class="mdi"
-              :class="isHierarchyExpanded(row.key) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
-              aria-hidden="true"
-            ></i>
-            <i
-              class="mdi"
-              :class="row.kind === 'category' ? 'mdi-folder-multiple-outline' : 'mdi-folder-outline'"
-              aria-hidden="true"
-            ></i>
-            <strong v-if="row.kind === 'category'">{{ row.label }}</strong>
-            <span v-else>{{ row.label }}</span>
-          </button>
-          <div
-            v-else
-            v-for="layer in row.kind === 'layer' ? [row.layer] : []"
-            :key="layer.id"
-            class="layer-entry-content"
-            :data-layer-id="layer.id"
-          >
-            <div class="layer-heading">
-            <label>
-              <input
-                type="checkbox"
-                :checked="layer.visible"
-                :disabled="busy || layer.status !== 'ready'"
-                @change="setVisibility(layer, $event)"
-              />
-              <span :title="layer.name">{{ row.label }}</span>
-            </label>
-            <span v-if="layer.status !== 'ready'" class="layer-status">{{ layer.status }}</span>
-            <button
-              type="button"
-              class="configuration-toggle"
-              :title="isLayerConfigurationExpanded(layer.id) ? 'Collapse layer configuration' : 'Expand layer configuration'"
-              :aria-label="isLayerConfigurationExpanded(layer.id) ? `Collapse configuration for ${layer.name}` : `Expand configuration for ${layer.name}`"
-              :aria-expanded="isLayerConfigurationExpanded(layer.id)"
-              :aria-controls="layerConfigurationId(layer.id)"
-              @click="toggleLayerConfiguration(layer.id)"
-            >
-              <i
-                class="mdi"
-                :class="isLayerConfigurationExpanded(layer.id) ? 'mdi-chevron-down' : 'mdi-chevron-right'"
-                aria-hidden="true"
-              ></i>
-            </button>
-            <button type="button" title="Rename layer" @click="renameLayer(layer)">
-              <i class="mdi mdi-pencil-outline" aria-hidden="true"></i>
-            </button>
-            <button
-              type="button"
-              title="Move layer up"
-              :disabled="!canMove(layer, -1)"
-              @click="move(layer, -1)"
-            >
-              <i class="mdi mdi-arrow-up" aria-hidden="true"></i>
-            </button>
-            <button
-              type="button"
-              title="Move layer down"
-              :disabled="!canMove(layer, 1)"
-              @click="move(layer, 1)"
-            >
-              <i class="mdi mdi-arrow-down" aria-hidden="true"></i>
-            </button>
-            <button type="button" title="Delete layer" @click="removeLayer(layer)">
-              <i class="mdi mdi-delete-outline" aria-hidden="true"></i>
-            </button>
-            </div>
-            <div
-              v-show="isLayerConfigurationExpanded(layer.id)"
-              :id="layerConfigurationId(layer.id)"
-              class="layer-configuration"
-            >
-            <label class="opacity-field">
-              <span>Opacity</span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                :value="layer.opacity"
-                :disabled="busy"
-                @change="setOpacity(layer, $event)"
-              />
-            </label>
-            <div class="zoom-fields">
-              <label>
-                <span>Min zoom</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="24"
-                  :value="layer.minimumZoom ?? ''"
-                  @change="setZoom(layer, 'minimumZoom', $event)"
-                />
-              </label>
-              <label>
-                <span>Max zoom</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="24"
-                  :value="layer.maximumZoom ?? ''"
-                  @change="setZoom(layer, 'maximumZoom', $event)"
-                />
-              </label>
-            </div>
+      <TreeSelectDropdown
+        v-if="store.items.length > 0"
+        :model-value="selectedLayerId"
+        :nodes="selectorModel.nodes"
+        :expanded-ids="expandedHierarchyIds"
+        label="Layer"
+        placeholder="Select a layer"
+        :disabled="!enabled || busy"
+        @update:model-value="selectLayer"
+        @update:expanded-ids="expandedHierarchyIds = $event"
+        @check="setTreeVisibility"
+      />
 
-            <div v-if="layer.pluginId === 'track-layer'" class="plugin-fields">
-              <label>
-                <span>Line</span>
-                <input
-                  type="color"
-                  :value="String(layer.configuration.lineColor ?? '#d4552d')"
-                  @change="setConfiguration(layer, 'lineColor', ($event.target as HTMLInputElement).value)"
-                />
-              </label>
-              <label>
-                <span>Line opacity</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  :value="Number(layer.configuration.lineOpacity ?? 0.9)"
-                  @change="setConfiguration(layer, 'lineOpacity', Number(($event.target as HTMLInputElement).value))"
-                />
-              </label>
-              <label>
-                <span>Width</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  :value="Number(layer.configuration.lineWidth ?? 4)"
-                  @change="setConfiguration(layer, 'lineWidth', Number(($event.target as HTMLInputElement).value))"
-                />
-              </label>
-            </div>
-
-            <div v-else-if="layer.pluginId === 'image-layer'" class="plugin-fields">
-              <label>
-                <span>Marker</span>
-                <input
-                  type="color"
-                  :value="String(layer.configuration.pointColor ?? '#c54e2e')"
-                  @change="setConfiguration(layer, 'pointColor', ($event.target as HTMLInputElement).value)"
-                />
-              </label>
-              <label class="recursive-field">
-                <input
-                  type="checkbox"
-                  :checked="Boolean(layer.configuration.showPreviews ?? true)"
-                  @change="setConfiguration(layer, 'showPreviews', ($event.target as HTMLInputElement).checked)"
-                />
-                <span>Preview popups</span>
-              </label>
-              <label>
-                <span>Radius</span>
-                <input
-                  type="number"
-                  min="2"
-                  max="30"
-                  :value="Number(layer.configuration.pointRadius ?? 8)"
-                  @change="setConfiguration(layer, 'pointRadius', Number(($event.target as HTMLInputElement).value))"
-                />
-              </label>
-            </div>
-
-            <label v-if="layer.pluginId === 'track-layer'" class="file-action">
-              <i class="mdi mdi-upload" aria-hidden="true"></i>
-              Import GPX/GeoJSON
-              <input
-                type="file"
-                data-layer-primary-action
-                accept=".gpx,.geojson,.json,application/gpx+xml,application/geo+json"
-                :disabled="busy"
-                @change="uploadTrack(layer.id, $event)"
-              />
-            </label>
-
-            <div v-else-if="layer.pluginId === 'image-layer'" class="image-tools">
-              <label>
-                <span>Image root</span>
-                <select
-                  v-model="rootSelections[layer.id]"
-                  :disabled="busy"
-                >
-                  <option value="">Select…</option>
-                  <option
-                    v-for="root in store.imageRoots"
-                    :key="root.id"
-                    :value="root.id"
-                    :disabled="!root.available"
-                  >
-                    {{ root.id }}{{ root.available ? '' : ' (unavailable)' }}
-                  </option>
-                </select>
-              </label>
-              <label>
-                <span>Subdirectory</span>
-                <input v-model="scanDirectories[layer.id]" type="text" placeholder="optional/relative" />
-              </label>
-              <label class="recursive-field">
-                <input v-model="recursiveScans[layer.id]" type="checkbox" />Recursive
-              </label>
-              <button
-                type="button"
-                data-layer-primary-action
-                :disabled="busy || !!scanJob(layer.id)"
-                @click="startScan(layer.id)"
-              >
-                <i class="mdi mdi-folder-search-outline" aria-hidden="true"></i>Scan directory
-              </button>
-              <p v-if="displayedScanJob(layer.id)" class="scan-status">
-                {{ displayedScanJob(layer.id)?.status }} ·
-                {{ displayedScanJob(layer.id)?.completed }}/{{ displayedScanJob(layer.id)?.total }} ·
-                new {{ displayedScanJob(layer.id)?.summary.created ?? 0 }} ·
-                changed {{ displayedScanJob(layer.id)?.summary.changed ?? 0 }} ·
-                missing {{ displayedScanJob(layer.id)?.summary.missing ?? 0 }} ·
-                failed {{ displayedScanJob(layer.id)?.summary.failed ?? 0 }}
-              </p>
-              <div v-if="scanJob(layer.id)" class="job-actions">
-                <button
-                  v-if="scanJob(layer.id)?.status !== 'paused'"
-                  type="button"
-                  @click="controlJob(scanJob(layer.id)!.id, 'pause')"
-                >Pause</button>
-                <button
-                  v-else
-                  type="button"
-                  @click="controlJob(scanJob(layer.id)!.id, 'resume')"
-                >Resume</button>
-                <button type="button" @click="controlJob(scanJob(layer.id)!.id, 'cancel')">
-                  Cancel
-                </button>
-              </div>
-              <button
-                v-if="imageAssets(layer.id).length > 0"
-                type="button"
-                @click="openAsset(imageAssets(layer.id)[0]!)"
-              >
-                Manage {{ imageAssets(layer.id).length }} images
-              </button>
-            </div>
-              </div>
-          </div>
-        </li>
-      </ol>
+      <LayerEditor
+        v-if="selectedLayer"
+        :layer="selectedLayer"
+        :busy="busy"
+        :can-move-up="canMove(selectedLayer, -1)"
+        :can-move-down="canMove(selectedLayer, 1)"
+        :image-roots="store.imageRoots"
+        :image-root-id="rootSelections[selectedLayer.id] ?? ''"
+        :scan-directory="scanDirectories[selectedLayer.id] ?? ''"
+        :recursive-scan="recursiveScans[selectedLayer.id] ?? true"
+        :active-scan-job="scanJob(selectedLayer.id)"
+        :displayed-scan-job="displayedScanJob(selectedLayer.id)"
+        :image-count="imageAssets(selectedLayer.id).length"
+        @visibility-change="setSelectedVisibility"
+        @opacity-change="setSelectedOpacity"
+        @zoom-change="setSelectedZoom"
+        @configuration-change="setSelectedConfiguration"
+        @rename="withSelectedLayer(renameLayer)"
+        @move="withSelectedLayer((layer) => move(layer, $event))"
+        @remove="withSelectedLayer(removeLayer)"
+        @upload-track="withSelectedLayer((layer) => uploadTrack(layer.id, $event))"
+        @update:image-root-id="withSelectedLayer((layer) => { rootSelections[layer.id] = $event; })"
+        @update:scan-directory="withSelectedLayer((layer) => { scanDirectories[layer.id] = $event; })"
+        @update:recursive-scan="withSelectedLayer((layer) => { recursiveScans[layer.id] = $event; })"
+        @start-scan="withSelectedLayer((layer) => startScan(layer.id))"
+        @scan-job-action="withSelectedLayer((layer) => { const job = scanJob(layer.id); if (job) controlJob(job.id, $event); })"
+        @manage-images="withSelectedLayer((layer) => openFirstImage(layer.id))"
+      />
     </section>
   </TogglePanel>
 
@@ -881,26 +761,22 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 0.7rem;
   width: min(25rem, 82vw);
-  max-height: min(34rem, 72vh);
-  overflow: auto;
+  max-height: min(38rem, 78vh);
 }
 
 .layer-panel header,
-.layer-heading,
-.add-actions,
 .coordinate-fields {
   display: flex;
   gap: 0.45rem;
   align-items: center;
 }
 
-.layer-panel header,
-.layer-heading {
+.layer-panel header {
   justify-content: space-between;
 }
 
-.layer-panel button,
-.file-action {
+.layer-panel header button,
+.add-dialog > button {
   display: inline-flex;
   gap: 0.3rem;
   align-items: center;
@@ -913,99 +789,8 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.layer-list {
-  display: grid;
-  gap: 0.65rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.hierarchy-layer {
-  display: grid;
-  gap: 0.5rem;
-  padding: 0.65rem;
-  border: 1px solid #d2ded9;
-  border-radius: 0.45rem;
-}
-
-.layer-entry-content {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.hierarchy-category,
-.hierarchy-folder {
-  min-width: 0;
-}
-
-.hierarchy-heading {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
-}
-
-.layer-panel .hierarchy-toggle {
-  width: 100%;
-  padding: 0.15rem 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-}
-
-.layer-panel .hierarchy-toggle:hover,
-.layer-panel .hierarchy-toggle:focus-visible {
-  color: #a34521;
-}
-
-.hierarchy-category:not(:first-child) {
-  margin-top: 0.3rem;
-}
-
-.folder-toggle {
-  color: #49665d;
-  font-size: 0.85rem;
-  font-weight: 650;
-}
-
-.layer-configuration {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.configuration-toggle {
-  font-size: 1.1rem !important;
-}
-
-.layer-heading > label {
-  display: flex;
-  flex: 1;
-  gap: 0.4rem;
-  align-items: center;
-  min-width: 0;
-  font-weight: 700;
-}
-
-.layer-heading > label > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.layer-heading > button {
-  padding: 0.2rem;
-  border: 0;
-}
-
-.layer-status,
-.scan-status {
-  color: #8b3d22;
-  font-size: 0.78rem;
-}
-
 .layer-note,
-.layer-error,
-.scan-status {
+.layer-error {
   margin: 0;
 }
 
@@ -1013,63 +798,13 @@ onBeforeUnmount(() => {
   color: #a22f26;
 }
 
-.opacity-field,
-.zoom-fields > label,
-.plugin-fields > label,
-.image-tools > label,
-.asset-editor label {
-  display: grid;
-  gap: 0.2rem;
-  font-size: 0.82rem;
-}
-
-.zoom-fields,
-.plugin-fields,
-.job-actions {
-  display: flex;
-  gap: 0.45rem;
-}
-
-.zoom-fields > label,
-.plugin-fields > label {
-  flex: 1;
-  min-width: 0;
-}
-
-.zoom-fields input,
-.plugin-fields input[type="number"] {
-  min-width: 0;
-  width: 100%;
-}
-
-.file-action {
-  position: relative;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.file-action input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.file-action:has(input:focus-visible) {
-  outline: 2px solid #a34521;
-  outline-offset: 2px;
-}
-
-.image-tools,
 .asset-editor,
-.asset-editor fieldset {
+.asset-editor fieldset,
+.asset-list,
+.asset-detail,
+.add-dialog {
   display: grid;
   gap: 0.5rem;
-}
-
-.recursive-field {
-  display: flex !important;
-  grid-template-columns: auto 1fr;
 }
 
 .asset-editor {
@@ -1078,14 +813,8 @@ onBeforeUnmount(() => {
   max-height: 68vh;
 }
 
-.asset-list,
-.asset-detail,
-.add-dialog {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.add-dialog > label {
+.add-dialog > label,
+.asset-editor label {
   display: grid;
   gap: 0.2rem;
 }
@@ -1106,9 +835,9 @@ onBeforeUnmount(() => {
 .layer-type-option {
   display: grid;
   gap: 0.25rem;
-  place-items: center;
   min-height: 5.5rem;
   padding: 0.65rem;
+  place-items: center;
   border: 1px solid #9aada6;
   border-radius: 0.5rem;
   color: #173d35;
@@ -1134,17 +863,10 @@ onBeforeUnmount(() => {
 }
 
 .add-dialog > button {
-  display: inline-flex;
-  gap: 0.3rem;
-  align-items: center;
   justify-self: end;
-  padding: 0.4rem 0.65rem;
-  border: 1px solid #286b5d;
-  border-radius: 0.35rem;
+  border-color: #286b5d;
   color: #fff;
   background: #286b5d;
-  font: inherit;
-  cursor: pointer;
 }
 
 .asset-list {

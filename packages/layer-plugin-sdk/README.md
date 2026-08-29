@@ -19,6 +19,11 @@ category ID and display name for the first level of the Layer hierarchy and must
 an exact `LAYER_PLUGIN_SDK_VERSION` match. Persisted schema migrations advance by one
 version, are ordered, and must be deterministic.
 
+SDK 1.1 adds the general Layer opacity to the server-render context. A schema step
+that must preserve appearance while changing configuration can use `migrateLayer`
+to migrate configuration, data, and opacity atomically; data-only migrations keep
+using `migrate`.
+
 The reference packages `plugins/track-layer` and `plugins/image-layer` demonstrate
 line and point/raster-overlay specializations. Executable plugin upload or runtime
 installation is outside the v1 trust model.

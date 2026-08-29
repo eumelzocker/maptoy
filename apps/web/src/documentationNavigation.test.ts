@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  documentationFallbackNotice,
   englishOnlyDocumentationLabel,
-  isMaptoyApplicationDocumentationPage,
+  groupDocumentationPages,
   sortDocumentationPages,
 } from "./documentationNavigation.js";
 
@@ -45,17 +46,48 @@ describe("documentation navigation", () => {
     );
   });
 
-  it("identifies maptoy application documentation pages", () => {
-    expect(
+  it("explains fallback content in the selected documentation language", () => {
+    expect(documentationFallbackNotice("de")).toBe(
+      "Diese Seite ist noch nicht übersetzt. Die englische Version wird angezeigt.",
+    );
+    expect(documentationFallbackNotice("th")).toBe(
+      "หน้านี้ยังไม่มีคำแปล กำลังแสดงฉบับภาษาอังกฤษ",
+    );
+    expect(documentationFallbackNotice("unknown")).toBe(
+      "This page is not translated yet. Showing the English version.",
+    );
+  });
+
+  it("keeps home separate and groups application and general map topics", () => {
+    const navigation = groupDocumentationPages(
       [
-        "changelog",
-        "map-sets",
-        "tile-cache",
-        "getting-started",
-        "api-reference",
-      ].every(isMaptoyApplicationDocumentationPage),
-    ).toBe(true);
-    expect(isMaptoyApplicationDocumentationPage("home")).toBe(false);
-    expect(isMaptoyApplicationDocumentationPage("tile-providers")).toBe(false);
+        { id: "tile-providers", title: "Tile Providers" },
+        { id: "screenshots", title: "Screenshots" },
+        { id: "home", title: "maptoy" },
+        { id: "layers", title: "Layers" },
+        { id: "api-reference", title: "API reference" },
+        { id: "glossary", title: "Glossary" },
+      ],
+      "en",
+    );
+
+    expect(navigation.home?.id).toBe("home");
+    expect(navigation.groups).toEqual([
+      {
+        id: "about-maptoy",
+        pages: [
+          { id: "api-reference", title: "API reference" },
+          { id: "layers", title: "Layers" },
+          { id: "screenshots", title: "Screenshots" },
+        ],
+      },
+      {
+        id: "about-maps",
+        pages: [
+          { id: "glossary", title: "Glossary" },
+          { id: "tile-providers", title: "Tile Providers" },
+        ],
+      },
+    ]);
   });
 });

@@ -35,47 +35,94 @@ describe("Map view architecture", () => {
   });
 
   it("keeps layer tools inside the standard Map view", async () => {
-    const [mapView, main, coverageView, layerPanel, layerStore] =
-      await Promise.all([
-        readFile(
-          fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
-          "utf8",
+    const [
+      mapView,
+      main,
+      coverageView,
+      layerPanel,
+      layerEditor,
+      trackLayerEditor,
+      imageLayerEditor,
+      treeSelectDropdown,
+      checkboxTree,
+      layerStore,
+    ] = await Promise.all([
+      readFile(
+        fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(fileURLToPath(new URL("./main.ts", import.meta.url)), "utf8"),
+      readFile(
+        fileURLToPath(new URL("./views/CoverageView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./components/LayerPanel.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./components/LayerEditor.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/TrackLayerEditor.vue", import.meta.url),
         ),
-        readFile(fileURLToPath(new URL("./main.ts", import.meta.url)), "utf8"),
-        readFile(
-          fileURLToPath(new URL("./views/CoverageView.vue", import.meta.url)),
-          "utf8",
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/ImageLayerEditor.vue", import.meta.url),
         ),
-        readFile(
-          fileURLToPath(
-            new URL("./components/LayerPanel.vue", import.meta.url),
-          ),
-          "utf8",
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/TreeSelectDropdown.vue", import.meta.url),
         ),
-        readFile(
-          fileURLToPath(new URL("./stores/layers.ts", import.meta.url)),
-          "utf8",
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/CheckboxTree.vue", import.meta.url),
         ),
-      ]);
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./stores/layers.ts", import.meta.url)),
+        "utf8",
+      ),
+    ]);
 
     expect(mapView).toContain("<LayerPanel");
     expect(mapView).toContain("LAYER_PLUGIN_REGISTRY_KEY");
     expect(mapView).toContain("renderPluginLayers");
-    expect(layerPanel).toContain("Scan directory");
-    expect(layerPanel).toContain('class="layer-configuration"');
-    expect(layerPanel).toContain(":aria-expanded=");
-    expect(layerPanel).toContain("loadExpandedLayerConfigurations");
+    expect(layerPanel).toContain("TreeSelectDropdown");
+    expect(layerPanel).toContain("LayerEditor");
+    expect(layerPanel).toContain('v-if="selectedLayer"');
+    expect(layerPanel).toContain("loadSelectedLayerId");
     expect(layerPanel).toContain("buildLayerHierarchyRows");
     expect(layerPanel).toContain("Name or folder/name");
-    expect(layerPanel).toContain("visibleHierarchyRows");
     expect(layerPanel).toContain("loadCollapsedLayerHierarchy");
-    expect(layerPanel).toContain("visibleLayerHierarchyRows");
-    expect(layerPanel).toContain('class="hierarchy-heading hierarchy-toggle"');
     expect(layerPanel).toContain('class="layer-type-option"');
     expect(layerPanel).toContain(':placeholder="suggestedLayerName"');
-    expect(layerPanel).toContain("data-layer-primary-action");
     expect(layerPanel).toContain("focusPrimaryLayerAction");
     expect(layerPanel).toContain(":suspend-outside-close=");
+    expect(layerEditor).toContain("TrackLayerEditor");
+    expect(layerEditor).toContain("ImageLayerEditor");
+    expect(layerEditor).toContain(':has-track="hasTrack(layer)"');
+    expect(trackLayerEditor).toContain("Import track…");
+    expect(trackLayerEditor).toContain("Replace track…");
+    expect(trackLayerEditor).toContain(':class="{ primary: !hasTrack }"');
+    expect(trackLayerEditor).toContain("GPX or GeoJSON");
+    expect(trackLayerEditor).not.toContain("lineOpacity");
+    expect(trackLayerEditor).not.toContain("Line opacity");
+    expect(imageLayerEditor).toContain("Scan directory");
+    expect(imageLayerEditor).toContain("data-layer-primary-action");
+    expect(treeSelectDropdown).toContain("CheckboxTree");
+    expect(treeSelectDropdown).toContain("Search layers…");
+    expect(checkboxTree).toContain("emit('check'");
+    expect(checkboxTree).toContain("emit('select'");
     expect(mapView).toContain("if (!layers.loaded)");
     expect(mapView).not.toContain("layers.load(mapSet.id)");
     expect(layerStore).toContain('apiRequest<LayerListResponse>("api/layers")');

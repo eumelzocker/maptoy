@@ -240,12 +240,12 @@ describe("maptoy server", () => {
       items: [
         {
           id: "track-layer",
-          sdkVersion: "1.0.0",
+          sdkVersion: "1.1.0",
           category: { id: "tracks", displayName: "Tracks" },
         },
         {
           id: "image-layer",
-          sdkVersion: "1.0.0",
+          sdkVersion: "1.1.0",
           category: { id: "images", displayName: "Images" },
         },
       ],

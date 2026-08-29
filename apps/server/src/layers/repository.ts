@@ -260,8 +260,8 @@ export class LayerRepository {
         .prepare(
           `INSERT INTO layer_instance_versions (
             layer_id, plugin_version, schema_version, configuration_json,
-            data_json, reason, created_at
-          ) VALUES (?, ?, ?, ?, ?, 'plugin-migration', ?)`,
+            data_json, opacity, reason, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, 'plugin-migration', ?)`,
         )
         .run(
           previous.id,
@@ -269,6 +269,7 @@ export class LayerRepository {
           previous.schemaVersion,
           JSON.stringify(previous.configuration),
           JSON.stringify(previous.data),
+          previous.opacity,
           new Date().toISOString(),
         );
       this.update(updated);

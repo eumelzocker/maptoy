@@ -79,6 +79,13 @@ describe("documentation build", () => {
     );
     expect(mapProjections?.html).toContain('src="./docs-assets/eqearth.png"');
     expect(mapProjections?.html).not.toContain("../assets/eqearth.png");
+
+    const screenshots = documentation.pages.find(
+      ({ id, requestedLanguage }) =>
+        id === "screenshots" && requestedLanguage === "en",
+    );
+    expect(screenshots?.html).toContain('src="./docs-assets/screenshot0.webp"');
+    expect(screenshots?.html).toContain('src="./docs-assets/screenshot1.webp"');
   });
 
   it("rewrites a supported callout type to a styled code element", () => {

@@ -3,15 +3,14 @@ import { documentation } from "virtual:maptoy-docs";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
-import maptoyIconUrl from "../assets/favicon.svg";
+import DocumentationPageLink from "../components/DocumentationPageLink.vue";
 import { decorateClipCopyCallouts } from "../documentationClipCopy.js";
 import { saveDocumentationLanguage } from "../documentationLanguage.js";
 import { decorateExternalDocumentationLinks } from "../documentationLinks.js";
 import {
+  documentationFallbackNotice,
   englishOnlyDocumentationLabel,
-  // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
-  isMaptoyApplicationDocumentationPage,
-  sortDocumentationPages,
+  groupDocumentationPages,
 } from "../documentationNavigation.js";
 import { documentationPageId } from "../documentationRoute.js";
 
@@ -38,8 +37,8 @@ const page = computed(() =>
 );
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const pageLinks = computed(() =>
-  sortDocumentationPages(
+const pageNavigation = computed(() =>
+  groupDocumentationPages(
     documentation.pages.filter(
       ({ requestedLanguage: language }) => language === requestedLanguage.value,
     ),
@@ -50,6 +49,10 @@ const pageLinks = computed(() =>
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const englishOnlyLabel = computed(() =>
   englishOnlyDocumentationLabel(requestedLanguage.value),
+);
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const fallbackNotice = computed(() =>
+  documentationFallbackNotice(requestedLanguage.value),
 );
 
 const pageContent = ref<HTMLElement | null>(null);
@@ -73,44 +76,39 @@ watch(requestedLanguage, saveDocumentationLanguage, { immediate: true });
     <aside class="docs-sidebar">
       <p class="eyebrow">Documentation</p>
       <nav aria-label="Documentation pages">
-        <RouterLink
-          v-for="link in pageLinks"
-          :key="link.id"
-          :to="`/docs/${requestedLanguage}/${link.id}`"
-          :class="{
-            'docs-home-link': link.id === 'home',
-            'docs-current-page': link.id === requestedPageId,
-          }"
-          :title="link.isFallback ? englishOnlyLabel : undefined"
-          :aria-current="link.id === requestedPageId ? 'page' : undefined"
+        <DocumentationPageLink
+          v-if="pageNavigation.home"
+          :link="pageNavigation.home"
+          :requested-language="requestedLanguage"
+          :requested-page-id="requestedPageId"
+          :english-only-label="englishOnlyLabel"
+          home
+        />
+        <details
+          v-for="group in pageNavigation.groups"
+          :key="group.id"
+          class="docs-nav-group"
+          open
         >
-          <i
-            v-if="link.id === 'home'"
-            class="mdi mdi-map-legend docs-nav-icon"
-            aria-hidden="true"
-          ></i>
-          <img
-            v-else-if="isMaptoyApplicationDocumentationPage(link.id)"
-            :src="maptoyIconUrl"
-            class="docs-nav-app-icon"
-            alt="maptoy application documentation"
-            title="maptoy application documentation"
-          />
-          <span>{{ link.title }}</span>
-          <i
-            v-if="link.id === requestedPageId"
-            class="mdi mdi-chevron-right-circle docs-nav-icon docs-current-icon"
-            aria-hidden="true"
-          ></i>
-          <i
-            v-if="link.isFallback"
-            class="mdi mdi-translate-off docs-nav-icon docs-fallback-icon"
-            aria-hidden="true"
-          ></i>
-          <span v-if="link.isFallback" class="visually-hidden">
-            — {{ englishOnlyLabel }}
-          </span>
-        </RouterLink>
+          <summary>
+            <i
+              class="mdi mdi-chevron-right docs-nav-group-chevron"
+              aria-hidden="true"
+            ></i>
+            <span v-if="group.id === 'about-maptoy'">About <em>maptoy</em></span>
+            <span v-else>About Maps, the Universe, and Everything</span>
+          </summary>
+          <div class="docs-nav-group-links">
+            <DocumentationPageLink
+              v-for="link in group.pages"
+              :key="link.id"
+              :link="link"
+              :requested-language="requestedLanguage"
+              :requested-page-id="requestedPageId"
+              :english-only-label="englishOnlyLabel"
+            />
+          </div>
+        </details>
       </nav>
       <div class="language-switcher" aria-label="Documentation language">
         <RouterLink
@@ -126,18 +124,13 @@ watch(requestedLanguage, saveDocumentationLanguage, { immediate: true });
           "
         >
           <span>{{ language.label }}</span>
-          <i
-            v-if="language.code === requestedLanguage"
-            class="mdi mdi-check-circle docs-nav-icon docs-current-icon"
-            aria-hidden="true"
-          ></i>
         </RouterLink>
       </div>
     </aside>
 
     <article v-if="page" class="docs-page">
       <p v-if="page.isFallback" class="fallback-notice" role="status">
-        This page is not translated yet. Showing the English version.
+        {{ fallbackNotice }}
       </p>
       <!-- The documentation build sanitizes this repository-owned HTML. -->
       <div ref="pageContent" v-html="page.html"></div>

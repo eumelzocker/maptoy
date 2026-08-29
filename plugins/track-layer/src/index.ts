@@ -2,6 +2,7 @@ import {
   assertLineGeometry,
   LAYER_PLUGIN_SDK_VERSION,
   type LayerPluginDefinition,
+  type LayerPluginMigrationState,
   type LineFeature,
 } from "@maptoy/layer-plugin-sdk";
 
@@ -10,7 +11,6 @@ export const TRACK_LAYER_PLUGIN_ID = "track-layer";
 export interface TrackLayerConfiguration {
   lineColor: string;
   lineWidth: number;
-  lineOpacity: number;
 }
 
 export interface TrackProperties {
@@ -29,7 +29,6 @@ export interface TrackLayerData {
 const defaultConfiguration: TrackLayerConfiguration = {
   lineColor: "#e24a33",
   lineWidth: 3,
-  lineOpacity: 0.9,
 };
 
 function record(value: unknown, message: string): Record<string, unknown> {
@@ -43,22 +42,41 @@ function validateConfiguration(value: unknown): TrackLayerConfiguration {
   const input = record(value, "Track layer configuration must be an object.");
   const lineColor = input.lineColor ?? defaultConfiguration.lineColor;
   const lineWidth = input.lineWidth ?? defaultConfiguration.lineWidth;
-  const lineOpacity = input.lineOpacity ?? defaultConfiguration.lineOpacity;
   if (
     typeof lineColor !== "string" ||
     !/^#[0-9a-f]{6}$/i.test(lineColor) ||
     typeof lineWidth !== "number" ||
     !Number.isFinite(lineWidth) ||
     lineWidth < 1 ||
-    lineWidth > 20 ||
-    typeof lineOpacity !== "number" ||
-    !Number.isFinite(lineOpacity) ||
-    lineOpacity < 0 ||
-    lineOpacity > 1
+    lineWidth > 20
   ) {
     throw new Error("Track layer style is invalid.");
   }
-  return { lineColor, lineWidth, lineOpacity };
+  return { lineColor, lineWidth };
+}
+
+function migrateVersionOneLayer(
+  value: LayerPluginMigrationState,
+): LayerPluginMigrationState {
+  const configuration = record(
+    value.configuration,
+    "Track layer configuration must be an object.",
+  );
+  const legacyLineOpacity = configuration.lineOpacity ?? 0.9;
+  if (
+    typeof legacyLineOpacity !== "number" ||
+    !Number.isFinite(legacyLineOpacity) ||
+    legacyLineOpacity < 0 ||
+    legacyLineOpacity > 1
+  ) {
+    throw new Error("Track layer line opacity is invalid.");
+  }
+  const { lineOpacity: _lineOpacity, ...nextConfiguration } = configuration;
+  return {
+    ...value,
+    configuration: nextConfiguration,
+    opacity: value.opacity * legacyLineOpacity,
+  };
 }
 
 function validateData(value: unknown): TrackLayerData {
@@ -264,7 +282,7 @@ function renderDescriptor(
         symbolizer: {
           color: configuration.lineColor,
           width: configuration.lineWidth,
-          opacity: configuration.lineOpacity,
+          opacity: 1,
         },
       })),
     },
@@ -278,14 +296,13 @@ export const trackLayerPlugin = {
     sdkVersion: LAYER_PLUGIN_SDK_VERSION,
     displayName: "Track layer",
     category: { id: "tracks", displayName: "Tracks" },
-    schemaVersion: 1,
+    schemaVersion: 2,
     configurationSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
         lineColor: { type: "string" },
         lineWidth: { type: "number", minimum: 1, maximum: 20 },
-        lineOpacity: { type: "number", minimum: 0, maximum: 1 },
       },
     },
     dataSchema: {
@@ -303,7 +320,13 @@ export const trackLayerPlugin = {
   shared: {
     validateConfiguration,
     validateData,
-    migrations: [],
+    migrations: [
+      {
+        fromSchemaVersion: 1,
+        toSchemaVersion: 2,
+        migrateLayer: migrateVersionOneLayer,
+      },
+    ],
   },
   frontend: {
     mount: (context, input) => {
@@ -340,7 +363,7 @@ export const trackLayerPlugin = {
           {
             color: configuration.lineColor,
             width: configuration.lineWidth,
-            opacity: configuration.lineOpacity,
+            opacity: context.opacity,
           },
         );
       }

@@ -1,10 +1,10 @@
 ---
 id: layers
-title: Layer, Tracks und externe Bilder
+title: Layers
 language: de
 ---
 
-# Layer, Tracks und externe Bilder
+# Layers
 
 Layer sind optionale Funktionen der normalen **Kartenansicht**. Das Layer-Werkzeug
 liegt links unten in der Karte. Es gibt keine eigene Layer-Hauptansicht; Coverage
@@ -21,8 +21,11 @@ Vektorfläche. Dieselben Grundlagen können später POIs, Routen und Regionen tr
 
 Über **Add layer** und die dortige Symbolauswahl wird ein Track- oder Bildlayer
 erstellt. Der Name ist optional; ein leeres Feld erhält den nächsten freien,
-nummerierten Namen wie `Track 1`. Nach dem Anlegen öffnet sich der neue Layer-Editor
-und fokussiert den Import beziehungsweise Verzeichnisscan. Alle Layer bilden
+nummerierten Namen wie `Track 1`. Nach dem Anlegen wird der neue Layer im
+Baum-Dropdown ausgewählt, als einziger Layer-Editor geöffnet und der Import
+beziehungsweise Verzeichnisscan fokussiert. Checkboxen im Dropdown ändern die
+Sichtbarkeit, ohne die Editorauswahl zu wechseln. Der allgemeine Regler
+**Opacity** gilt für den gesamten Layer in interaktiver Karte und Export. Alle Layer bilden
 einen globalen, von Map Sets unabhängigen Overlay-Stack. Beim Wechsel des Map Sets
 wird nur die Basiskarte ersetzt; dieselben Overlays werden mit ihrer Reihenfolge,
 Sichtbarkeit, Deckkraft, Zoombegrenzung und Konfiguration wieder angehängt. Fehlende
@@ -38,8 +41,10 @@ Darstellungspräferenzen bleiben lokal im Browser erhalten.
 
 ## Tracks importieren
 
-In einem Track-Layer importiert **Import GPX/GeoJSON** GPX beziehungsweise GeoJSON
-LineString/MultiLineString. maptoy vergibt eine Asset-ID, validiert über das Plugin
+In einem leeren Track-Layer ist **Import track…** als Primäraktion hervorgehoben.
+Nach erfolgreichem Import heißt die normale Aktion **Replace track…**, weil eine
+weitere Datei die normalisierte Trackgeometrie ersetzt. Beide Aktionen akzeptieren
+GPX beziehungsweise GeoJSON LineString/MultiLineString. maptoy vergibt eine Asset-ID, validiert über das Plugin
 und speichert die Datei kontrolliert unter `MAPTOY_DATA_DIR/layer-assets`. Der
 ursprüngliche Dateiname bleibt nur Metadatum. DTD- und Entity-Deklarationen in GPX
 werden abgewiesen. Es gilt `MAPTOY_MAX_LAYER_ASSET_BYTES`.

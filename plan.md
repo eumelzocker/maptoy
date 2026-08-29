@@ -463,9 +463,12 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 
 Für Layer, Assets und Bildkatalog wird in v1 keine eigene Hauptansicht und keine
 eigene `/layers`-Route angelegt. Die Kartenansicht bleibt während Auswahl,
-Konfiguration und Import sichtbar. Ein kompaktes, schließbares Layer-Panel zeigt den
-globalen Overlay-Stack sowie Sichtbarkeit, Deckkraft, Reihenfolge, Zoomgrenzen und
-Diagnosestatus. Plugin-Auswahl, Trackimport, Bildwurzelauswahl,
+Konfiguration und Import sichtbar. Ein kompaktes, schließbares Layer-Panel bietet
+oberhalb genau eines Layer-Editors einen durchsuchbaren Dropdown-Baum für den
+globalen Overlay-Stack. Checkboxen an Layern, Kategorien und Ordnern erlauben die
+schnelle, bei Gruppen dreistufig dargestellte Sichtbarkeitssteuerung. Der ausgewählte
+Layer stellt Deckkraft, Reihenfolge, Zoomgrenzen und Diagnosestatus im einzigen
+Editor des Panels dar. Plugin-Auswahl, Trackimport, Bildwurzelauswahl,
 Verzeichnisscan, Detailbearbeitung und Diagnose öffnen fokussierte Dialoge oder
 Unterpanels innerhalb dieser Ansicht.
 
@@ -484,6 +487,10 @@ Persistenzmodell aus `/`-Segmenten des verpflichtenden Layernamens, beispielswei
 
 ### 7.2 Bedienprinzipien
 
+- Die Hauptnavigation markiert die aktive Ansicht dauerhaft und unterscheidet
+  diesen Zustand klar von Hover und Tastaturfokus. Bei schmalen Viewports ersetzt
+  ein zugänglicher Dropdown-Wechsler die horizontalen Routenlinks; beide
+  Darstellungen verwenden dieselbe zentrale View-Definition.
 - Vor großen Downloads oder Exporten werden Tile-Anzahl, geschätztes Datenvolumen und relevante Provider-Limits angezeigt.
 - Destruktive Aktionen wie das Löschen einer Tile-Revision, eines Snapshots oder eines gesamten Map Sets erfordern eine eindeutige Bestätigung; referenzierte Revisionen sind geschützt.
 - Fehler nennen Map Set, Jobphase und eine handlungsorientierte Ursache, ohne Secrets oder vollständige signierte URLs anzuzeigen.
@@ -491,11 +498,24 @@ Persistenzmodell aus `/`-Segmenten des verpflichtenden Layernamens, beispielswei
 - Nicht unterstützte Funktionen werden anhand der Adapter-/Provider-Capabilities deaktiviert und mit einer Begründung versehen.
 - Das Layer-Panel ist ein optionales Werkzeug des Map View und wird bei fehlender
   Capability `layerRendering` nicht als scheinbar nutzbare Verwaltung angeboten.
-- Die Konfiguration jeder Layer-Instanz ist im Layer-Panel einzeln aufklappbar,
-  standardmäßig geschlossen und merkt sich ihren Zustand lokal im Browser.
+- Im Layer-Panel ist stets höchstens ein Layer-Editor im DOM. Der im Dropdown-Baum
+  ausgewählte Layer wird oberhalb des Editors mit seinem vollständigen Pfad
+  angezeigt; die Auswahl wird lokal im Browser gespeichert.
 - Plugin-Kategorien und alle aus `/`-Namenssegmenten entstehenden Ordner sind auf-
   und zuklappbar; eingeklappte Hierarchieknoten werden lokal im Browser gespeichert
   und sind ohne gespeicherte Präferenz geöffnet.
+- Klick auf einen Layernamen im Dropdown-Baum wählt ihn für den Editor aus und
+  schließt den Dropdown. Ein Klick auf eine Checkbox ändert ausschließlich die
+  Sichtbarkeit und lässt den Dropdown für weitere schnelle Änderungen geöffnet.
+  Kategorien und Ordner verwenden dreistufige Checkboxen für ihre Nachfahren.
+- Ein Track-Layer ohne importierte Geometrie hebt `Import track…` als Primäraktion
+  hervor und nennt GPX sowie GeoJSON als unterstützte Formate. Nach einem Import
+  wird daraus die nicht hervorgehobene Aktion `Replace track…`, weil ein erneuter
+  Dateiimport die vorhandene Trackgeometrie vollständig ersetzt.
+- Die allgemeine Layer-Deckkraft ist der einzige Deckkraftwert eines Track-Layers
+  und wirkt identisch in interaktiver Karte und Serverexport. Eine frühere
+  Track-Konfiguration mit zusätzlicher Linien-Deckkraft wird verlustfrei migriert,
+  indem beide bisherigen Faktoren in den allgemeinen Layerwert überführt werden.
 - Plugin-Editoren erscheinen innerhalb einer einheitlichen Layer-Oberfläche und dürfen Navigation, globale Stores oder andere Plugins nicht direkt manipulieren.
 - Bildverzeichnisscans zeigen Fortschritt, neue, geänderte, fehlende und
   fehlgeschlagene Dateien, ohne pro EXIF-GPS-Position eine Bestätigung zu verlangen.
@@ -531,9 +551,14 @@ Die Dokumentation ist ein fester Teil der SPA und über die Hauptnavigation sowi
 
 **Darstellung und Navigation**
 
+- Die Startseite bleibt als eigener Eintrag oberhalb des Inhaltsverzeichnisses.
+  Die übrigen Seiten sind in die einklappbaren Bereiche `About maptoy` und
+  `About Maps, the Universe, and Everything` gegliedert. Noch nicht übersetzte
+  Seiten tragen kompakt eine UK-Flagge als Englisch-Fallbackhinweis.
 - globaler Sprachumschalter mindestens für `English`, `Deutsch` und `ไทย`; optionale Sprachen werden aus einem Sprachmanifest ergänzt
 - die Sprachwahl wird lokal gespeichert und bleibt beim Wechsel möglichst auf derselben Seite und Überschrift
 - Standardauswahl anhand der Browsersprache; fehlt eine lokalisierte Seite, wird die englische Fassung mit sichtbarem Fallback-Hinweis angezeigt
+- der Fallback-Hinweis wird in der gewählten Dokumentationssprache angezeigt
 - Inhaltsverzeichnis, Breadcrumbs, Vor/Zurück-Navigation, stabile Überschriftenanker und kopierbare Deep Links
 - lokale Volltextsuche mindestens für Englisch und Deutsch; Thai-Suche wird nur aktiviert, wenn eine ausreichend zuverlässige Segmentierung mit vertretbarem Aufwand umgesetzt werden kann
 - ist Thai-Suche deaktiviert, zeigt die Oberfläche dies ausdrücklich an und bietet die englische Suche an; thailändische Inhalte, Navigation und Englisch-Fallback bleiben davon unberührt
@@ -920,7 +945,8 @@ erst mit dem Download-Worker ergänzt.
 ### Phase 5: Layer-Plugin-System und externer Bildkatalog
 
 **Status:** Kernumfang am 28. August 2026 als Version `0.2.0` veröffentlicht;
-Abschluss nach den unten aufgeführten Restarbeiten
+Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
+`0.2.1` verfeinert; Abschluss nach den unten aufgeführten Restarbeiten
 
 **Aufgaben**
 
@@ -935,9 +961,11 @@ Abschluss nach den unten aufgeführten Restarbeiten
   vorsehen, ohne ihn als gewöhnliche Vektorfläche zu modellieren
 - generische Layer-Persistenz, Assetkatalog, kontrollierten Speicher für verwaltete
   Nicht-Bild-Assets und Bildvorschauen sowie die CRUD-API bauen
-- ein optional einblendbares Layer-Panel und fokussierte Plugin-, Import-, Scan-,
-  Konfigurations- und Assetdialoge in den bestehenden Map View integrieren; keine
-  eigene Layer-Route oder Hauptansicht anlegen
+- ein optional einblendbares Layer-Panel mit durchsuchbarem Dropdown-Baum,
+  Gruppencheckboxen und genau einem ausgewählten Layer-Editor sowie fokussierte
+  Plugin-, Import-, Scan- und Assetdialoge in den bestehenden Map View integrieren;
+  generische Baum-, Dropdown- und Editorbausteine als wiederverwendbare
+  Vue-Komponenten auslagern; keine eigene Layer-Route oder Hauptansicht anlegen
 - Layer-Instanzen als globalen Overlay-Stack unabhängig von Map Sets persistieren
   und beim Wechsel der Basiskarte mit Sichtbarkeit, Reihenfolge und Konfiguration
   wieder an den neu erzeugten Renderer anhängen
@@ -981,11 +1009,13 @@ Abschluss nach den unten aufgeführten Restarbeiten
   dargestellt, sofern dieser Layer-Rendering unterstützt.
 - Layer erscheinen unter ihrer Plugin-Kategorie und lassen sich über Namen wie
   `Reisen/2026/Alpen` ohne zusätzliche Ordnerdatensätze weiter strukturieren.
-- Kategorien und sämtliche aus Namenssegmenten entstehenden Ordnerebenen sind
-  unabhängig ein- und ausklappbar; der Zustand bleibt lokal im Browser erhalten.
+- Kategorien und sämtliche aus Namenssegmenten entstehenden Ordnerebenen sind im
+  durchsuchbaren Dropdown-Baum unabhängig ein- und ausklappbar; der Zustand bleibt
+  lokal im Browser erhalten. Layer- und Gruppencheckboxen ändern die Sichtbarkeit,
+  ohne den Dropdown zu schließen oder die Editorauswahl zu ändern.
 - Der Add-Layer-Dialog bietet die Kategorien als visuelle Auswahl an. Nach dem
-  Anlegen wird der neue Layer sichtbar aufgeklappt und der primäre Import- oder
-  Scan-Einstieg fokussiert.
+  Anlegen wird der neue Layer ausgewählt, als einziger Editor dargestellt und der
+  primäre Import- oder Scan-Einstieg fokussiert.
 - Sämtliche Layeraufgaben der v1 sind über das optionale Panel und die zugehörigen
   Dialoge im Standard-Map-View erreichbar; es gibt keine eigene Layer-Hauptansicht
   oder `/layers`-Route, und die Coverage-Ansicht bleibt unverändert auf das
@@ -1147,6 +1177,7 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.1.1` | Phase 4: aggregierte Cache-Abdeckung, Zustandsvergleiche, Drill-down und Coverage-Kartenansicht |
 | `0.1.2` | Coverage-Ansicht bereinigt und präzisiert, gemeinsame Zoom-Steuerung sowie Dokumentationsverbesserungen |
 | `0.2.0` | Kernumfang von Phase 5: Layer-Plugin-System, Track-/Bildlayer, globaler Overlay-Stack, externer Bildkatalog und persistente Scan-Jobs |
+| `0.2.1` | Skalierbare Layer- und Hauptnavigation, vereinheitlichte Track-Deckkraftmigration sowie gruppierte Dokumentationsnavigation |
 
 ### 13.2 Weitere Releases
 

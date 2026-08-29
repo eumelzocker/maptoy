@@ -1,10 +1,10 @@
 ---
 id: layers
-title: Layers, tracks, and external images
+title: Layers
 language: en
 ---
 
-# Layers, tracks, and external images
+# Layers
 
 Layers are optional features of the standard **Map** view. Open the Layers tool in
 the lower-left corner of the map. There is no separate layer page, and Coverage
@@ -22,7 +22,10 @@ plugins.
 
 Use **Add layer** and its icon choices to create a Track or Images layer. The name
 is optional; an empty field gets the next free numbered name, such as `Track 1`.
-After creation, the new Layer editor opens and focuses its import or scan control.
+After creation, the new Layer is selected in the tree dropdown, its single editor
+opens, and its import or scan control receives focus. The checkboxes in the dropdown
+change visibility without changing the editor selection. The general **Opacity**
+slider applies to the complete Layer in both the interactive map and exports.
 Layers form one global overlay stack independent of Map Sets. Changing the
 Map Set replaces only the base map and reattaches the same overlays with their
 existing order, visibility, opacity, Zoom range, and configuration. A missing or
@@ -38,7 +41,10 @@ in the browser.
 
 ## Importing tracks
 
-Create a Track layer and choose **Import GPX/GeoJSON**. The upload is assigned a
+Create a Track layer and choose the highlighted **Import track…** action. After a
+successful import, the secondary action is named **Replace track…** because another
+file replaces the normalized Track geometry. Both actions accept GPX and GeoJSON.
+The upload is assigned a
 generated Asset ID and stored below `MAPTOY_DATA_DIR/layer-assets`; the original
 client filename is metadata only. GPX track segments and GeoJSON LineString or
 MultiLineString features are normalized into the shared line model. GPX DTD and

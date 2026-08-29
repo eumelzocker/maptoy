@@ -180,7 +180,11 @@ export const imageLayerPlugin = {
       const configuration = validateConfiguration(context.configuration);
       for (const asset of context.assets) {
         if (asset.bounds !== undefined) {
-          context.surface.drawManagedImage(asset.assetId, asset.bounds, 1);
+          context.surface.drawManagedImage(
+            asset.assetId,
+            asset.bounds,
+            context.opacity,
+          );
         } else if (asset.longitude !== null && asset.latitude !== null) {
           context.surface.drawPoint(
             {
@@ -190,6 +194,7 @@ export const imageLayerPlugin = {
             {
               fillColor: configuration.pointColor,
               radius: configuration.pointRadius,
+              opacity: context.opacity,
             },
           );
         }
