@@ -1,4 +1,4 @@
-export const MAP_ADAPTER_SDK_VERSION = "1.0.0";
+export const MAP_ADAPTER_SDK_VERSION = "1.1.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -37,7 +37,17 @@ export interface MapRendererManifest {
   displayName: string;
   configurationSchema: Readonly<Record<string, unknown>>;
   capabilities: MapRendererCapabilities;
+  supportedLayerTypes: readonly MapLayerType[];
 }
+
+export type MapLayerType =
+  | "rectangle-grid"
+  | "point-collection"
+  | "line-collection"
+  | "area-collection"
+  | "raster-overlay"
+  | "xyz-tile-grid"
+  | "composite";
 
 export interface MapLayerDescriptor {
   id: string;
@@ -140,12 +150,24 @@ export interface MapRasterOverlayLayerData {
   features: readonly MapRasterOverlayFeature[];
 }
 
+export interface MapXyzTileGridLayerData {
+  kind: "xyz-tile-grid";
+  lineColor: string;
+  textColor: string;
+  backgroundColor: string;
+  showGrid: boolean;
+  showLabels: boolean;
+  showScale: boolean;
+  scaleWidthPercent: number;
+}
+
 export type MapPrimitiveLayerData =
   | MapRectangleLayerData
   | MapPointLayerData
   | MapLineLayerData
   | MapAreaLayerData
-  | MapRasterOverlayLayerData;
+  | MapRasterOverlayLayerData
+  | MapXyzTileGridLayerData;
 
 export interface MapCompositeLayerData {
   kind: "composite";
@@ -191,6 +213,34 @@ export function isMapRasterOverlayLayerData(
   value: unknown,
 ): value is MapRasterOverlayLayerData {
   return hasKind(value, "raster-overlay");
+}
+
+export function isMapXyzTileGridLayerData(
+  value: unknown,
+): value is MapXyzTileGridLayerData {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    value.kind === "xyz-tile-grid" &&
+    "lineColor" in value &&
+    typeof value.lineColor === "string" &&
+    "textColor" in value &&
+    typeof value.textColor === "string" &&
+    "backgroundColor" in value &&
+    typeof value.backgroundColor === "string" &&
+    "showGrid" in value &&
+    typeof value.showGrid === "boolean" &&
+    "showLabels" in value &&
+    typeof value.showLabels === "boolean" &&
+    "showScale" in value &&
+    typeof value.showScale === "boolean" &&
+    "scaleWidthPercent" in value &&
+    typeof value.scaleWidthPercent === "number" &&
+    Number.isFinite(value.scaleWidthPercent) &&
+    value.scaleWidthPercent >= 25 &&
+    value.scaleWidthPercent <= 100
+  );
 }
 
 export function isMapCompositeLayerData(
@@ -280,6 +330,15 @@ export function createFakeMapRendererFactory(): MapRendererFactory {
         tileArchive: false,
         batchDownload: false,
       },
+      supportedLayerTypes: [
+        "rectangle-grid",
+        "point-collection",
+        "line-collection",
+        "area-collection",
+        "raster-overlay",
+        "xyz-tile-grid",
+        "composite",
+      ],
     },
     create(options): MapRendererInstance {
       let viewport: MapViewport = options.initialViewport;
@@ -365,6 +424,16 @@ export function assertValidMapRendererManifest(
     `unsupported SDK version: ${manifest.sdkVersion}`,
   );
   invariant(manifest.displayName.trim().length > 0, "empty display name");
+  invariant(
+    new Set(manifest.supportedLayerTypes).size ===
+      manifest.supportedLayerTypes.length,
+    "duplicate supported Layer type",
+  );
+  invariant(
+    manifest.capabilities.layerRendering ||
+      manifest.supportedLayerTypes.length === 0,
+    "Layer types require Layer rendering capability",
+  );
 }
 
 export interface MapRendererManifestRegistry {
@@ -426,6 +495,16 @@ export async function exerciseMapRendererContract(
     { kind: "line-collection", features: [] },
     { kind: "area-collection", features: [] },
     { kind: "raster-overlay", features: [] },
+    {
+      kind: "xyz-tile-grid",
+      lineColor: "#000000",
+      textColor: "#000000",
+      backgroundColor: "#ffffff",
+      showGrid: true,
+      showLabels: true,
+      showScale: true,
+      scaleWidthPercent: 75,
+    },
     {
       kind: "composite",
       layers: [

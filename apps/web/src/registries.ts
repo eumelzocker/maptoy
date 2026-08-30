@@ -10,6 +10,7 @@ import {
   type MapRendererFactoryRegistry,
   type MapRendererManifestRegistry,
 } from "@maptoy/map-adapter-sdk";
+import { tileGridLayerPlugin } from "@maptoy/tile-grid-layer";
 import { trackLayerPlugin } from "@maptoy/track-layer";
 import type { InjectionKey } from "vue";
 
@@ -24,6 +25,7 @@ export const mapRendererFactoryRegistry = createMapRendererFactoryRegistry([
 export const layerPluginRegistry = createLayerPluginRegistry([
   trackLayerPlugin,
   imageLayerPlugin,
+  tileGridLayerPlugin,
 ]);
 
 export const MAP_RENDERER_REGISTRY_KEY: InjectionKey<MapRendererManifestRegistry> =

@@ -30,6 +30,9 @@ importers:
       '@maptoy/map-adapter-sdk':
         specifier: workspace:*
         version: link:../../packages/map-adapter-sdk
+      '@maptoy/map-core':
+        specifier: workspace:*
+        version: link:../../packages/map-core
       leaflet:
         specifier: 1.9.4
         version: 1.9.4
@@ -67,6 +70,9 @@ importers:
       '@maptoy/map-core':
         specifier: workspace:*
         version: link:../../packages/map-core
+      '@maptoy/tile-grid-layer':
+        specifier: workspace:*
+        version: link:../../plugins/tile-grid-layer
       '@maptoy/track-layer':
         specifier: workspace:*
         version: link:../../plugins/track-layer
@@ -104,6 +110,9 @@ importers:
       '@maptoy/map-core':
         specifier: workspace:*
         version: link:../../packages/map-core
+      '@maptoy/tile-grid-layer':
+        specifier: workspace:*
+        version: link:../../plugins/tile-grid-layer
       '@maptoy/track-layer':
         specifier: workspace:*
         version: link:../../plugins/track-layer
@@ -173,6 +182,12 @@ importers:
   packages/map-core: {}
 
   plugins/image-layer:
+    dependencies:
+      '@maptoy/layer-plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/layer-plugin-sdk
+
+  plugins/tile-grid-layer:
     dependencies:
       '@maptoy/layer-plugin-sdk':
         specifier: workspace:*

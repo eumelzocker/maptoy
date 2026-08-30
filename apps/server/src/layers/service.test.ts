@@ -18,6 +18,84 @@ afterEach(async () => {
 });
 
 describe("Layer service", () => {
+  it("creates a data-free Tile Grid layer through the generic Layer service", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "maptoy-layer-test-"));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(path.join(directory, "maptoy.sqlite"));
+    const repository = new LayerRepository(database.sqlite);
+    const layers = new LayerService(repository, layerPluginRegistry);
+
+    await expect(
+      layers.create({
+        name: "Tile Grid",
+        pluginId: "tile-grid-layer",
+        configuration: {},
+        data: {},
+        visible: true,
+        displayOrder: 0,
+        opacity: 1,
+        minimumZoom: null,
+        maximumZoom: null,
+      }),
+    ).resolves.toMatchObject({
+      pluginId: "tile-grid-layer",
+      configuration: {
+        showGrid: true,
+        showLabels: true,
+        showScale: true,
+        scaleWidthPercent: 75,
+      },
+      data: {},
+      status: "ready",
+    });
+    database.close();
+  });
+
+  it("migrates a Tile Grid pixel width to a Tile percentage", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "maptoy-layer-test-"));
+    temporaryDirectories.push(directory);
+    const database = await openDatabase(path.join(directory, "maptoy.sqlite"));
+    const repository = new LayerRepository(database.sqlite);
+    repository.insert({
+      id: "legacy-tile-grid",
+      name: "Legacy Tile Grid",
+      pluginId: "tile-grid-layer",
+      pluginVersion: "0.2.2",
+      schemaVersion: 1,
+      configuration: {
+        showGrid: true,
+        showLabels: true,
+        showScale: true,
+        scaleMaximumWidth: 192,
+      },
+      data: {},
+      visible: true,
+      displayOrder: 0,
+      opacity: 1,
+      minimumZoom: null,
+      maximumZoom: null,
+      status: "ready",
+      diagnostic: null,
+      createdAt: "2026-08-30T00:00:00.000Z",
+      updatedAt: "2026-08-30T00:00:00.000Z",
+    });
+
+    const layers = new LayerService(repository, layerPluginRegistry);
+    await layers.initialize();
+
+    expect(layers.get("legacy-tile-grid")).toMatchObject({
+      schemaVersion: 2,
+      configuration: {
+        showGrid: true,
+        showLabels: true,
+        showScale: true,
+        scaleWidthPercent: 75,
+      },
+      status: "ready",
+    });
+    database.close();
+  });
+
   it("preserves effective Track opacity while migrating schema 1", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "maptoy-layer-test-"));
     temporaryDirectories.push(directory);

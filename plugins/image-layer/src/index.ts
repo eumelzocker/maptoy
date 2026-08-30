@@ -158,6 +158,11 @@ export const imageLayerPlugin = {
       serverPreview: false,
       serverRender: true,
     },
+    requiredRendererLayerTypes: [
+      "point-collection",
+      "raster-overlay",
+      "composite",
+    ],
   },
   shared: {
     validateConfiguration,

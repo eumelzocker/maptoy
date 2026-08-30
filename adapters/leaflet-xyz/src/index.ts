@@ -7,12 +7,20 @@ import {
   isMapPointLayerData,
   isMapRasterOverlayLayerData,
   isMapRectangleLayerData,
+  isMapXyzTileGridLayerData,
   type MapLayerDescriptor,
   type MapRendererEvent,
   type MapRendererFactory,
   type MapRendererInstance,
   type MapRendererManifest,
 } from "@maptoy/map-adapter-sdk";
+import {
+  geodesicDistanceMeters,
+  type SegmentedMetricScale,
+  segmentedMetricScale,
+  type TileCoordinate,
+  xyzToWgs84,
+} from "@maptoy/map-core";
 import type * as Leaflet from "leaflet";
 
 export const LEAFLET_XYZ_ADAPTER_ID = "leaflet-xyz";
@@ -33,6 +41,15 @@ export const leafletXyzManifest = {
     tileArchive: true,
     batchDownload: true,
   },
+  supportedLayerTypes: [
+    "rectangle-grid",
+    "point-collection",
+    "line-collection",
+    "area-collection",
+    "raster-overlay",
+    "xyz-tile-grid",
+    "composite",
+  ],
 } satisfies MapRendererManifest;
 
 export interface LeafletXyzConfiguration {
@@ -55,6 +72,76 @@ export function leafletXyzZoomOptions(
     minZoom: value.minZoom + displayZoomOffset,
     maxZoom: value.maxZoom + displayZoomOffset,
     zoomOffset: displayZoomOffset === 0 ? 0 : -displayZoomOffset,
+  };
+}
+
+function leafletXyzSourceTile(
+  coordinates: Readonly<{ x: number; y: number; z: number }>,
+  zoomOffset: number,
+): TileCoordinate {
+  const sourceZoom = coordinates.z + zoomOffset;
+  const scale = 2 ** sourceZoom;
+  const canonicalX = ((coordinates.x % scale) + scale) % scale;
+  return { zoom: sourceZoom, x: canonicalX, y: coordinates.y };
+}
+
+export function leafletXyzTileLabel(
+  coordinates: Readonly<{ x: number; y: number; z: number }>,
+  zoomOffset: number,
+): string {
+  const source = leafletXyzSourceTile(coordinates, zoomOffset);
+  return `${source.zoom}/${source.x}/${source.y}`;
+}
+
+export interface LeafletXyzTileDecoration {
+  label: string;
+  scale: SegmentedMetricScale;
+}
+
+export interface HorizontalLabelBounds {
+  left: number;
+  right: number;
+}
+
+export function nonOverlappingScaleMarkIndexes(
+  bounds: readonly HorizontalLabelBounds[],
+  minimumGap = 2,
+): readonly number[] {
+  const visible: number[] = [];
+  let nextVisibleLeft = Number.POSITIVE_INFINITY;
+  for (let index = bounds.length - 1; index >= 0; index -= 1) {
+    const mark = bounds[index];
+    if (
+      mark !== undefined &&
+      (visible.length === 0 || mark.right + minimumGap <= nextVisibleLeft)
+    ) {
+      visible.unshift(index);
+      nextVisibleLeft = mark.left;
+    }
+  }
+  return visible;
+}
+
+export function leafletXyzTileDecoration(
+  coordinates: Readonly<{ x: number; y: number; z: number }>,
+  zoomOffset: number,
+  scaleWidthPercent: number,
+): LeafletXyzTileDecoration {
+  const source = leafletXyzSourceTile(coordinates, zoomOffset);
+  const westernCenter = xyzToWgs84({
+    zoom: source.zoom,
+    x: source.x,
+    y: source.y + 0.5,
+  });
+  const easternCenter = xyzToWgs84({
+    zoom: source.zoom,
+    x: source.x + 1,
+    y: source.y + 0.5,
+  });
+  const tileWidthMeters = geodesicDistanceMeters(westernCenter, easternCenter);
+  return {
+    label: `${source.zoom}/${source.x}/${source.y}`,
+    scale: segmentedMetricScale(tileWidthMeters * (scaleWidthPercent / 100)),
   };
 }
 
@@ -124,10 +211,12 @@ async function createLeafletInstance(
     zoomOffset: zoomOptions.zoomOffset,
   }).addTo(map);
 
-  const layers = new Map<
-    string,
-    { descriptor: MapLayerDescriptor; leafletLayer: Leaflet.LayerGroup | null }
-  >();
+  interface RenderedLayer {
+    descriptor: MapLayerDescriptor;
+    leafletLayer: Leaflet.Layer | null;
+  }
+
+  const layers = new Map<string, RenderedLayer>();
   const selectionListeners = new Set<(payload: unknown) => void>();
   const subscriptions = new Set<{
     event: string;
@@ -345,20 +434,181 @@ async function createLeafletInstance(
     return group;
   };
 
+  const createXyzTileGridLayer = (
+    descriptor: MapLayerDescriptor,
+  ): Leaflet.GridLayer | null => {
+    if (
+      descriptor.type !== "xyz-tile-grid" ||
+      !isMapXyzTileGridLayerData(descriptor.data)
+    ) {
+      return null;
+    }
+    const data = descriptor.data;
+    class XyzTileGridLayer extends L.GridLayer {
+      override createTile(coordinates: Leaflet.Coords): HTMLElement {
+        const tile = L.DomUtil.create("div", "maptoy-xyz-tile-grid-cell");
+        tile.style.boxSizing = "border-box";
+        tile.style.boxShadow = data.showGrid
+          ? `inset 0 0 0 1px ${data.lineColor}`
+          : "none";
+        tile.style.display = "grid";
+        tile.style.placeItems = "center";
+        tile.style.pointerEvents = "none";
+        if (data.showLabels || data.showScale) {
+          const decoration = leafletXyzTileDecoration(
+            coordinates,
+            zoomOptions.zoomOffset,
+            data.scaleWidthPercent,
+          );
+          if (data.showLabels) {
+            const label = L.DomUtil.create(
+              "span",
+              "maptoy-xyz-tile-grid-label",
+              tile,
+            );
+            label.textContent = decoration.label;
+            label.style.position = "absolute";
+            label.style.left = "50%";
+            label.style.top = "calc(50% - 1.35rem)";
+            label.style.transform = "translate(-50%, -50%)";
+            label.style.padding = "0.15rem 0.3rem";
+            label.style.borderRadius = "0.2rem";
+            label.style.color = data.textColor;
+            label.style.background = data.backgroundColor;
+            label.style.font = "600 0.75rem/1.2 ui-monospace, monospace";
+            label.style.whiteSpace = "nowrap";
+          }
+          if (data.showScale) {
+            const scale = L.DomUtil.create(
+              "div",
+              "maptoy-xyz-tile-scale",
+              tile,
+            );
+            scale.style.position = "absolute";
+            scale.style.left = "50%";
+            scale.style.top = "50%";
+            scale.style.width = `${data.scaleWidthPercent}%`;
+            scale.style.transform = "translate(-50%, -50%)";
+            scale.style.paddingTop = "0.1rem";
+            scale.style.borderRadius = "0.15rem";
+            scale.style.color = data.textColor;
+            scale.style.background = data.backgroundColor;
+            scale.style.font = "600 0.55rem/1 ui-monospace, monospace";
+            scale.style.whiteSpace = "nowrap";
+            const marks = L.DomUtil.create(
+              "div",
+              "maptoy-xyz-tile-scale-marks",
+              scale,
+            );
+            marks.style.position = "relative";
+            marks.style.height = "0.65rem";
+            const ticks = L.DomUtil.create(
+              "div",
+              "maptoy-xyz-tile-scale-ticks",
+              scale,
+            );
+            ticks.style.position = "absolute";
+            ticks.style.right = "0";
+            ticks.style.bottom = "0.35rem";
+            ticks.style.left = "0";
+            ticks.style.height = "0.2rem";
+            ticks.style.pointerEvents = "none";
+            const markElements: HTMLElement[] = [];
+            for (const [index, mark] of decoration.scale.marks.entries()) {
+              const markElement = L.DomUtil.create(
+                "span",
+                "maptoy-xyz-tile-scale-label",
+                marks,
+              );
+              markElement.textContent = mark.label;
+              markElement.style.position = "absolute";
+              markElement.style.left = `${mark.position * 100}%`;
+              markElement.style.transform =
+                index === decoration.scale.marks.length - 1
+                  ? "translateX(-100%)"
+                  : "translateX(-50%)";
+              markElements.push(markElement);
+              const tickElement = L.DomUtil.create(
+                "span",
+                "maptoy-xyz-tile-scale-tick",
+                ticks,
+              );
+              tickElement.style.position = "absolute";
+              tickElement.style.bottom = "0";
+              tickElement.style.left = `${mark.position * 100}%`;
+              tickElement.style.width = "1px";
+              tickElement.style.height = "100%";
+              tickElement.style.background = "currentColor";
+              tickElement.style.transform = "translateX(-50%)";
+            }
+            requestAnimationFrame(() => {
+              if (!scale.isConnected) {
+                return;
+              }
+              const visibleIndexes = new Set(
+                nonOverlappingScaleMarkIndexes(
+                  markElements.map((element) =>
+                    element.getBoundingClientRect(),
+                  ),
+                ),
+              );
+              for (const [index, element] of markElements.entries()) {
+                element.hidden = !visibleIndexes.has(index);
+              }
+            });
+            const scaleLine = L.DomUtil.create(
+              "div",
+              "maptoy-xyz-tile-scale-line",
+              scale,
+            );
+            scaleLine.style.display = "flex";
+            scaleLine.style.width = "100%";
+            scaleLine.style.height = "0.35rem";
+            scaleLine.style.boxSizing = "border-box";
+            scaleLine.style.overflow = "hidden";
+            scaleLine.style.border = "1px solid #111111";
+            for (const section of decoration.scale.sections) {
+              const sectionElement = L.DomUtil.create(
+                "span",
+                "maptoy-xyz-tile-scale-section",
+                scaleLine,
+              );
+              sectionElement.style.flex = `0 0 ${section.width * 100}%`;
+              sectionElement.style.background = section.dark
+                ? "#111111"
+                : "#ffffff";
+            }
+          }
+        }
+        return tile;
+      }
+    }
+    return new XyzTileGridLayer({
+      tileSize: leafletConfiguration.tileSize,
+      opacity: descriptor.opacity,
+      updateWhenZooming: true,
+      updateWhenIdle: false,
+      zIndex: 500,
+    });
+  };
+
   const createDescriptorLayer = (
     descriptor: MapLayerDescriptor,
-  ): Leaflet.LayerGroup | null => {
+  ): Leaflet.Layer | null => {
     if (
       descriptor.type === "composite" &&
       isMapCompositeLayerData(descriptor.data)
     ) {
       const group = L.layerGroup();
       for (const data of descriptor.data.layers) {
-        createDescriptorLayer({
+        const child = createDescriptorLayer({
           ...descriptor,
           type: data.kind,
           data,
-        })?.addTo(group);
+        });
+        if (child !== null) {
+          group.addLayer(child);
+        }
       }
       return group;
     }
@@ -367,22 +617,27 @@ async function createLeafletInstance(
       createPointLayer(descriptor) ??
       createLineLayer(descriptor) ??
       createAreaLayer(descriptor) ??
-      createRasterOverlayLayer(descriptor)
+      createRasterOverlayLayer(descriptor) ??
+      createXyzTileGridLayer(descriptor)
     );
+  };
+
+  const removeRenderedLayer = (rendered: RenderedLayer): void => {
+    rendered.leafletLayer?.removeFrom(map);
   };
 
   const replaceLayer = (descriptor: MapLayerDescriptor): void => {
     const previous = layers.get(descriptor.id);
-    if (
-      previous?.leafletLayer !== null &&
-      previous?.leafletLayer !== undefined
-    ) {
-      previous.leafletLayer.removeFrom(map);
+    if (previous !== undefined) {
+      removeRenderedLayer(previous);
     }
-    const leafletLayer = createDescriptorLayer(descriptor);
-    layers.set(descriptor.id, { descriptor, leafletLayer });
-    if (descriptor.visible && leafletLayer !== null) {
-      leafletLayer.addTo(map);
+    const rendered = {
+      descriptor,
+      leafletLayer: createDescriptorLayer(descriptor),
+    };
+    layers.set(descriptor.id, rendered);
+    if (descriptor.visible) {
+      rendered.leafletLayer?.addTo(map);
     }
   };
 
@@ -473,15 +728,22 @@ async function createLeafletInstance(
       }
       for (const layerId of layerIds) {
         const leafletLayer = layers.get(layerId)?.leafletLayer;
-        leafletLayer?.eachLayer((child) => {
-          if (child instanceof L.Path) {
-            child.bringToFront();
-          }
-        });
+        if (leafletLayer instanceof L.LayerGroup) {
+          leafletLayer.eachLayer((child: Leaflet.Layer) => {
+            if (child instanceof L.Path || child instanceof L.GridLayer) {
+              child.bringToFront();
+            }
+          });
+        } else if (leafletLayer instanceof L.GridLayer) {
+          leafletLayer.bringToFront();
+        }
       }
     },
     removeLayer: (layerId) => {
-      layers.get(layerId)?.leafletLayer?.removeFrom(map);
+      const rendered = layers.get(layerId);
+      if (rendered !== undefined) {
+        removeRenderedLayer(rendered);
+      }
       layers.delete(layerId);
     },
     geographicToScreen: ({ longitude, latitude }) => {
@@ -498,8 +760,8 @@ async function createLeafletInstance(
       }
       subscriptions.clear();
       selectionListeners.clear();
-      for (const { leafletLayer } of layers.values()) {
-        leafletLayer?.removeFrom(map);
+      for (const rendered of layers.values()) {
+        removeRenderedLayer(rendered);
       }
       layers.clear();
       map.remove();

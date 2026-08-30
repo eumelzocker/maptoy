@@ -22,6 +22,8 @@ interface MapContextMenuState {
   showMapSelector: boolean;
   showCoordinates: boolean;
   showAttribution: boolean;
+  showTileGrid: boolean;
+  tileGridAvailable: boolean;
 }
 
 export const mapContextMenuIds = {
@@ -38,6 +40,7 @@ export const mapContextMenuIds = {
   showMapSelector: "option-show-map-selector",
   showCoordinates: "option-show-coordinates",
   showAttribution: "option-show-attribution",
+  showTileGrid: "option-show-tile-grid",
 } as const;
 
 export function createMapContextMenuItems(
@@ -176,6 +179,12 @@ export function createMapContextMenuItems(
           id: mapContextMenuIds.showAttribution,
           label: "Show Attribution",
           checked: state.showAttribution,
+        },
+        {
+          id: mapContextMenuIds.showTileGrid,
+          label: "Show Tile Grid",
+          checked: state.showTileGrid,
+          disabled: !state.tileGridAvailable,
         },
       ],
     },

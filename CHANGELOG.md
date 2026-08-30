@@ -4,13 +4,27 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-30
+
 ### Added
 
+- Added an off-by-default **Show Tile Grid** option to the Map display popup and
+  context menu. It reuses or creates the editable `Default Grid` Decorations layer
+  and keeps its browser-local toggle in sync with Layer visibility and deletion.
+- Added an asset-free, editable Tile Grid Decorations layer that outlines and labels
+  the active base map's visible source Tiles as `z/x/y`. It renders a centered,
+  latitude-aware metric scale in every Tile with configurable percentage width,
+  collision-safe labels, marker ticks, alternating subdivisions, and independently
+  transparent line, text, and background colors.
+- Added explicit renderer descriptor compatibility and registry-resolved,
+  schema-based Layer editors so decorative and future plugin types reuse the common
+  Layer lifecycle without plugin-specific branches in the editor shell.
 - Added an English Mapping Resources documentation page with curated references
   for geospatial standards, APIs, formats, tools, and open data catalogs.
 
 ### Changed
 
+- Placed every Layer's visibility and opacity controls on one row.
 - Vertically centered the Map view's Layer and Display Options.
 - Kept the Map viewport at least 400 by 400 pixels when the browser window is
   resized, using application scrolling below that size.

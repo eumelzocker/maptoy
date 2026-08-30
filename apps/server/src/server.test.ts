@@ -346,19 +346,24 @@ describe("maptoy server", () => {
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toEqual({ status: "ready" });
     expect(mapRenderers.json()).toMatchObject({
-      items: [{ id: "leaflet-xyz", sdkVersion: "1.0.0" }],
+      items: [{ id: "leaflet-xyz", sdkVersion: "1.1.0" }],
     });
     expect(layerPlugins.json()).toMatchObject({
       items: [
         {
           id: "track-layer",
-          sdkVersion: "1.1.0",
+          sdkVersion: "1.2.0",
           category: { id: "tracks", displayName: "Tracks" },
         },
         {
           id: "image-layer",
-          sdkVersion: "1.1.0",
+          sdkVersion: "1.2.0",
           category: { id: "images", displayName: "Images" },
+        },
+        {
+          id: "tile-grid-layer",
+          sdkVersion: "1.2.0",
+          category: { id: "decorations", displayName: "Decorations" },
         },
       ],
     });

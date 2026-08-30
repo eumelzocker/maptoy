@@ -5,12 +5,14 @@ import {
   loadShowAttribution,
   loadShowCoordinates,
   loadShowMapSelector,
+  loadShowTileGrid,
   loadShowTitleBar,
   saveCachedTilesOnly,
   saveCoordinateFormat,
   saveShowAttribution,
   saveShowCoordinates,
   saveShowMapSelector,
+  saveShowTileGrid,
   saveShowTitleBar,
 } from "./mapDisplayPreferences.js";
 
@@ -30,6 +32,7 @@ describe("Map display preferences", () => {
     expect(loadShowTitleBar(storage)).toBe(true);
     expect(loadShowMapSelector(storage)).toBe(true);
     expect(loadCachedTilesOnly(storage)).toBe(false);
+    expect(loadShowTileGrid(storage)).toBe(false);
     expect(loadCoordinateFormat(storage)).toBe("dd");
   });
 
@@ -40,12 +43,14 @@ describe("Map display preferences", () => {
     saveShowTitleBar(false, storage);
     saveShowMapSelector(false, storage);
     saveCachedTilesOnly(true, storage);
+    saveShowTileGrid(true, storage);
     saveCoordinateFormat("dms", storage);
     expect(loadShowCoordinates(storage)).toBe(false);
     expect(loadShowAttribution(storage)).toBe(false);
     expect(loadShowTitleBar(storage)).toBe(false);
     expect(loadShowMapSelector(storage)).toBe(false);
     expect(loadCachedTilesOnly(storage)).toBe(true);
+    expect(loadShowTileGrid(storage)).toBe(true);
     expect(loadCoordinateFormat(storage)).toBe("dms");
   });
 
@@ -59,6 +64,7 @@ describe("Map display preferences", () => {
     expect(loadShowTitleBar(storage)).toBe(true);
     expect(loadShowMapSelector(storage)).toBe(true);
     expect(loadCachedTilesOnly(storage)).toBe(false);
+    expect(loadShowTileGrid(storage)).toBe(false);
     expect(loadCoordinateFormat(storage)).toBe("dd");
   });
 
@@ -70,5 +76,6 @@ describe("Map display preferences", () => {
     expect(loadShowTitleBar(storage)).toBe(true);
     expect(loadShowMapSelector(storage)).toBe(true);
     expect(loadCachedTilesOnly(storage)).toBe(false);
+    expect(loadShowTileGrid(storage)).toBe(false);
   });
 });

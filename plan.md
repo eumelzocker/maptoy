@@ -193,12 +193,12 @@ Footprint kann bei Bedarf als Fläche abgeleitet werden.
 Neben Deskriptoren für persistierte Geometrie und Rasterdaten unterstützt das SDK
 zustandsabgeleitete Dekorationsdeskriptoren. Deren sichtbarer Inhalt wird aus
 Viewport, Projektion und aktiver Tile-Matrix berechnet und nicht als Feature- oder
-Assetdaten persistiert. Initial stehen `xyz-tile-grid` für ein weltbezogenes Raster
-der tatsächlich verwendeten Source-Tiles und `scale-bar` für eine
-bildschirmbezogene Maßstabsleiste bereit. Ein Plugin veröffentlicht nur die
-deklarative Konfiguration; der Renderer aktualisiert die Darstellung bei Pan, Zoom
-und Basiskartenwechsel selbstständig. Plugins erhalten dafür weder Zugriff auf
-Leaflet noch auf Map-Set- oder globale UI-Stores.
+Assetdaten persistiert. Initial steht `xyz-tile-grid` für ein weltbezogenes Raster
+der tatsächlich verwendeten Source-Tiles bereit, das Grenzen, `z/x/y`-Beschriftung
+und eine lokale metrische Maßstabsleiste je Tile gemeinsam beschreibt. Ein Plugin
+veröffentlicht nur die deklarative Konfiguration; der Renderer aktualisiert die
+Darstellung bei Pan, Zoom und Basiskartenwechsel selbstständig. Plugins erhalten
+dafür weder Zugriff auf Leaflet noch auf Map-Set- oder globale UI-Stores.
 
 Einfache Plugin-Konfigurationen werden aus validiertem Konfigurationsschema und
 typisierten UI-Hinweisen in einem gemeinsamen Editor dargestellt. Plugins mit
@@ -524,12 +524,17 @@ Persistenzmodell aus `/`-Segmenten des verpflichtenden Layernamens, beispielswei
 
 Der unter `Decorations` angebotene `tile-grid-layer` benötigt weder Import noch
 Assets. Sein Editor konfiguriert, ob Tile-Raster samt Koordinatenbeschriftung und die
-metrische Maßstabsleiste sichtbar sind, sowie deren Farben und die maximale Breite
-der Maßstabsleiste. Die allgemeinen Layerwerte steuern weiterhin Deckkraft und
-Zoomgrenzen. Die Maßstabsleiste liegt als Bildschirmdekoration in einer festen
-Renderer-Ebene über den weltbezogenen Layern; die Layer-Reihenfolge betrifft den
-weltbezogenen Rasteranteil, während Sichtbarkeit und Deckkraft auf beide Teile
-wirken.
+metrische Maßstabsleiste sichtbar sind, sowie deren Farben und die Breite der
+Maßstabsleiste als Anteil von 25 bis 100 Prozent der Tile-Breite. Die allgemeinen
+Layerwerte steuern weiterhin Deckkraft und Zoomgrenzen. Jede sichtbare Tile-Zelle
+enthält ihre eigene, für deren geografische Lage berechnete Maßstabsleiste. Deren
+Breite bleibt innerhalb aller Tiles gleich; beschriftete und
+visuell unterteilte Intervalle weisen die lokal dargestellte Distanz aus. Raster,
+Beschriftung und Maßstab liegen gemeinsam in der weltbezogenen Renderer-Ebene und
+folgen derselben Layer-Reihenfolge, Sichtbarkeit und Deckkraft.
+Die Display Options bieten zusätzlich einen einfachen Grid-Schalter. Er verwendet
+einen vorhandenen Tile-Grid-Layer namens `Default Grid` unverändert oder erzeugt ihn
+bei Bedarf mit Standardkonfiguration; die Detailbearbeitung bleibt im Layer-Panel.
 
 ### 7.2 Bedienprinzipien
 
@@ -766,7 +771,8 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
   Feature-/Stützpunkteigenschaften, Ringvalidierung und Trennung von Geometrie und Stil
 - adapterneutrale Darstellungsdeskriptoren und Symbolisierung für Punkt, Linie, Fläche
   sowie den gesonderten Raster-Overlay-Typ
-- zustandsabgeleitete Deskriptoren für XYZ-Tile-Raster und Maßstabsleiste,
+- den zustandsabgeleiteten Deskriptor für XYZ-Tile-Raster, Beschriftung und lokale
+  Maßstabsleiste je Tile,
   Capability-Abgleich sowie kanonische Source-Tile-Auswahl bei Viertel-Zoom,
   Tile-Größen-Offset und World-Wrapping
 - geodätische Distanz und Rundung metrischer Maßstabswerte für definierte
@@ -795,8 +801,8 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Export mit Track- und Bildoverlay
 - persistenter, assetfreier Tile-Grid-Layer mit korrekten `z/x/y`-Beschriftungen
   bei Pan, Viertel-Zoomstufen, 256-/512-Pixel-Tiles, Zoom-Offset und World-Wrapping
-- koordinatenabhängige Maßstabsleiste an mehreren Breitengraden sowie konsistente
-  Neuberechnung nach Viewport- und Map-Set-Wechsel
+- koordinatenabhängige Maßstabsleisten in jedem sichtbaren Tile an mehreren
+  Breitengraden sowie konsistente Neuberechnung nach Viewport- und Map-Set-Wechsel
 - Plugin-Registry und isolierter Aufruf von Import-, Asset- und Export-Hooks
 - Verhalten bei fehlendem oder inkompatiblem Plugin ohne Verlust persistierter Layerdaten
 - Scan einer konfigurierten Read-only-Bildwurzel mit automatischer EXIF-Position,
@@ -1118,11 +1124,16 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 
 ### Phase 5a: Zustandsabgeleitete dekorative Layer
 
+**Status:** Interaktiver Kernumfang am 30. August 2026 mit Version `0.2.3`
+veröffentlicht; die serverseitige Ausgabe desselben Deskriptors bleibt Bestandteil
+von Phase 7
+
 **Aufgaben**
 
-- versionierte, adapterneutrale Deskriptoren `xyz-tile-grid` und `scale-bar` im
-  Map-Adapter- und Layer-Plugin-SDK ergänzen; Renderer-Manifeste weisen unterstützte
-  Deskriptorarten aus und Plugins deklarieren ihre Anforderungen
+- einen versionierten, adapterneutralen Deskriptor `xyz-tile-grid` im Map-Adapter-
+  und Layer-Plugin-SDK ergänzen, der Raster, `z/x/y`-Beschriftung und lokale
+  Maßstabsleiste je Tile gemeinsam konfiguriert; Renderer-Manifeste weisen
+  unterstützte Deskriptorarten aus und Plugins deklarieren ihre Anforderungen
 - bestehende XYZ-Umrechnungen in `map-core` für sichtbare kanonische Tile-Bereiche
   wiederverwenden und dort gemeinsame, projektionsunabhängig nutzbare Grundlagen für
   geodätische Distanz sowie gut lesbar gerundete metrische Maßstabswerte ergänzen
@@ -1131,26 +1142,28 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
   Renderer-Zoom-Offset und World-Wrapping dürfen Beschriftung und geladene Tile-URL
   nicht auseinanderlaufen lassen
 - `xyz-tile-grid` im Leaflet-/XYZ-Adapter als dynamisch aktualisierte weltbezogene
-  Darstellung der sichtbaren Tile-Grenzen mit kanonischer Beschriftung `z/x/y`
-  implementieren; Pan und Zoom erzeugen keine persistierten Features und bauen die
-  Layer-Instanz nicht neu auf
-- `scale-bar` als feste Bildschirmdekoration implementieren, deren metrische Länge
-  aus Projektion, Ankerposition und Bildschirmbreite berechnet und auf einen gut
-  lesbaren Wert gerundet wird
-- beide Deskriptoren im Fake-Adapter und in gemeinsamen Adapter-Contract-Tests
-  abdecken; Anfügen, Aktualisieren, Sichtbarkeit, Deckkraft, Entfernen,
-  Renderer-Neuaufbau und vollständiges Aufräumen von Ereignis-Listenern prüfen
+  Darstellung der sichtbaren Tile-Grenzen mit kanonischer Beschriftung `z/x/y` und
+  einer eigenen Maßstabsleiste in jeder Tile-Zelle implementieren;
+  deren feste prozentuale Breite wird auf die lokale metrische Länge des Source-Tiles
+  abgebildet und mit gut lesbaren, segmentierten Intervallen dargestellt; Pan und
+  Zoom erzeugen keine persistierten Features und bauen die Layer-Instanz nicht neu
+  auf
+- den Deskriptor im Fake-Adapter und in gemeinsamen Adapter-Contract-Tests abdecken;
+  Anfügen, Aktualisieren, Sichtbarkeit, Deckkraft, Entfernen, Renderer-Neuaufbau und
+  vollständiges Aufräumen prüfen
 - das vertrauenswürdige Plugin `tile-grid-layer` unter der Kategorie `Decorations`
-  registrieren; es veröffentlicht beide Deskriptoren als zusammengesetzten Layer,
-  verwendet ein leeres Datenobjekt und besitzt weder Asset-, Import- noch Job-Hooks
+  registrieren; es veröffentlicht den Dekorationsdeskriptor im allgemeinen
+  Layer-Lebenszyklus, verwendet ein leeres Datenobjekt und besitzt weder Asset-,
+  Import- noch Job-Hooks
 - einen gemeinsamen schemabasierten Konfigurationseditor für einfache Plugins sowie
   eine Registry-Auflösung für Spezialeditoren einführen; die Layer-Editor-Shell darf
   für den neuen Plugin-Typ keine weitere Plugin-ID-Verzweigung erhalten
 - Tile-Raster, Beschriftung und Maßstabsleiste jeweils konfigurierbar machen;
-  Linien-/Textfarben und maximale Breite der Maßstabsleiste als Plugin-Konfiguration,
-  Deckkraft und Zoomgrenzen weiterhin ausschließlich als allgemeine Layerwerte führen
-- SDK- und Plugin-Dokumentation um zustandsabgeleitete Layer, Deskriptor-Capabilities
-  sowie die Trennung welt- und bildschirmbezogener Dekorationen ergänzen
+  Linien-/Textfarben und eine Maßstabsbreite zwischen 25 und 100 Prozent der
+  Tile-Breite als Plugin-Konfiguration, Deckkraft und Zoomgrenzen weiterhin
+  ausschließlich als allgemeine Layerwerte führen
+- SDK- und Plugin-Dokumentation um zustandsabgeleitete Layer,
+  Deskriptor-Capabilities und lokale Dekorationen je Tile ergänzen
 
 **Ergebnis/Akzeptanz**
 
@@ -1159,9 +1172,11 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 - Raster und Beschriftungen bleiben bei Pan, Viertel-Zoomstufen,
   256-/512-Pixel-Tiles, Renderer-Zoom-Offset, Datumsgrenzenüberschreitung und
   World-Wrapping mit der Basiskarte deckungsgleich.
-- Die kleine metrische Maßstabsleiste reagiert ohne verzögerte Plugin-Neumontage auf
-  Zoom und geografische Breite und verwendet in interaktiver Ansicht und späterem
-  Export dieselbe Distanz- und Rundungslogik.
+- Jedes sichtbare Tile enthält eine kleine metrische Maßstabsleiste, die ohne
+  verzögerte Plugin-Neumontage auf Source-Zoom und lokale geografische Breite
+  reagiert, bei gleicher konfigurierter Breite lesbare Distanzen ausweist sowie in
+  interaktiver Ansicht und späterem Export dieselbe Distanz-, Rundungs- und
+  Segmentierungslogik verwendet.
 - Der dekorative Layer wird über den vorhandenen Add-Layer-Dialog angelegt und nutzt
   unverändert Name, Hierarchie, Persistenz, Sichtbarkeit, Reihenfolge, Deckkraft,
   Zoomgrenzen, Diagnose und Löschen des allgemeinen Layer-Systems.
@@ -1206,10 +1221,9 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 - gewählte Zielprojektionen ergänzen
 - serverseitige Layer-Plugin-Hooks in den Exportablauf integrieren
 - Track- und Bild-Referenz-Plugins für alle unterstützten Zielprojektionen rendern
-- die Deskriptoren `xyz-tile-grid` und `scale-bar` serverseitig rendern; das
-  XYZ-Raster bezeichnet weiterhin die Source-Tiles und wird in die Zielprojektion
-  abgebildet, während die Maßstabsleiste als Bildschirmdekoration aus dem
-  Exportausschnitt berechnet wird
+- den Deskriptor `xyz-tile-grid` serverseitig rendern; das XYZ-Raster bezeichnet
+  weiterhin die Source-Tiles und wird mit `z/x/y`-Beschriftung sowie der lokal je
+  Tile berechneten Maßstabsleiste in die Zielprojektion abgebildet
 - externe Bildoriginale für hochauflösende Raster-Overlays nur über den
   kontrollierten Asset-Resolver und bei passendem gespeicherten Fingerprint lesen;
   für fehlende oder geänderte Quellen eine konfigurierbare, verständliche
@@ -1222,8 +1236,9 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 - Ein Kartenausschnitt wird in jeder unterstützten Ausgabeart und Projektion korrekt erzeugt.
 - Testtrack, GPS-Bild und Bounds-Bild liegen nach Projektion visuell und numerisch an den erwarteten Koordinaten.
 - Tile-Grenzen und `z/x/y`-Beschriftungen entsprechen in allen unterstützten
-  Zielprojektionen denselben Source-Tiles; die Maßstabsleiste zeigt für definierte
-  Ausschnitte und Breitengrade numerisch korrekte, gut lesbar gerundete Werte.
+  Zielprojektionen denselben Source-Tiles; die Maßstabsleisten der einzelnen Tiles
+  zeigen für definierte Ausschnitte und Breitengrade numerisch korrekte, gut lesbar
+  gerundete Werte.
 - Der Export nutzt Plugin-Daten und -Stile konsistent zur interaktiven Ansicht, soweit die Ausgabemedien dies zulassen.
 - Fehlende Tiles, inkompatible Plugins und zu große Exporte führen zu einer vorhersehbaren, verständlichen Reaktion.
 
@@ -1299,6 +1314,7 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.2.0` | Kernumfang von Phase 5: Layer-Plugin-System, Track-/Bildlayer, globaler Overlay-Stack, externer Bildkatalog und persistente Scan-Jobs |
 | `0.2.1` | Skalierbare Layer- und Hauptnavigation, vereinheitlichte Track-Deckkraftmigration sowie gruppierte Dokumentationsnavigation |
 | `0.2.2` | Koordinatenformate, verfeinerte Map-Set-Auswahl und Tile-Vorschau sowie OpenTopoMap als zugangsdatenfreie Erststartvorgabe |
+| `0.2.3` | Dekorativer Tile-Grid-Layer mit lokalen Maßstabsleisten, schnellem Display-Schalter und Mapping-Ressourcen |
 
 ### 13.2 Weitere Releases
 
@@ -1342,7 +1358,7 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 | Leaflet-Details gelangen in fachliche Komponenten | späterer Renderer-Adapter erfordert großen Umbau | eigene Adapter-Schnittstelle, Importgrenzen und Contract-Test mit Fake-Adapter |
 | Plugin-Schnittstelle ist zu eng oder instabil | weitere Layertypen benötigen Kernänderungen | versionierte Geometriegrundlagen und zustandsabgeleitete Dekorationsdeskriptoren, getrennte Feature-/Stützpunkteigenschaften und Symbolisierung, explizite Descriptor-Capabilities, datenbasierte und assetfreie Referenz-Plugins sowie Contract-Tests |
 | Tile-Grid zeigt bei Viertel-Zoom, 512-Pixel-Tiles oder World-Wrapping andere Koordinaten als die Basiskarte tatsächlich lädt | Diagnose und gezielter Tile-Abruf verwenden falsche `z/x/y`-Werte | tatsächlichen ganzzahligen Source-Zoom und kanonische Tile-Koordinaten im Renderer bestimmen, gemeinsame XYZ-Mathematik aus `map-core` verwenden und alle Offset-/Wrap-Fälle testen |
-| Maßstabsleiste unterscheidet sich zwischen Browser und Export oder ist in hohen Breitengraden falsch | kartografisch irreführende Längenangabe | gemeinsame geodätische Distanz- und Rundungslogik, Berechnung an einer definierten Ankerposition sowie numerische Tests über mehrere Breitengrade und Projektionen |
+| Maßstabsleiste unterscheidet sich zwischen Browser und Export oder ist in hohen Breitengraden falsch | kartografisch irreführende Längenangabe | gemeinsame geodätische Distanz- und Rundungslogik, Berechnung am Mittelpunkt jedes Source-Tiles sowie numerische Tests über mehrere Breitengrade und Projektionen |
 | Plugin oder Dateiimport verarbeitet schädliche Inhalte | Codeausführung, Datenleck oder Ressourcenverbrauch | nur vertrauenswürdige Buildzeit-Plugins, kontrollierte Hooks, sichere Decoder und harte Limits |
 | Konfigurierte Bildwurzel oder Originalbild fehlt beziehungsweise wurde geändert | Bildanzeige oder reproduzierbarer hochauflösender Export ist eingeschränkt | Metadaten und Vorschau erhalten, Fingerprint prüfen, Zustand `missing`/`changed` anzeigen und keine automatische Löschung oder unbemerkte Ersetzung |
 | Bildscan verlässt über Pfad oder Symlink die konfigurierte Wurzel | Zugriff auf nicht freigegebene Hostdateien | nur Wurzel-IDs und normalisierte relative Pfade akzeptieren, reale Zielpfade gegen die Read-only-Wurzel prüfen und absolute Pfade nicht offenlegen |
@@ -1379,8 +1395,8 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
   ohne Laufzeitfeatures oder ein paralleles Layer-System zu speichern;
 - der Tile-Grid-Layer die tatsächlich verwendeten Source-Tiles bei Viertel-Zoom,
   256-/512-Pixel-Tiles und World-Wrapping korrekt als `z/x/y` bezeichnet und seine
-  metrische Maßstabsleiste abhängig von Ausschnitt und geografischer Breite korrekt
-  berechnet;
+  metrische Maßstabsleiste in jedem sichtbaren Tile abhängig von Source-Zoom und
+  geografischer Breite korrekt berechnet;
 - verwaltete Nicht-Bild-Assets über Frontend und API hochgeladen und validiert werden
   können und sämtliche Layer ausschließlich kontrollierte Asset-IDs statt frei
   zusammengesetzter Dateipfade referenzieren;
@@ -1395,7 +1411,7 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
   verwenden, Bilder mit geografischen Bounds den gesonderten Raster-Overlay-Vertrag
   nutzen und alle Varianten interaktiv sowie im Export funktionieren;
 - Kartenbilder mit den dokumentierten Projektionen und Plugin-Layern einschließlich
-  projiziertem XYZ-Tile-Grid und koordinatenabhängiger Maßstabsleiste korrekt
+  projiziertem XYZ-Tile-Grid und koordinatenabhängiger Maßstabsleiste je Tile korrekt
   exportiert werden;
 - das vollständige englische App-Handbuch, die zur Serverversion passende API-Referenz, Provider-/Plugin-/Projektionsseiten und das Glossar integriert, englisch/deutsch durchsuchbar und kontextbezogen verlinkt sind;
 - Deutsch und Thai auswählbar sind und fehlende Übersetzungen sichtbar und funktionsfähig auf Englisch zurückfallen;

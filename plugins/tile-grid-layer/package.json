@@ -1,5 +1,5 @@
 {
-  "name": "@maptoy/leaflet-xyz",
+  "name": "@maptoy/tile-grid-layer",
   "version": "0.2.3",
   "private": true,
   "type": "module",
@@ -8,18 +8,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@maptoy/map-adapter-sdk": "workspace:*",
-    "@maptoy/map-core": "workspace:*",
-    "leaflet": "1.9.4"
-  },
-  "devDependencies": {
-    "@types/leaflet": "1.9.22"
+    "@maptoy/layer-plugin-sdk": "workspace:*"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./style.css": "./src/style.css"
+    }
   }
 }

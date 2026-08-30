@@ -7,8 +7,13 @@ import type {
   LayerInput,
   LayerPatch,
 } from "@maptoy/contracts";
+import { TILE_GRID_LAYER_PLUGIN_ID } from "@maptoy/tile-grid-layer";
 import { defineStore } from "pinia";
 import { apiRequest } from "../api.js";
+import {
+  DEFAULT_GRID_LAYER_NAME,
+  findDefaultGridLayer,
+} from "../defaultGridLayer.js";
 
 interface LayerListResponse {
   items: Layer[];
@@ -37,6 +42,10 @@ export const useLayersStore = defineStore("layers", {
     loaded: false,
     error: null as string | null,
   }),
+  getters: {
+    defaultGridLayer: (state): Layer | null =>
+      findDefaultGridLayer(state.items),
+  },
   actions: {
     async load(): Promise<void> {
       this.loading = true;
@@ -78,10 +87,7 @@ export const useLayersStore = defineStore("layers", {
       this.imageRoots = response.items;
     },
 
-    async create(
-      pluginId: "track-layer" | "image-layer",
-      name: string,
-    ): Promise<Layer> {
+    async create(pluginId: string, name: string): Promise<Layer> {
       const input: LayerInput = {
         name,
         pluginId,
@@ -100,6 +106,18 @@ export const useLayersStore = defineStore("layers", {
       this.items.push(layer);
       this.assetsByLayer[layer.id] = [];
       return layer;
+    },
+
+    async setDefaultGridVisible(visible: boolean): Promise<Layer | null> {
+      const existing = findDefaultGridLayer(this.items);
+      if (existing === null) {
+        return visible
+          ? this.create(TILE_GRID_LAYER_PLUGIN_ID, DEFAULT_GRID_LAYER_NAME)
+          : null;
+      }
+      return existing.visible === visible
+        ? existing
+        : this.update(existing.id, { visible });
     },
 
     async swapOrder(id: string, otherId: string): Promise<void> {

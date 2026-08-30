@@ -9,6 +9,7 @@ import {
   isMapPointLayerData,
   isMapRasterOverlayLayerData,
   isMapRectangleLayerData,
+  isMapXyzTileGridLayerData,
 } from "./index.js";
 
 describe("map renderer contract", () => {
@@ -67,6 +68,21 @@ describe("map renderer contract", () => {
     );
     expect(
       isMapRasterOverlayLayerData({ kind: "raster-overlay", features: [] }),
+    ).toBe(true);
+  });
+
+  it("recognizes the derived Tile Grid decoration descriptor", () => {
+    expect(
+      isMapXyzTileGridLayerData({
+        kind: "xyz-tile-grid",
+        lineColor: "#000000",
+        textColor: "#000000",
+        backgroundColor: "#ffffff",
+        showGrid: true,
+        showLabels: true,
+        showScale: true,
+        scaleWidthPercent: 75,
+      }),
     ).toBe(true);
   });
 

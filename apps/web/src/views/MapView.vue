@@ -3,9 +3,11 @@ import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
 import type {
   GeographicCoordinate,
   MapLayerDescriptor,
+  MapLayerType,
   MapRendererInstance,
 } from "@maptoy/map-adapter-sdk";
 import type { LayerPluginFrontendHandle } from "@maptoy/layer-plugin-sdk";
+import { TILE_GRID_LAYER_PLUGIN_ID } from "@maptoy/tile-grid-layer";
 import { documentation } from "virtual:maptoy-docs";
 import { storeToRefs } from "pinia";
 import {
@@ -50,11 +52,13 @@ import {
   loadShowAttribution,
   loadShowCoordinates,
   loadShowMapSelector,
+  loadShowTileGrid,
   saveCachedTilesOnly,
   saveCoordinateFormat,
   saveShowAttribution,
   saveShowCoordinates,
   saveShowMapSelector,
+  saveShowTileGrid,
 } from "../mapDisplayPreferences.js";
 import {
   createMapContextMenuItems,
@@ -102,6 +106,32 @@ const coordinateFormat = ref<CoordinateFormat>(
 );
 const showAttribution = ref(loadShowAttribution(browserStorage));
 const showMapSelector = ref(loadShowMapSelector(browserStorage));
+const storedShowTileGrid = ref(loadShowTileGrid(browserStorage));
+const defaultGridBusy = ref(false);
+const supportedLayerTypes = computed<readonly MapLayerType[]>(() =>
+  selected.value === null
+    ? []
+    : (factories.get(selected.value.rendererId)?.manifest.supportedLayerTypes ??
+      []),
+);
+const tileGridAvailable = computed(() => {
+  if (selected.value?.capabilities.layerRendering !== true) {
+    return false;
+  }
+  const supportedTypes = new Set(supportedLayerTypes.value);
+  const plugin = layerPlugins.get(TILE_GRID_LAYER_PLUGIN_ID);
+  return (
+    plugin?.frontend !== undefined &&
+    plugin.manifest.requiredRendererLayerTypes.every((type) =>
+      supportedTypes.has(type),
+    )
+  );
+});
+const showTileGrid = computed(() =>
+  layers.loaded
+    ? layers.defaultGridLayer?.visible === true
+    : storedShowTileGrid.value,
+);
 const displayOptionsPanel = ref<{ close: () => void } | null>(null);
 const gotoCoordinatesOpen = ref(false);
 const gotoInitialCoordinate = ref<GeographicCoordinate>({
@@ -162,6 +192,8 @@ const mapContextMenuItems = computed(() =>
     showMapSelector: showMapSelector.value,
     showCoordinates: showCoordinates.value,
     showAttribution: showAttribution.value,
+    showTileGrid: showTileGrid.value,
+    tileGridAvailable: tileGridAvailable.value && !defaultGridBusy.value,
   }),
 );
 let renderer: MapRendererInstance | null = null;
@@ -174,6 +206,10 @@ let layerOperation: Promise<void> = Promise.resolve();
 watch(showCoordinates, (value) => saveShowCoordinates(value, browserStorage));
 watch(coordinateFormat, (value) => saveCoordinateFormat(value, browserStorage));
 watch(showMapSelector, (value) => saveShowMapSelector(value, browserStorage));
+watch(showTileGrid, (value) => {
+  storedShowTileGrid.value = value;
+  saveShowTileGrid(value, browserStorage);
+});
 watch(controlZoom, (value) => mapViewState.setSourceZoom(value), {
   immediate: true,
 });
@@ -225,6 +261,14 @@ async function renderPluginLayers(): Promise<void> {
     }
     const plugin = layerPlugins.get(layer.pluginId);
     if (plugin?.frontend === undefined) {
+      continue;
+    }
+    const supportedTypes = new Set(supportedLayerTypes.value);
+    if (
+      plugin.manifest.requiredRendererLayerTypes.some(
+        (type) => !supportedTypes.has(type),
+      )
+    ) {
       continue;
     }
     const assets = (layers.assetsByLayer[layer.id] ?? []).map((asset) => ({
@@ -321,9 +365,13 @@ async function refreshLayerZoomVisibility(): Promise<void> {
       if (published === undefined) {
         return;
       }
+      const visible = layerIsVisibleAtCurrentZoom(layer);
+      if (published.visible === visible) {
+        return;
+      }
       const next = {
         ...published,
-        visible: layerIsVisibleAtCurrentZoom(layer),
+        visible,
       };
       publishedLayers.set(layer.id, next);
       await activeRenderer.updateLayer(next);
@@ -489,6 +537,8 @@ function selectMapContextMenuItem(item: MenuItem): void {
     openTileCalculator();
   } else if (item.id === mapContextMenuIds.cachedTilesOnly) {
     cachedTilesOnly.value = !cachedTilesOnly.value;
+  } else if (item.id === mapContextMenuIds.showTileGrid) {
+    void setDefaultGridVisible(!showTileGrid.value);
   } else if (item.id === mapContextMenuIds.showTitleBar) {
     showTitleBar.value = !showTitleBar.value;
   } else if (item.id === mapContextMenuIds.showMapSelector) {
@@ -497,6 +547,27 @@ function selectMapContextMenuItem(item: MenuItem): void {
     showCoordinates.value = !showCoordinates.value;
   } else if (item.id === mapContextMenuIds.showAttribution) {
     showAttribution.value = !showAttribution.value;
+  }
+}
+
+async function setDefaultGridVisible(visible: boolean): Promise<void> {
+  if (!tileGridAvailable.value || defaultGridBusy.value) {
+    return;
+  }
+  defaultGridBusy.value = true;
+  try {
+    if (!layers.loaded) {
+      await layers.load();
+    }
+    await layers.setDefaultGridVisible(visible);
+    await renderPluginLayers();
+  } catch (error) {
+    mapError.value =
+      error instanceof Error
+        ? error.message
+        : "The default Tile Grid could not be updated.";
+  } finally {
+    defaultGridBusy.value = false;
   }
 }
 
@@ -643,6 +714,7 @@ function selectCoordinateFormat(value: string): void {
         <LayerPanel
           v-if="selected"
           :enabled="selected.capabilities.layerRendering"
+          :supported-layer-types="supportedLayerTypes"
           placement="right"
           @changed="renderPluginLayers"
         />
@@ -698,6 +770,15 @@ function selectCoordinateFormat(value: string): void {
           <label class="check-field">
             <input v-model="showAttribution" type="checkbox" />
             <span>Show Attribution</span>
+          </label>
+          <label class="check-field">
+            <input
+              type="checkbox"
+              :checked="showTileGrid"
+              :disabled="!tileGridAvailable || defaultGridBusy"
+              @change="setDefaultGridVisible(($event.target as HTMLInputElement).checked)"
+            />
+            <span>Show Tile Grid</span>
           </label>
         </TogglePanel>
       </div>

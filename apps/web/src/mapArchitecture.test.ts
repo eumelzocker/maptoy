@@ -41,6 +41,8 @@ describe("Map view architecture", () => {
       coverageView,
       layerPanel,
       layerEditor,
+      layerEditorRegistry,
+      schemaLayerEditor,
       trackLayerEditor,
       imageLayerEditor,
       treeSelectDropdown,
@@ -62,6 +64,16 @@ describe("Map view architecture", () => {
       ),
       readFile(
         fileURLToPath(new URL("./components/LayerEditor.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./layerEditorRegistry.ts", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/SchemaLayerEditor.vue", import.meta.url),
+        ),
         "utf8",
       ),
       readFile(
@@ -108,9 +120,16 @@ describe("Map view architecture", () => {
     expect(layerPanel).toContain(':placeholder="suggestedLayerName"');
     expect(layerPanel).toContain("focusPrimaryLayerAction");
     expect(layerPanel).toContain(":suspend-outside-close=");
-    expect(layerEditor).toContain("TrackLayerEditor");
-    expect(layerEditor).toContain("ImageLayerEditor");
-    expect(layerEditor).toContain(':has-track="hasTrack(layer)"');
+    expect(layerEditor).toContain(':is="pluginEditor"');
+    expect(layerEditor).not.toContain("layer.pluginId ===");
+    expect(layerEditorRegistry).toContain("TrackLayerPluginEditor");
+    expect(layerEditorRegistry).toContain("ImageLayerPluginEditor");
+    expect(layerEditorRegistry).toContain('"tile-grid-layer"');
+    expect(schemaLayerEditor).toContain("configurationSchema.properties");
+    expect(schemaLayerEditor).toContain('class="color-fields"');
+    expect(schemaLayerEditor).toContain("colorAlphaPercent");
+    expect(schemaLayerEditor).toContain("field.property.uiControl === 'range'");
+    expect(layerEditor).toContain('class="layer-state-fields"');
     expect(trackLayerEditor).toContain("Import track…");
     expect(trackLayerEditor).toContain("Replace track…");
     expect(trackLayerEditor).toContain(':class="{ primary: !hasTrack }"');

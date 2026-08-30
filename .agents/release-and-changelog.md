@@ -16,6 +16,12 @@
   passenden weiteren Keep-a-Changelog-Kategorie eintragen. Nutzerrelevantes
   Verhalten, APIs, Persistenz, Betrieb und Dokumentation gehören hinein; reine
   Implementierungsdetails normalerweise nicht.
+- Features, die im aktuellen `Unreleased`-Stand erstmals hinzukommen, ausschließlich
+  ergebnisorientiert unter `Added` beschreiben. Anpassungen und Fehlerbehebungen
+  während ihrer noch unveröffentlichten Entwicklung nicht zusätzlich unter
+  `Changed` oder `Fixed` wiederholen, sondern in den bestehenden `Added`-Eintrag
+  einarbeiten. `Changed` und `Fixed` bleiben Änderungen an bereits veröffentlichten
+  oder davon unabhängigen bestehenden Funktionen vorbehalten.
 - Vor einem Release die angesammelten Einträge zusammenführen, Dopplungen entfernen
   und gegen den tatsächlichen Diff prüfen. Historische Release-Abschnitte nicht
   nachträglich umdeuten. Für das Release `Unreleased` als `## [x.y.z] - YYYY-MM-DD`

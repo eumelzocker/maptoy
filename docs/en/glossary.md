@@ -44,9 +44,11 @@ history.
 ## Coordinate notation
 
 A way of writing a WGS 84 longitude or latitude value. *maptoy* supports three
-notations: **DD** (Decimal Degrees, e.g. `53.548333°, 9.978889°`), **DMS**
-(Degrees, Minutes, and Seconds, e.g. `53° 32'54.0"N 9°58'44.0"E`), and **DMM**
-(Degrees and Decimal Minutes, e.g. `53° 32.900'N 9°58.733'E`).
+notations:
+
+- **DD** (Decimal Degrees, e.g. `53.548333°, 9.978889°`)-
+- **DMS** (Degrees, Minutes, and Seconds, e.g. `53° 32'54.0"N 9°58'44.0"E`)
+- **DMM** (Degrees and Decimal Minutes, e.g. `53° 32.900'N 9°58.733'E`)
 
 ## Coordinate reference system
 
@@ -95,10 +97,18 @@ renderer. Version 1.0 supplies the Leaflet/XYZ adapter.
 The conversion of geographic data or a raster image from one coordinate reference
 system to another. Reprojection can change shape, scale, and visible extent.
 
+## Reverse proxy
+
+A server that forwards client requests to another server, commonly used to publish
+an application under a chosen URL or domain. When *maptoy* is published below a URL
+subpath, the proxy must remove that prefix before forwarding requests. Since
+*maptoy* v1 has no built-in authentication, the proxy must also authenticate and
+authorize access when the application is reachable from an untrusted network.
+
 ## Tile
 
-A small, rectangular map image at one zoom level and `x`/`y` position. Adjacent
-tiles form the map visible in the renderer or an export.
+A small, rectangular map image identified by a `z` zoom level and an `x`/`y`
+position. Adjacent tiles form the map visible in the renderer or an export.
 
 ## Tile revision
 

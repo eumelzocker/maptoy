@@ -28,6 +28,8 @@ describe("Map context menu items", () => {
       showMapSelector: true,
       showCoordinates: true,
       showAttribution: false,
+      showTileGrid: true,
+      tileGridAvailable: true,
     });
 
     expect(items.map(({ label }) => label)).toEqual([
@@ -91,6 +93,11 @@ describe("Map context menu items", () => {
       { id: mapContextMenuIds.showMapSelector, checked: true },
       { id: mapContextMenuIds.showCoordinates, checked: true },
       { id: mapContextMenuIds.showAttribution, checked: false },
+      {
+        id: mapContextMenuIds.showTileGrid,
+        checked: true,
+        disabled: false,
+      },
     ]);
   });
 });

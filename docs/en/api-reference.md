@@ -6,9 +6,10 @@ language: en
 
 # API reference
 
-All API paths are relative to *maptoy*'s public entry URL and start with `api/`. API
-clients must preserve a configured reverse-proxy prefix. Error responses use
-`{ "error": { "code": "...", "message": "..." } }`.
+This is more of an introduction to the API than an actual API reference.
+
+All API paths are relative to *maptoy*'s public entry URL and start with `api/`.
+Error responses use `{ "error": { "code": "...", "message": "..." } }`.
 
 ## Tile retrieval
 
@@ -102,5 +103,5 @@ Image scans additionally persist `summary` counts for `created`, `changed`,
 
 *maptoy* v1 does not authenticate API requests. The Tile upload is a write operation
 that can replace the current map state and consume storage. Run it only in a trusted
-private environment, or require authentication and authorization at the reverse
+private environment, or require authentication and authorization at a reverse
 proxy before allowing access from an untrusted network.

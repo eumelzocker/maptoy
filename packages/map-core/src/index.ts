@@ -1,5 +1,6 @@
 export const XYZ_TILE_SIZE = 256;
 export const WEB_MERCATOR_MAX_LATITUDE = 85.0511287798066;
+const EARTH_MEAN_RADIUS_METERS = 6_371_008.8;
 
 export interface Wgs84Coordinate {
   longitude: number;
@@ -26,6 +27,169 @@ export interface XyzTileRange {
   maximumY: number;
 }
 
+export interface MetricScaleBar {
+  distanceMeters: number;
+  width: number;
+  label: string;
+}
+
+export const METRIC_SCALE_INTERMEDIATE_LABEL_COUNT = 3;
+export const METRIC_SCALE_SUBDIVISIONS_PER_INTERVAL = 10;
+
+export interface SegmentedMetricScaleMark {
+  distanceMeters: number;
+  position: number;
+  label: string;
+}
+
+export interface SegmentedMetricScaleSection {
+  distanceMeters: number;
+  width: number;
+  dark: boolean;
+}
+
+export interface SegmentedMetricScale {
+  distanceMeters: number;
+  intervalMeters: number;
+  marks: readonly SegmentedMetricScaleMark[];
+  sections: readonly SegmentedMetricScaleSection[];
+}
+
+export function geodesicDistanceMeters(
+  first: Wgs84Coordinate,
+  second: Wgs84Coordinate,
+): number {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const firstLatitude = radians(first.latitude);
+  const secondLatitude = radians(second.latitude);
+  const latitudeDelta = secondLatitude - firstLatitude;
+  const longitudeDelta = radians(second.longitude - first.longitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(firstLatitude) *
+      Math.cos(secondLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+  return (
+    2 * EARTH_MEAN_RADIUS_METERS * Math.asin(Math.min(1, Math.sqrt(haversine)))
+  );
+}
+
+export function metricScaleBar(
+  maximumDistanceMeters: number,
+  maximumWidth: number,
+): MetricScaleBar {
+  if (
+    !Number.isFinite(maximumDistanceMeters) ||
+    maximumDistanceMeters <= 0 ||
+    !Number.isFinite(maximumWidth) ||
+    maximumWidth <= 0
+  ) {
+    throw new Error("Scale bar dimensions must be positive finite numbers.");
+  }
+  const exponent = 10 ** Math.floor(Math.log10(maximumDistanceMeters));
+  const normalized = maximumDistanceMeters / exponent;
+  const leading = normalized >= 5 ? 5 : normalized >= 2 ? 2 : 1;
+  const distanceMeters = leading * exponent;
+  const width = (distanceMeters / maximumDistanceMeters) * maximumWidth;
+  return {
+    distanceMeters,
+    width,
+    label:
+      distanceMeters >= 1000
+        ? `${distanceMeters / 1000} km`
+        : `${distanceMeters} m`,
+  };
+}
+
+function formatMetricScaleDistance(
+  distanceMeters: number,
+  scaleDistanceMeters: number,
+  includeUnit: boolean,
+): string {
+  const usesKilometers = scaleDistanceMeters >= 1000;
+  const value = Number(
+    (usesKilometers ? distanceMeters / 1000 : distanceMeters).toFixed(1),
+  );
+  return includeUnit ? `${value} ${usesKilometers ? "km" : "m"}` : `${value}`;
+}
+
+function roundedMetricScaleDistance(distanceMeters: number): number {
+  const rounding =
+    distanceMeters >= 10_000
+      ? 1000
+      : distanceMeters >= 1000
+        ? 100
+        : distanceMeters >= 100
+          ? 10
+          : 1;
+  return Math.max(rounding, Math.round(distanceMeters / rounding) * rounding);
+}
+
+function metricScaleInterval(distanceMeters: number): number {
+  const target = distanceMeters / (METRIC_SCALE_INTERMEDIATE_LABEL_COUNT + 1);
+  const exponent = 10 ** Math.floor(Math.log10(target));
+  const candidates = [0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10].map(
+    (value) => value * exponent,
+  );
+  const valid = candidates.filter(
+    (value) => value * METRIC_SCALE_INTERMEDIATE_LABEL_COUNT < distanceMeters,
+  );
+  return valid.reduce((nearest, candidate) =>
+    Math.abs(candidate - target) < Math.abs(nearest - target)
+      ? candidate
+      : nearest,
+  );
+}
+
+export function segmentedMetricScale(
+  maximumDistanceMeters: number,
+): SegmentedMetricScale {
+  if (!Number.isFinite(maximumDistanceMeters) || maximumDistanceMeters <= 0) {
+    throw new Error("Scale distance must be a positive finite number.");
+  }
+  const distanceMeters = roundedMetricScaleDistance(maximumDistanceMeters);
+  const intervalMeters = metricScaleInterval(distanceMeters);
+  const subdivisionMeters =
+    intervalMeters / METRIC_SCALE_SUBDIVISIONS_PER_INTERVAL;
+  const fullSectionCount = Math.floor(
+    distanceMeters / subdivisionMeters + Number.EPSILON,
+  );
+  const sections: SegmentedMetricScaleSection[] = Array.from(
+    { length: fullSectionCount },
+    (_, index) => ({
+      distanceMeters: subdivisionMeters,
+      width: subdivisionMeters / distanceMeters,
+      dark: index % 2 === 0,
+    }),
+  );
+  const coveredDistance = fullSectionCount * subdivisionMeters;
+  const remainder = distanceMeters - coveredDistance;
+  if (remainder > Number.EPSILON * distanceMeters) {
+    sections.push({
+      distanceMeters: remainder,
+      width: remainder / distanceMeters,
+      dark: fullSectionCount % 2 === 0,
+    });
+  }
+  const marks = Array.from(
+    { length: METRIC_SCALE_INTERMEDIATE_LABEL_COUNT },
+    (_, index) => {
+      const distance = intervalMeters * (index + 1);
+      return {
+        distanceMeters: distance,
+        position: distance / distanceMeters,
+        label: formatMetricScaleDistance(distance, distanceMeters, false),
+      };
+    },
+  );
+  marks.push({
+    distanceMeters,
+    position: 1,
+    label: formatMetricScaleDistance(distanceMeters, distanceMeters, true),
+  });
+  return { distanceMeters, intervalMeters, marks, sections };
+}
+
 export function wgs84ToXyz(
   coordinate: Wgs84Coordinate,
   zoom: number,
@@ -44,18 +208,27 @@ export function wgs84ToXyz(
   };
 }
 
-export function xyzTileBounds(tile: TileCoordinate): Wgs84Bounds {
+export function xyzToWgs84(tile: TileCoordinate): Wgs84Coordinate {
   const scale = 2 ** tile.zoom;
-  const longitude = (x: number) => (x / scale) * 360 - 180;
-  const latitude = (y: number) => {
-    const mercator = Math.PI * (1 - (2 * y) / scale);
-    return (Math.atan(Math.sinh(mercator)) * 180) / Math.PI;
-  };
+  const mercator = Math.PI * (1 - (2 * tile.y) / scale);
   return {
-    west: longitude(tile.x),
-    south: latitude(tile.y + 1),
-    east: longitude(tile.x + 1),
-    north: latitude(tile.y),
+    longitude: (tile.x / scale) * 360 - 180,
+    latitude: (Math.atan(Math.sinh(mercator)) * 180) / Math.PI,
+  };
+}
+
+export function xyzTileBounds(tile: TileCoordinate): Wgs84Bounds {
+  const northwest = xyzToWgs84(tile);
+  const southeast = xyzToWgs84({
+    zoom: tile.zoom,
+    x: tile.x + 1,
+    y: tile.y + 1,
+  });
+  return {
+    west: northwest.longitude,
+    south: southeast.latitude,
+    east: southeast.longitude,
+    north: northwest.latitude,
   };
 }
 

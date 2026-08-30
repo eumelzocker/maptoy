@@ -33,6 +33,7 @@ function fakePlugin(): LayerPluginDefinition {
         serverPreview: true,
         serverRender: true,
       },
+      requiredRendererLayerTypes: ["point-collection"],
     },
     shared: {
       validateConfiguration: expectRecord,
@@ -194,5 +195,23 @@ describe("layer plugin contract", () => {
     expect(() =>
       createLayerPluginRegistry([{ ...plugin, frontend: undefined }]),
     ).toThrow("interactive capability and frontend hook disagree");
+  });
+
+  it("rejects duplicate renderer Layer requirements", () => {
+    const plugin = fakePlugin();
+    expect(() =>
+      createLayerPluginRegistry([
+        {
+          ...plugin,
+          manifest: {
+            ...plugin.manifest,
+            requiredRendererLayerTypes: [
+              "point-collection",
+              "point-collection",
+            ],
+          },
+        },
+      ]),
+    ).toThrow("duplicate required renderer Layer type");
   });
 });

@@ -1,4 +1,4 @@
-export const LAYER_PLUGIN_SDK_VERSION = "1.1.0";
+export const LAYER_PLUGIN_SDK_VERSION = "1.2.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 export type JsonObject = Readonly<Record<string, unknown>>;
@@ -160,6 +160,7 @@ export interface LayerPluginManifest {
   configurationSchema: JsonObject;
   dataSchema: JsonObject;
   capabilities: LayerPluginCapabilities;
+  requiredRendererLayerTypes: readonly InteractiveLayerType[];
 }
 
 export interface LayerPluginMigration {
@@ -207,23 +208,17 @@ export interface LayerPluginAssetReference {
   }>;
 }
 
+export type InteractiveLayerType =
+  | "point-collection"
+  | "line-collection"
+  | "area-collection"
+  | "raster-overlay"
+  | "xyz-tile-grid"
+  | "composite";
+
 export interface InteractiveLayerDescriptor {
-  type:
-    | "point-collection"
-    | "line-collection"
-    | "area-collection"
-    | "raster-overlay"
-    | "composite";
-  data: Readonly<{
-    kind:
-      | "point-collection"
-      | "line-collection"
-      | "area-collection"
-      | "raster-overlay"
-      | "composite";
-    features?: readonly unknown[];
-    layers?: readonly unknown[];
-  }>;
+  type: InteractiveLayerType;
+  data: Readonly<Record<string, unknown> & { kind: InteractiveLayerType }>;
 }
 
 export interface LayerPluginFrontendContext {
@@ -365,6 +360,16 @@ export function assertValidLayerPluginDefinition(
     manifest.capabilities.serverRender ===
       (definition.server?.render !== undefined),
     "server-render capability and hook disagree",
+  );
+  invariant(
+    new Set(manifest.requiredRendererLayerTypes).size ===
+      manifest.requiredRendererLayerTypes.length,
+    "duplicate required renderer Layer type",
+  );
+  invariant(
+    manifest.capabilities.interactive ||
+      manifest.requiredRendererLayerTypes.length === 0,
+    "renderer Layer types require interactive capability",
   );
 
   let previousTarget = 0;

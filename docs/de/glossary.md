@@ -45,9 +45,11 @@ Tile-Inhalte und adressiert Inhaltsdateien, ohne die Revisionshistorie zu verwer
 ## Coordinate notation
 
 Eine Schreibweise für einen WGS-84-Längen- oder Breitengrad. *maptoy* unterstützt
-drei Notationen: **DD** (Decimal Degrees, z. B. `53.548333°, 9.978889°`), **DMS**
-(Degrees, Minutes, and Seconds, z. B. `53° 32'54.0"N 9°58'44.0"E`) und **DMM**
-(Degrees and Decimal Minutes, z. B. `53° 32.900'N 9°58.733'E`).
+drei Notationen:
+
+- **DD** (Decimal Degrees, z. B. `53.548333°, 9.978889°`)
+- **DMS** (Degrees, Minutes, and Seconds, z. B. `53° 32'54.0"N 9°58'44.0"E`)
+- **DMM** (Degrees and Decimal Minutes, z. B. `53° 32.900'N 9°58.733'E`)
 
 ## Coordinate reference system
 
@@ -101,10 +103,20 @@ Umrechnung geografischer Daten oder eines Rasterbilds von einem
 Koordinatenreferenzsystem in ein anderes. Eine Reprojektion kann Form, Maßstab und
 sichtbaren Ausschnitt verändern.
 
+## Reverse proxy
+
+Ein Server, der Anfragen von Clients an einen anderen Server weiterleitet, häufig um
+eine Anwendung unter einer gewählten URL oder Domain zu veröffentlichen. Wird
+*maptoy* unter einem URL-Unterpfad veröffentlicht, muss der Proxy diesen Präfix vor
+dem Weiterleiten entfernen. Da *maptoy* v1 keine eigene Authentifizierung besitzt,
+muss der Proxy den Zugriff zusätzlich authentifizieren und autorisieren, wenn die
+Anwendung aus einem nicht vertrauenswürdigen Netz erreichbar ist.
+
 ## Tile
 
-Kleines rechteckiges Kartenbild für eine Zoomstufe und eine `x`-/`y`-Position.
-Benachbarte Tiles bilden die im Renderer oder Export sichtbare Karte.
+Kleines rechteckiges Kartenbild, das durch eine Zoomstufe `z` und eine
+`x`-/`y`-Position bestimmt ist. Benachbarte Tiles bilden die im Renderer oder Export
+sichtbare Karte.
 
 ## Tile revision
 

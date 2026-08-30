@@ -2,11 +2,13 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Vue template references are not detected by Biome.
 // biome-ignore-all lint/correctness/noUnusedVariables: Vue template references are not detected by Biome.
 import type { Job, Layer } from "@maptoy/contracts";
-import ImageLayerEditor from "./ImageLayerEditor.vue";
-import TrackLayerEditor from "./TrackLayerEditor.vue";
+import { computed } from "vue";
+import { layerTypePresentation } from "../layerEditorRegistry.js";
 
-defineProps<{
+const props = defineProps<{
   layer: Layer;
+  configurationSchema: Readonly<Record<string, unknown>>;
+  compatibilityDiagnostic: string | null;
   busy: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -18,6 +20,10 @@ defineProps<{
   displayedScanJob: Job | undefined;
   imageCount: number;
 }>();
+
+const pluginEditor = computed(
+  () => layerTypePresentation(props.layer.pluginId).editor,
+);
 
 const emit = defineEmits<{
   visibilityChange: [visible: boolean];
@@ -41,8 +47,11 @@ function nullableNumber(event: Event): number | null {
   return value === "" ? null : Number(value);
 }
 
-function hasTrack(layer: Layer): boolean {
-  return Array.isArray(layer.data.features) && layer.data.features.length > 0;
+function emitConfigurationChange(
+  key: string,
+  value: string | number | boolean,
+): void {
+  emit("configurationChange", key, value);
 }
 </script>
 
@@ -75,33 +84,35 @@ function hasTrack(layer: Layer): boolean {
           <i class="mdi mdi-arrow-down" aria-hidden="true"></i>
         </button>
         <button type="button" title="Delete layer" :disabled="busy" @click="emit('remove')">
-          <i class="mdi mdi-delete-outline" aria-hidden="true"></i>
+          <i class="mdi mdi-trash-can-outline" aria-hidden="true"></i>
         </button>
       </div>
     </header>
 
-    <label class="visibility-field">
-      <input
-        type="checkbox"
-        :checked="layer.visible"
-        :disabled="busy || layer.status !== 'ready'"
-        @change="emit('visibilityChange', ($event.target as HTMLInputElement).checked)"
-      />
-      <span>Visible on map</span>
-    </label>
+    <div class="layer-state-fields">
+      <label class="visibility-field">
+        <input
+          type="checkbox"
+          :checked="layer.visible"
+          :disabled="busy || layer.status !== 'ready' || compatibilityDiagnostic !== null"
+          @change="emit('visibilityChange', ($event.target as HTMLInputElement).checked)"
+        />
+        <span>Visible on map</span>
+      </label>
 
-    <label class="opacity-field">
-      <span>Opacity</span>
-      <input
-        type="range"
-        min="0"
-        max="1"
-        step="0.05"
-        :value="layer.opacity"
-        :disabled="busy"
-        @change="emit('opacityChange', Number(($event.target as HTMLInputElement).value))"
-      />
-    </label>
+      <label class="opacity-field">
+        <span>Opacity</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          :value="layer.opacity"
+          :disabled="busy"
+          @change="emit('opacityChange', Number(($event.target as HTMLInputElement).value))"
+        />
+      </label>
+    </div>
 
     <div class="zoom-fields">
       <label>
@@ -128,36 +139,32 @@ function hasTrack(layer: Layer): boolean {
       </label>
     </div>
 
-    <TrackLayerEditor
-      v-if="layer.pluginId === 'track-layer'"
+    <component
+      :is="pluginEditor"
+      :layer="layer"
       :configuration="layer.configuration"
-      :busy="busy"
-      :has-track="hasTrack(layer)"
-      @configuration-change="(key, value) => emit('configurationChange', key, value)"
-      @upload="emit('uploadTrack', $event)"
-    />
-    <ImageLayerEditor
-      v-else-if="layer.pluginId === 'image-layer'"
-      :configuration="layer.configuration"
+      :configuration-schema="configurationSchema"
       :busy="busy"
       :image-roots="imageRoots"
-      :root-id="imageRootId"
+      :image-root-id="imageRootId"
       :scan-directory="scanDirectory"
-      :recursive="recursiveScan"
-      :active-job="activeScanJob"
-      :displayed-job="displayedScanJob"
+      :recursive-scan="recursiveScan"
+      :active-scan-job="activeScanJob"
+      :displayed-scan-job="displayedScanJob"
       :image-count="imageCount"
-      @configuration-change="(key, value) => emit('configurationChange', key, value)"
-      @update:root-id="emit('update:imageRootId', $event)"
+      @configuration-change="emitConfigurationChange"
+      @upload-track="emit('uploadTrack', $event)"
+      @update:image-root-id="emit('update:imageRootId', $event)"
       @update:scan-directory="emit('update:scanDirectory', $event)"
-      @update:recursive="emit('update:recursiveScan', $event)"
+      @update:recursive-scan="emit('update:recursiveScan', $event)"
       @start-scan="emit('startScan')"
-      @job-action="emit('scanJobAction', $event)"
+      @scan-job-action="emit('scanJobAction', $event)"
       @manage-images="emit('manageImages')"
     />
-    <p v-else class="layer-status">No editor is available for plugin {{ layer.pluginId }}.</p>
 
-    <p v-if="layer.diagnostic" class="layer-status">{{ layer.diagnostic }}</p>
+    <p v-if="compatibilityDiagnostic || layer.diagnostic" class="layer-status">
+      {{ compatibilityDiagnostic || layer.diagnostic }}
+    </p>
   </section>
 </template>
 
@@ -220,13 +227,32 @@ function hasTrack(layer: Layer): boolean {
   background: #edf4f1;
 }
 
-.visibility-field {
+.layer-state-fields,
+.visibility-field,
+.opacity-field {
   display: flex;
   gap: 0.4rem;
   align-items: center;
 }
 
-.opacity-field,
+.layer-state-fields {
+  gap: 0.8rem;
+}
+
+.visibility-field {
+  flex: 0 0 auto;
+}
+
+.opacity-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.opacity-field input {
+  flex: 1;
+  min-width: 3rem;
+}
+
 .zoom-fields > label {
   display: grid;
   gap: 0.2rem;

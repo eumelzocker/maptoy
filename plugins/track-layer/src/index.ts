@@ -316,6 +316,7 @@ export const trackLayerPlugin = {
       serverPreview: false,
       serverRender: true,
     },
+    requiredRendererLayerTypes: ["line-collection"],
   },
   shared: {
     validateConfiguration,

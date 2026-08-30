@@ -6,13 +6,17 @@ owns viewport, events, Layer lifecycle, ordering, attribution, and coordinate
 conversion.
 
 Adapter-neutral Layer data includes point, line, and area collections with separate
-symbolizers, a raster-overlay descriptor for geographically bounded images, and a
-composite of primitive descriptors. Raster overlays are intentionally not modeled as
-vector areas.
+symbolizers, a raster-overlay descriptor for geographically bounded images, a
+state-derived `xyz-tile-grid` decoration, and a composite of primitive descriptors.
+The Tile Grid descriptor combines boundaries, `z/x/y` labels, and a fixed-width
+segmented metric scale across the visual center of every Tile. Raster overlays are
+intentionally not modeled as vector areas. Renderer manifests list their supported
+descriptor types so plugins can be disabled with a useful diagnostic instead of
+failing during attachment.
 
 Use `createMapRendererFactoryRegistry` for registration and
 `exerciseMapRendererContract` in adapter tests. The contract exercises attachment,
-update, ordering, and removal for point, line, area, raster-overlay, and composite
-descriptors. `createFakeMapRendererFactory` is available to test higher-level code
-without importing a rendering library. The shipped Leaflet/XYZ adapter is the v1
-reference implementation.
+update, ordering, and removal for stored and state-derived descriptors.
+`createFakeMapRendererFactory` is available to test higher-level code without
+importing a rendering library. The shipped Leaflet/XYZ adapter is the v1 reference
+implementation.

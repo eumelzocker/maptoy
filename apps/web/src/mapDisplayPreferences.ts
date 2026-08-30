@@ -11,6 +11,7 @@ const showAttributionKey = "maptoy:show-attribution";
 const showTitleBarKey = "maptoy:show-title-bar";
 const showMapSelectorKey = "maptoy:show-map-selector";
 const cachedTilesOnlyKey = "maptoy:cached-tiles-only";
+const showTileGridKey = "maptoy:show-tile-grid";
 const coordinateFormatKey = "maptoy:coordinate-format";
 
 function loadBooleanPreference(
@@ -105,4 +106,15 @@ export function saveCachedTilesOnly(
   storage?: PreferenceStorage | null,
 ): void {
   saveBooleanPreference(cachedTilesOnlyKey, value, storage);
+}
+
+export function loadShowTileGrid(storage?: PreferenceStorage | null): boolean {
+  return loadBooleanPreference(showTileGridKey, false, storage);
+}
+
+export function saveShowTileGrid(
+  value: boolean,
+  storage?: PreferenceStorage | null,
+): void {
+  saveBooleanPreference(showTileGridKey, value, storage);
 }

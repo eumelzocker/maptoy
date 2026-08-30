@@ -1,6 +1,6 @@
 {
   "name": "@maptoy/server",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,6 +19,7 @@
     "@maptoy/leaflet-xyz": "workspace:*",
     "@maptoy/map-adapter-sdk": "workspace:*",
     "@maptoy/map-core": "workspace:*",
+    "@maptoy/tile-grid-layer": "workspace:*",
     "@maptoy/track-layer": "workspace:*",
     "fastify": "5.12.1",
     "sharp": "0.35.3"

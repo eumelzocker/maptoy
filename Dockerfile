@@ -25,6 +25,7 @@ COPY packages/layer-plugin-sdk/package.json packages/layer-plugin-sdk/package.js
 COPY packages/map-adapter-sdk/package.json packages/map-adapter-sdk/package.json
 COPY packages/map-core/package.json packages/map-core/package.json
 COPY plugins/image-layer/package.json plugins/image-layer/package.json
+COPY plugins/tile-grid-layer/package.json plugins/tile-grid-layer/package.json
 COPY plugins/track-layer/package.json plugins/track-layer/package.json
 
 RUN pnpm install --frozen-lockfile

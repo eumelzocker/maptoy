@@ -2,6 +2,7 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Vue template references are not detected by Biome.
 // biome-ignore-all lint/correctness/noUnusedVariables: Vue template references are not detected by Biome.
 import type { Layer, LayerAsset } from "@maptoy/contracts";
+import type { MapLayerType } from "@maptoy/map-adapter-sdk";
 import {
   computed,
   inject,
@@ -31,6 +32,7 @@ import {
   saveSelectedLayerId,
 } from "../layerPanelPreferences.js";
 import { availableLocalStorage } from "../localStorage.js";
+import { layerTypePresentation } from "../layerEditorRegistry.js";
 import { LAYER_PLUGIN_REGISTRY_KEY } from "../registries.js";
 import { useLayersStore } from "../stores/layers.js";
 import CenteredDialog from "./CenteredDialog.vue";
@@ -38,27 +40,29 @@ import LayerEditor from "./LayerEditor.vue";
 import TogglePanel from "./TogglePanel.vue";
 import TreeSelectDropdown from "./TreeSelectDropdown.vue";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     enabled: boolean;
     placement?: "top" | "right";
+    supportedLayerTypes?: readonly MapLayerType[];
   }>(),
-  { placement: "top" },
+  { placement: "top", supportedLayerTypes: () => [] },
 );
 
 const emit = defineEmits<{ changed: [] }>();
 const store = useLayersStore();
-const layerPlugins = inject(LAYER_PLUGIN_REGISTRY_KEY);
-if (layerPlugins === undefined) {
+const injectedLayerPlugins = inject(LAYER_PLUGIN_REGISTRY_KEY);
+if (injectedLayerPlugins === undefined) {
   throw new Error("Layer plugin registry is not available.");
 }
+const layerPlugins = injectedLayerPlugins;
 const browserStorage = availableLocalStorage();
 const busy = ref(false);
 const localError = ref<string | null>(null);
 const addDialogOpen = ref(false);
 const addDialogError = ref<string | null>(null);
 const newLayerName = ref("");
-const newLayerPluginId = ref<"track-layer" | "image-layer">("track-layer");
+const newLayerPluginId = ref("track-layer");
 const assetSearch = ref("");
 const rootSelections = reactive<Record<string, string>>({});
 const scanDirectories = reactive<Record<string, string>>({});
@@ -118,12 +122,16 @@ const selectorModel = computed<LayerSelectorModel>(() => {
             id: row.layer.id,
             label: row.label,
             checked: row.layer.visible,
-            checkDisabled: row.layer.status !== "ready",
+            checkDisabled:
+              row.layer.status !== "ready" ||
+              compatibilityDiagnostic(row.layer) !== null,
             selectable: true,
             searchText: row.layer.name,
-            ...(row.layer.status === "ready"
-              ? {}
-              : { secondaryText: row.layer.status }),
+            ...(row.layer.status !== "ready"
+              ? { secondaryText: row.layer.status }
+              : compatibilityDiagnostic(row.layer) === null
+                ? {}
+                : { secondaryText: "unsupported" }),
           }
         : {
             id: row.key,
@@ -146,7 +154,10 @@ const selectorModel = computed<LayerSelectorModel>(() => {
   function finalize(node: CheckboxTreeNode): string[] {
     if (!node.children?.length) {
       const layer = store.items.find(({ id }) => id === node.id);
-      const layerIds = layer?.status === "ready" ? [node.id] : [];
+      const layerIds =
+        layer?.status === "ready" && compatibilityDiagnostic(layer) === null
+          ? [node.id]
+          : [];
       layerIdsByNode.set(node.id, layerIds);
       return layerIds;
     }
@@ -184,24 +195,28 @@ const selectedLayer = computed(
   () => store.items.find(({ id }) => id === selectedLayerId.value) ?? null,
 );
 
-const creatableLayerTypes = [
-  {
-    id: "track-layer" as const,
-    icon: "mdi-vector-polyline",
-    defaultName: "Track",
-  },
-  {
-    id: "image-layer" as const,
-    icon: "mdi-image-marker",
-    defaultName: "Image",
-  },
-].map((type) => ({
-  ...type,
-  label:
-    layerPlugins.get(type.id)?.manifest.category.displayName ??
-    layerPlugins.get(type.id)?.manifest.displayName ??
-    type.id,
-}));
+function compatibilityDiagnostic(layer: Layer): string | null {
+  const plugin = layerPlugins.get(layer.pluginId);
+  if (plugin === undefined) {
+    return null;
+  }
+  const supported = new Set(props.supportedLayerTypes);
+  const missing = plugin.manifest.requiredRendererLayerTypes.filter(
+    (type) => !supported.has(type),
+  );
+  return missing.length === 0
+    ? null
+    : `This renderer does not support: ${missing.join(", ")}.`;
+}
+
+const creatableLayerTypes = layerPlugins
+  .list()
+  .filter(({ frontend }) => frontend !== undefined)
+  .map((plugin) => ({
+    id: plugin.manifest.id,
+    ...layerTypePresentation(plugin.manifest.id),
+    label: plugin.manifest.category.displayName,
+  }));
 const selectedLayerType = computed(() => {
   const selected = creatableLayerTypes.find(
     ({ id }) => id === newLayerPluginId.value,
@@ -646,6 +661,8 @@ onBeforeUnmount(() => {
       <LayerEditor
         v-if="selectedLayer"
         :layer="selectedLayer"
+        :configuration-schema="layerPlugins.get(selectedLayer.pluginId)?.manifest.configurationSchema ?? {}"
+        :compatibility-diagnostic="compatibilityDiagnostic(selectedLayer)"
         :busy="busy"
         :can-move-up="canMove(selectedLayer, -1)"
         :can-move-down="canMove(selectedLayer, 1)"

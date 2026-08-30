@@ -1,6 +1,6 @@
 {
   "name": "@maptoy/web",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,6 +15,7 @@
     "@maptoy/leaflet-xyz": "workspace:*",
     "@maptoy/map-adapter-sdk": "workspace:*",
     "@maptoy/map-core": "workspace:*",
+    "@maptoy/tile-grid-layer": "workspace:*",
     "@maptoy/track-layer": "workspace:*",
     "@mdi/font": "7.4.47",
     "marked": "18.0.10",

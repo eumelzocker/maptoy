@@ -2,6 +2,7 @@ import { imageLayerPlugin } from "@maptoy/image-layer";
 import { createLayerPluginRegistry } from "@maptoy/layer-plugin-sdk";
 import { leafletXyzManifest } from "@maptoy/leaflet-xyz";
 import { createMapRendererManifestRegistry } from "@maptoy/map-adapter-sdk";
+import { tileGridLayerPlugin } from "@maptoy/tile-grid-layer";
 import { trackLayerPlugin } from "@maptoy/track-layer";
 
 export const mapRendererRegistry = createMapRendererManifestRegistry([
@@ -11,4 +12,5 @@ export const mapRendererRegistry = createMapRendererManifestRegistry([
 export const layerPluginRegistry = createLayerPluginRegistry([
   trackLayerPlugin,
   imageLayerPlugin,
+  tileGridLayerPlugin,
 ]);
