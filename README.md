@@ -1,6 +1,6 @@
 # maptoy
 
-*maptoy* is a self-hosted application for viewing, archiving, and exporting maps and map custom layers.
+*maptoy* is a self-hosted application for viewing, archiving, and exporting maps and custom layers.
 
 <img src="docs/assets/screenshot0.webp" alt="Screenshot 0" width="600">
 <img src="docs/assets/screenshot1.webp" alt="Screenshot 1" width="600">
@@ -15,7 +15,7 @@
 > - Track and external photo layers
 > - Integrated documentation
 >
-> Batch downloads and exports in additional map projections will be added soon.
+> Batch downloads and exports in additional map projections will be added soon.<br>
 > Support for vector maps comes in v2.
 
 ## Start with Docker Compose 🐳

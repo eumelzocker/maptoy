@@ -31,6 +31,7 @@ describe("database migrations", () => {
       { version: 7 },
       { version: 8 },
       { version: 9 },
+      { version: 10 },
     ]);
     expect(
       database.sqlite
@@ -38,12 +39,14 @@ describe("database migrations", () => {
           `SELECT name FROM sqlite_master
             WHERE type = 'table' AND name IN ('map_sets', 'source_revisions',
               'logical_tiles', 'tile_revisions', 'cache_snapshots',
-              'layer_instances', 'layer_instance_versions', 'layer_assets', 'jobs')
+              'layer_instances', 'layer_instance_versions', 'layer_assets', 'jobs',
+              'job_errors')
             ORDER BY name`,
         )
         .all(),
     ).toEqual([
       { name: "cache_snapshots" },
+      { name: "job_errors" },
       { name: "jobs" },
       { name: "layer_assets" },
       { name: "layer_instance_versions" },
@@ -76,6 +79,12 @@ describe("database migrations", () => {
         .all()
         .map((column) => (column as { name: string }).name),
     ).toContain("opacity");
+    expect(
+      database.sqlite
+        .prepare("PRAGMA table_info(jobs)")
+        .all()
+        .map((column) => (column as { name: string }).name),
+    ).toContain("progress_cursor");
     database.close();
   });
 
@@ -182,6 +191,7 @@ describe("database migrations", () => {
       { version: 7 },
       { version: 8 },
       { version: 9 },
+      { version: 10 },
     ]);
     expect(
       reopened.sqlite

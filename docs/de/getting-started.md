@@ -32,7 +32,7 @@ docker compose up --build
 ```
 
 Laufzeitvariablen folgen `MAPTOY_<DOMÄNE>_<EIGENSCHAFT>`. Die aktuellen Domänen
-sind `SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS` und `PHOTOS`; bei
+sind `SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, `JOBS` und `PHOTOS`; bei
 Provider-Secrets bildet der Providername die Domäne. Frühere Variablennamen werden
 nicht unterstützt.
 
@@ -56,6 +56,13 @@ produktive Datenbanken vor Version 4 existieren nicht.
 `MAPTOY_TILES_MAX_BYTES` begrenzt sowohl Providerantworten als auch den Raw-Body der
 Tile-Seeding-Route. Das Uploadlimit gilt routenspezifisch und verkleinert nicht die
 zulässige Größe von Map-Set-JSON oder anderen API-Requests.
+
+Abgeschlossene, fehlgeschlagene und abgebrochene Jobs bleiben standardmäßig 30 Tage
+erhalten. `MAPTOY_JOBS_RETENTION_DAYS` konfiguriert diese Frist,
+`MAPTOY_JOBS_ERROR_HISTORY_LIMIT` die begrenzte Diagnosehistorie je Job. Die
+Bereinigung läuft beim Start und stündlich; ein vertrauenswürdiger Betreiber kann
+dieselbe Regel mit `POST api/jobs/cleanup` auslösen. Wartende, laufende und pausierte
+Jobs werden nie durch die Aufbewahrungsregel entfernt.
 
 ## Traffic-Logs
 

@@ -6,4 +6,8 @@ Set `mapSetId` to an existing Map Set and `tileZ`, `tileX`, and `tileY` to a val
 
 Before using the Tile-seeding request, set `tileFile` to an absolute PNG, JPEG, or WebP path and adjust its `Content-Type` header to the Map Set's configured format. The request sends that file directly as the body.
 
-Layer requests use `layerId` for a Track Layer, `photoLayerId` for a Photo Layer, and `layerAssetFile` for a GPX or GeoJSON file. **Photo Directory - Status** reports whether `MAPTOY_PHOTOS_DIR` is available. Upload and scan requests are explicitly marked as state-changing and should be run individually.
+Layer requests use `layerId` for a Track Layer, `photoLayerId` for a Photo Layer,
+`jobId` for Job diagnostics, and `layerAssetFile` for a GPX or GeoJSON file.
+**Photo Directory - Status** reports whether `MAPTOY_PHOTOS_DIR` is available.
+Upload, scan, and Job-retention cleanup requests are explicitly marked as
+state-changing and should be run individually.

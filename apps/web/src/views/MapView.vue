@@ -255,6 +255,12 @@ async function renderPluginLayers(): Promise<void> {
     return;
   }
 
+  await Promise.all(
+    layers.items
+      .filter((layer) => layer.pluginId === "photo-layer" && layer.visible)
+      .map((layer) => layers.loadAllAssets(layer.id)),
+  );
+
   for (const handle of layerHandles.values()) {
     await handle.destroy();
   }

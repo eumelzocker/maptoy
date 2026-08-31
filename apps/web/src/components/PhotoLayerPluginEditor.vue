@@ -15,6 +15,8 @@ defineProps<{
   activeScanJob: Job | undefined;
   displayedScanJob: Job | undefined;
   photoCount: number;
+  photosLoaded: boolean;
+  hasMorePhotos: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -37,6 +39,8 @@ const emit = defineEmits<{
     :active-job="activeScanJob"
     :displayed-job="displayedScanJob"
     :photo-count="photoCount"
+    :photos-loaded="photosLoaded"
+    :has-more-photos="hasMorePhotos"
     @configuration-change="(key, value) => emit('configurationChange', key, value)"
     @update:scan-directory="emit('update:scanDirectory', $event)"
     @update:recursive="emit('update:recursiveScan', $event)"

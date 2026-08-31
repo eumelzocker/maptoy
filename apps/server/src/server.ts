@@ -80,6 +80,8 @@ const configurationEnvironmentNames = new Set([
   "MAPTOY_TILES_PROVIDER_TIMEOUT_MS",
   "MAPTOY_TILES_MAX_BYTES",
   "MAPTOY_LAYERS_ASSET_MAX_BYTES",
+  "MAPTOY_JOBS_RETENTION_DAYS",
+  "MAPTOY_JOBS_ERROR_HISTORY_LIMIT",
   "MAPTOY_PHOTOS_DIR",
   "MAPTOY_PHOTOS_MAX_FILE_BYTES",
   "MAPTOY_PHOTOS_MAX_DECODED_PIXELS",
@@ -189,6 +191,7 @@ export async function buildServer(
       decoderConcurrency: config.photos.scanConcurrency,
       maximumFiles: config.photos.scanMaximumFiles,
     },
+    config.jobs,
   );
   const managedAssetService = new ManagedAssetService(
     layerService,

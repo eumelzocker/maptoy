@@ -12,6 +12,8 @@ defineProps<{
   activeJob: Job | undefined;
   displayedJob: Job | undefined;
   photoCount: number;
+  photosLoaded: boolean;
+  hasMorePhotos: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -108,8 +110,12 @@ const emit = defineEmits<{
         <button v-else type="button" @click="emit('jobAction', 'resume')">Resume</button>
         <button type="button" @click="emit('jobAction', 'cancel')">Cancel</button>
       </div>
-      <button v-if="photoCount > 0" type="button" @click="emit('managePhotos')">
-        Manage {{ photoCount }} photos
+      <button
+        type="button"
+        :disabled="busy || (photosLoaded && photoCount === 0)"
+        @click="emit('managePhotos')"
+      >
+        {{ photosLoaded ? (photoCount === 0 ? "No photos" : `Manage ${photoCount}${hasMorePhotos ? "+" : ""} photos`) : "Manage photos" }}
       </button>
     </div>
   </section>

@@ -11,6 +11,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { MaptoyConfig } from "@maptoy/config";
@@ -61,6 +62,7 @@ async function testConfig(): Promise<MaptoyConfig> {
       maximumBytes: 1024 * 1024,
     },
     layers: { assetMaximumBytes: 1024 * 1024 },
+    jobs: { retentionDays: 30, errorHistoryLimit: 100 },
     photos: {
       directory: null,
       maximumFileBytes: 10 * 1024 * 1024,
@@ -736,6 +738,88 @@ describe("maptoy server", () => {
     expect(
       await readdir(path.join(config.storage.dataDirectory, "layer-previews")),
     ).toEqual([]);
+
+    await server.close();
+  });
+
+  it("exposes bounded photo Job errors and cleans up expired terminal Jobs", async () => {
+    const config = await testConfig();
+    const photoRoot = await mkdtemp(
+      path.join(tmpdir(), "maptoy-broken-photos-"),
+    );
+    temporaryDirectories.push(photoRoot);
+    await writeFile(path.join(photoRoot, "broken.jpg"), "not an image");
+    config.photos.directory = photoRoot;
+    config.jobs.errorHistoryLimit = 1;
+    const server = await buildServer({
+      config,
+      providerClient,
+      serveWeb: false,
+    });
+    const layerResponse = await server.inject({
+      method: "POST",
+      url: "/api/layers",
+      payload: {
+        name: "Broken photos",
+        pluginId: "photo-layer",
+        configuration: {},
+        data: {},
+        visible: true,
+        displayOrder: 0,
+        opacity: 1,
+        minimumZoom: null,
+        maximumZoom: null,
+      },
+    });
+    const layerId = layerResponse.json().id as string;
+    const scanResponse = await server.inject({
+      method: "POST",
+      url: `/api/layers/${layerId}/photo-scan-jobs`,
+      payload: { relativeDirectory: "", recursive: true },
+    });
+    const jobId = scanResponse.json().id as string;
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${jobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        total: 1,
+        failed: 1,
+      });
+    });
+
+    const errors = await server.inject({
+      method: "GET",
+      url: `/api/jobs/${jobId}/errors`,
+    });
+    expect(errors.statusCode, errors.body).toBe(200);
+    expect(errors.json()).toMatchObject({
+      items: [
+        {
+          code: "PHOTO_PROCESSING_FAILED",
+          item: "broken.jpg",
+        },
+      ],
+    });
+    expect(errors.body).not.toContain(photoRoot);
+
+    const sqlite = new DatabaseSync(config.storage.databasePath);
+    sqlite
+      .prepare("UPDATE jobs SET finished_at = ?, updated_at = ? WHERE id = ?")
+      .run("2000-01-01T00:00:00.000Z", "2000-01-01T00:00:00.000Z", jobId);
+    sqlite.close();
+    const cleanup = await server.inject({
+      method: "POST",
+      url: "/api/jobs/cleanup",
+    });
+    expect(cleanup.statusCode, cleanup.body).toBe(200);
+    expect(cleanup.json()).toMatchObject({ deletedJobs: 1 });
+    expect(
+      (await server.inject({ method: "GET", url: `/api/jobs/${jobId}` }))
+        .statusCode,
+    ).toBe(404);
 
     await server.close();
   });

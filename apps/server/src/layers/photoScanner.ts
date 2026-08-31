@@ -3,10 +3,12 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import type {
-  PhotoScanJobInput,
   Job,
+  JobCleanupResponse,
+  JobError,
   LayerAsset,
   LayerAssetPatch,
+  PhotoScanJobInput,
 } from "@maptoy/contracts";
 import type { LayerService } from "./service.js";
 import type {
@@ -117,6 +119,7 @@ function publicAsset(asset: StoredLayerAsset): LayerAsset {
 
 export class PhotoScanService {
   private activeRun: Promise<void> | null = null;
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private shuttingDown = false;
 
   constructor(
@@ -130,11 +133,18 @@ export class PhotoScanService {
       decoderConcurrency: number;
       maximumFiles: number;
     },
+    private readonly jobPolicy: {
+      retentionDays: number;
+      errorHistoryLimit: number;
+    },
   ) {}
 
   async initialize(): Promise<void> {
     await this.previews.initialize();
     this.jobs.recoverInterrupted();
+    this.cleanupJobs();
+    this.cleanupTimer = setInterval(() => this.cleanupJobs(), 60 * 60 * 1000);
+    this.cleanupTimer.unref();
     this.pump();
   }
 
@@ -148,6 +158,18 @@ export class PhotoScanService {
       throw new JobNotFoundError();
     }
     return job;
+  }
+
+  listJobErrors(id: string): JobError[] {
+    this.getJob(id);
+    return this.jobs.listErrors(id);
+  }
+
+  cleanupJobs(referenceTime = new Date()): JobCleanupResponse {
+    const cutoff = new Date(
+      referenceTime.getTime() - this.jobPolicy.retentionDays * 86_400_000,
+    ).toISOString();
+    return { deletedJobs: this.jobs.deleteExpired(cutoff), cutoff };
   }
 
   assertLayerIdle(layerId: string): void {
@@ -327,6 +349,10 @@ export class PhotoScanService {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
     await this.activeRun;
   }
 
@@ -371,20 +397,28 @@ export class PhotoScanService {
           `The scan found ${files.length} photos; MAPTOY_PHOTOS_SCAN_MAX_FILES allows ${this.limits.maximumFiles}.`,
         );
       }
+      const progressCursor = this.jobs.progressCursor(job.id);
+      const remainingFiles =
+        progressCursor === null
+          ? files
+          : files.filter(
+              (file) => file.relativePath.localeCompare(progressCursor) > 0,
+            );
+      const processedFiles = job.completed + job.skipped + job.failed;
       job = {
         ...job,
-        total: files.length,
+        total: processedFiles + remainingFiles.length,
         updatedAt: new Date().toISOString(),
       };
       this.jobs.update(job);
       const existing = this.layerRepository.listExternalPhotos(input.layerId);
-      const seen = new Set<string>();
+      const seen = new Set(files.map((file) => file.relativePath));
       for (
         let batchStart = 0;
-        batchStart < files.length;
+        batchStart < remainingFiles.length;
         batchStart += this.limits.batchSize
       ) {
-        const batch = files.slice(
+        const batch = remainingFiles.slice(
           batchStart,
           batchStart + this.limits.batchSize,
         );
@@ -393,15 +427,7 @@ export class PhotoScanService {
           chunkStart < batch.length;
           chunkStart += this.limits.decoderConcurrency
         ) {
-          const current = this.getJob(job.id);
-          if (current.status !== "running" || this.shuttingDown) {
-            if (this.shuttingDown && current.status === "running") {
-              this.jobs.update({
-                ...current,
-                status: "queued",
-                updatedAt: new Date().toISOString(),
-              });
-            }
+          if (this.stopRequested(job.id)) {
             return;
           }
           const chunk = batch.slice(
@@ -410,12 +436,11 @@ export class PhotoScanService {
           );
           const results = await Promise.all(
             chunk.map(async (file) => {
-              seen.add(file.relativePath);
               const previous = this.layerRepository.getExternalPhoto(
                 input.layerId,
                 file.relativePath,
               );
-              return this.processFile(input.layerId, file, previous);
+              return this.processFile(job.id, input.layerId, file, previous);
             }),
           );
           const progress = results.reduce(
@@ -428,6 +453,19 @@ export class PhotoScanService {
             { created: 0, changed: 0, unchanged: 0, failed: 0 },
           );
           const latest = this.getJob(job.id);
+          const nextProcessedFiles =
+            latest.completed +
+            latest.skipped +
+            latest.failed +
+            progress.created +
+            progress.changed +
+            progress.unchanged +
+            progress.failed;
+          if (nextProcessedFiles > latest.total) {
+            throw new Error(
+              "Photo scan progress exceeds the discovered total.",
+            );
+          }
           job = {
             ...latest,
             completed: latest.completed + progress.created + progress.changed,
@@ -442,8 +480,17 @@ export class PhotoScanService {
             },
             updatedAt: new Date().toISOString(),
           };
-          this.jobs.update(job);
+          const lastProcessedPath = chunk.at(-1)?.relativePath;
+          if (lastProcessedPath === undefined) {
+            throw new Error(
+              "Photo scan progress cannot checkpoint an empty chunk.",
+            );
+          }
+          this.jobs.updateProgress(job, lastProcessedPath);
         }
+      }
+      if (this.stopRequested(job.id)) {
+        return;
       }
       let missing = 0;
       for (const asset of existing) {
@@ -454,17 +501,18 @@ export class PhotoScanService {
             input.relativeDirectory,
             input.recursive,
           ) &&
-          !seen.has(asset.relativePath) &&
-          asset.status !== "missing"
+          !seen.has(asset.relativePath)
         ) {
-          this.layerRepository.upsertAsset({
-            ...asset,
-            status: "missing",
-            errorCode: "PHOTO_SOURCE_MISSING",
-            errorMessage: "The external photo file is no longer available.",
-            updatedAt: new Date().toISOString(),
-          });
           missing += 1;
+          if (asset.status !== "missing") {
+            this.layerRepository.upsertAsset({
+              ...asset,
+              status: "missing",
+              errorCode: "PHOTO_SOURCE_MISSING",
+              errorMessage: "The external photo file is no longer available.",
+              updatedAt: new Date().toISOString(),
+            });
+          }
         }
       }
       const finishedAt = new Date().toISOString();
@@ -474,25 +522,50 @@ export class PhotoScanService {
         status: "completed",
         summary: {
           ...latest.summary,
-          missing: (latest.summary.missing ?? 0) + missing,
+          missing,
         },
         updatedAt: finishedAt,
         finishedAt,
       });
     } catch (error) {
       const timestamp = new Date().toISOString();
+      const message =
+        error instanceof Error ? error.message : "The photo scan failed.";
+      this.jobs.addError(
+        job.id,
+        {
+          code: "PHOTO_SCAN_FAILED",
+          message,
+          item: null,
+          createdAt: timestamp,
+        },
+        this.jobPolicy.errorHistoryLimit,
+      );
       this.jobs.update({
         ...this.getJob(job.id),
         status: "failed",
-        lastError:
-          error instanceof Error ? error.message : "The photo scan failed.",
+        lastError: message,
         updatedAt: timestamp,
         finishedAt: timestamp,
       });
     }
   }
 
+  private stopRequested(jobId: string): boolean {
+    const current = this.getJob(jobId);
+    if (this.shuttingDown && current.status === "running") {
+      this.jobs.update({
+        ...current,
+        status: "queued",
+        updatedAt: new Date().toISOString(),
+      });
+      return true;
+    }
+    return current.status !== "running";
+  }
+
   private async processFile(
+    jobId: string,
     layerId: string,
     file: ResolvedPhotoFile,
     previous: StoredLayerAsset | undefined,
@@ -573,6 +646,9 @@ export class PhotoScanService {
       }
       return previous === undefined ? "created" : "changed";
     } catch (error) {
+      const message = (
+        error instanceof Error ? error.message : "Photo processing failed."
+      ).replaceAll(file.absolutePath, file.relativePath);
       this.layerRepository.upsertAsset({
         id: assetId,
         layerId,
@@ -592,8 +668,7 @@ export class PhotoScanService {
         coordinateSource: previous?.coordinateSource ?? "none",
         previewAvailable: previous?.previewAvailable ?? false,
         errorCode: "PHOTO_PROCESSING_FAILED",
-        errorMessage:
-          error instanceof Error ? error.message : "Photo processing failed.",
+        errorMessage: message,
         createdAt: previous?.createdAt ?? timestamp,
         updatedAt: timestamp,
         managedPath: null,
@@ -602,6 +677,16 @@ export class PhotoScanService {
         bounds: previous?.bounds ?? null,
         metadata: previous?.metadata ?? {},
       });
+      this.jobs.addError(
+        jobId,
+        {
+          code: "PHOTO_PROCESSING_FAILED",
+          message,
+          item: file.relativePath,
+          createdAt: timestamp,
+        },
+        this.jobPolicy.errorHistoryLimit,
+      );
       return "failed";
     }
   }

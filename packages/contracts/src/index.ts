@@ -382,6 +382,34 @@ export const JobListResponseSchema = Type.Object(
   { additionalProperties: false, $id: "JobListResponse" },
 );
 
+export const JobErrorSchema = Type.Object(
+  {
+    id: Type.Integer({ minimum: 1 }),
+    code: Type.String(),
+    message: Type.String(),
+    item: Type.Union([Type.String(), Type.Null()]),
+    createdAt: Type.String(),
+  },
+  { additionalProperties: false, $id: "JobError" },
+);
+
+export type JobError = Static<typeof JobErrorSchema>;
+
+export const JobErrorListResponseSchema = Type.Object(
+  { items: Type.Array(JobErrorSchema) },
+  { additionalProperties: false, $id: "JobErrorListResponse" },
+);
+
+export const JobCleanupResponseSchema = Type.Object(
+  {
+    deletedJobs: Type.Integer({ minimum: 0 }),
+    cutoff: Type.String(),
+  },
+  { additionalProperties: false, $id: "JobCleanupResponse" },
+);
+
+export type JobCleanupResponse = Static<typeof JobCleanupResponseSchema>;
+
 export const MapSetTestResponseSchema = Type.Object(
   {
     ok: Type.Boolean(),

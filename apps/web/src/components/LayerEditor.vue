@@ -18,6 +18,8 @@ const props = defineProps<{
   activeScanJob: Job | undefined;
   displayedScanJob: Job | undefined;
   photoCount: number;
+  photosLoaded: boolean;
+  hasMorePhotos: boolean;
 }>();
 
 const pluginEditor = computed(
@@ -133,6 +135,8 @@ function emitConfigurationChange(
       :active-scan-job="activeScanJob"
       :displayed-scan-job="displayedScanJob"
       :photo-count="photoCount"
+      :photos-loaded="photosLoaded"
+      :has-more-photos="hasMorePhotos"
       @configuration-change="emitConfigurationChange"
       @upload-track="emit('uploadTrack', $event)"
       @update:scan-directory="emit('update:scanDirectory', $event)"

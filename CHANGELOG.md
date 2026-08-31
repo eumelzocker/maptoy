@@ -4,6 +4,25 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-31
+
+### Added
+
+- Added bounded per-Job diagnostic history and configurable terminal-Job retention
+  with automatic and manual cleanup that protects queued, running, and paused Jobs.
+
+### Changed
+
+- Load Photo Asset pages on demand in the browser, with explicit cursor-based
+  catalog continuation and full map loading limited to visible Photo Layers.
+- Document reproducible Photo scan measurements and tighten configurable ceilings
+  for file bytes, decoded pixels, previews, batches, decoder concurrency, and files.
+
+### Fixed
+
+- Checkpointed Photo scan progress so pause, resume, cancellation, and restart
+  recovery never count already processed files twice.
+
 ## [0.3.0] - 2026-08-31
 
 ### Changed

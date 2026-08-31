@@ -85,6 +85,12 @@ Unveränderte Dateien werden anhand Größe und Änderungszeit vor dem Dekodiere
 übersprungen. Nicht mehr vorhandene Dateien erhalten den Status `missing`; Katalog
 und Vorschau bleiben erhalten.
 
+Der Browser lädt nicht mehr sämtliche Assetseiten aller Layer vorab. Beim Auswählen
+eines Fotolayers wird die erste Katalogseite geladen; **Load more photos** folgt bei
+Bedarf dem Server-Cursor. Für die Karte werden die Cursorseiten nur bei sichtbaren
+Fotolayern vollständig abgearbeitet, sodass ausgeblendete Kataloge den initialen
+Layer-Aufbau nicht verzögern.
+
 EXIF-GPS wird beim ersten Scan unmittelbar zur wirksamen Punktposition. Es gibt keine
 getrennte erkannte und akzeptierte Koordinate. Unter **Manage photos** kann die
 Position korrigiert, bewusst entfernt oder durch West-/Süd-/Ost-/Nord-Bounds für ein
@@ -104,3 +110,7 @@ Vorschaukante, Batchgröße 100, zwei parallele Decoder und 100.000 Dateien pro 
 Sie werden über `MAPTOY_PHOTOS_MAX_FILE_BYTES`, `MAPTOY_PHOTOS_MAX_DECODED_PIXELS`,
 `MAPTOY_PHOTOS_PREVIEW_MAX_EDGE`, `MAPTOY_PHOTOS_SCAN_BATCH_SIZE`,
 `MAPTOY_PHOTOS_SCAN_CONCURRENCY` und `MAPTOY_PHOTOS_SCAN_MAX_FILES` konfiguriert.
+Werte oberhalb von 256 MiB, 150 Millionen dekodierten Pixeln, 2048 Pixel
+Vorschaukante, Batchgröße 1.000, vier Decodern oder 250.000 Dateien weist der Server
+beim Start zurück. Die Defaults und Obergrenzen beruhen auf dem reproduzierbaren
+Phase-5-Fotobenchmark.

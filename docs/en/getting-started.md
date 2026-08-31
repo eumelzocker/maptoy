@@ -43,8 +43,9 @@ docker compose up --build
 ```
 
 Runtime settings follow `MAPTOY_<DOMAIN>_<PROPERTY>`. The current domains are
-`SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, and `PHOTOS`; provider secrets
-use the provider name as their domain. Previous variable names are not supported.
+`SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, `JOBS`, and `PHOTOS`; provider
+secrets use the provider name as their domain. Previous variable names are not
+supported.
 
 Set `MAPTOY_PHOTOS_DIR` to an existing host directory when using the Photo catalog.
 The standard Compose file mounts it read-only automatically; no additional Compose
@@ -64,6 +65,12 @@ not supported upgrade sources; no production database predates version 4.
 `MAPTOY_TILES_MAX_BYTES` limits both provider responses and the raw body of the Tile
 seeding route. The upload limit is route-specific and does not reduce the accepted
 size of Map Set JSON or unrelated API requests.
+
+Terminal Jobs are retained for 30 days by default. Configure that period with
+`MAPTOY_JOBS_RETENTION_DAYS` and the per-Job diagnostic history with
+`MAPTOY_JOBS_ERROR_HISTORY_LIMIT`. Cleanup runs during startup and hourly; a trusted
+operator can also trigger the same policy with `POST api/jobs/cleanup`. Queued,
+running, and paused Jobs are never removed by retention.
 
 ## Traffic logs
 

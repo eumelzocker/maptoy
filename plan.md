@@ -1011,7 +1011,8 @@ erst mit dem Download-Worker ergänzt.
 **Status:** Kernumfang am 28. August 2026 als Version `0.2.0` veröffentlicht;
 Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 `0.2.1` verfeinert; Photo-Domäne und Betriebskonfiguration am 31. August 2026 mit
-Version `0.3.0` konsolidiert; Abschluss nach den unten aufgeführten Restarbeiten
+Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten am
+31. August 2026 abgeschlossen und mit Version `0.3.1` veröffentlicht
 
 **Aufgaben**
 
@@ -1105,26 +1106,25 @@ Version `0.3.0` konsolidiert; Abschluss nach den unten aufgeführten Restarbeite
 - Ein deaktiviertes oder fehlendes Plugin verursacht keinen Datenverlust; ungültige beziehungsweise inkompatible Zustände werden verständlich angezeigt.
 - Es kann kein ausführbarer Plugin-Code über API oder Weboberfläche installiert werden.
 
-**Offene Restarbeiten vor Abschluss der Phase**
+**Abschlussarbeiten**
 
-- Fortschrittszähler und Zusammenfassungen von Fotoscan-Jobs bei Pause,
-  Fortsetzung und Neustart-Recovery konsistent halten. Eine erneut begonnene
+- Fortschrittszähler und Zusammenfassungen von Fotoscan-Jobs werden bei Pause,
+  Fortsetzung und Neustart-Recovery durch persistente Cursor konsistent gehalten. Eine erneut begonnene
   inkrementelle Verarbeitung darf bereits gezählte Dateien nicht ein zweites Mal
   addieren; Integrationsprüfungen decken Pause, Fortsetzung, Abbruch und Recovery
   einschließlich `completed + skipped + failed <= total` ab.
-- Standard- und Hartgrenzen für Bilddateigröße, dekodierte Pixel,
-  Vorschauabmessungen, Scan-Batchgröße und parallele Decoder mit repräsentativen
-  Bildverzeichnissen messen. Messumgebung, Laufzeit, Speicherbedarf, gewählte
-  Defaults und Diagnosen für einzelne zu große oder beschädigte Dateien werden
-  nachvollziehbar dokumentiert.
-- Für abgeschlossene Jobs und ihre begrenzte Fehlerhistorie eine konfigurierbare
-  Aufbewahrungsstrategie sowie einen nachvollziehbaren manuellen beziehungsweise
-  automatischen Bereinigungsweg umsetzen. Laufende und pausierte Jobs bleiben
+- Standard- und Hartgrenzen für Fotodateigröße, dekodierte Pixel,
+  Vorschauabmessungen, Scan-Batchgröße, parallele Decoder und Dateianzahl sind mit
+  repräsentativen Verzeichnissen gemessen. Messumgebung, Laufzeit, Speicherbedarf,
+  gewählte Defaults und Einzelfehlerdiagnosen sind reproduzierbar dokumentiert.
+- Für abgeschlossene Jobs und ihre begrenzte Fehlerhistorie ist eine konfigurierbare
+  Aufbewahrungsstrategie mit stündlicher, beim Start ausgeführter und manuell
+  auslösbarer Bereinigung umgesetzt. Wartende, laufende und pausierte Jobs bleiben
   geschützt; Phase 7 erweitert dieselbe Entscheidung um fertige Exportdateien.
-- Den Fotokatalog im Frontend bedarfsgerecht und cursor-basiert laden, statt beim
-  Initialisieren sämtliche Assetseiten aller Layer abzurufen und anschließend nur
-  einen Ausschnitt anzuzeigen. Verwaltung und Kartenanzeige bleiben auch bei großen
-  konfigurierten Fotokatalogen kontrolliert nutzbar.
+- Der Fotokatalog wird im Frontend bedarfsgerecht und cursor-basiert geladen, statt
+  beim Initialisieren sämtliche Assetseiten aller Layer abzurufen. Die Verwaltung
+  lädt explizit weitere Seiten; nur sichtbare Fotolayer werden für die Karte
+  vollständig nachgeladen.
 
 ### Phase 5a: Zustandsabgeleitete dekorative Layer
 
@@ -1320,23 +1320,21 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.2.2` | Koordinatenformate, verfeinerte Map-Set-Auswahl und Tile-Vorschau sowie OpenTopoMap als zugangsdatenfreie Erststartvorgabe |
 | `0.2.3` | Dekorativer Tile-Grid-Layer mit lokalen Maßstabsleisten, schnellem Display-Schalter und Mapping-Ressourcen |
 | `0.3.0` | Konsistentes Environment-Schema, vereinfachter Fotokatalog und überarbeitete Dialog- und Kartenwerkzeuge |
+| `0.3.1` | Abschluss von Phase 5 mit belastbarer Scan-Wiederaufnahme, Job-Aufbewahrung, skalierbarem Fotokatalog und gemessenen Fotolimits |
 
 ### 13.2 Weitere Releases
 
-Mit `0.2.0` ist der nutzbare Kernumfang von Phase 5 veröffentlicht. Vor Beginn von
-Phase 6 werden die bei Phase 5 dokumentierten Restarbeiten und anschließend Phase
-5a abgeschlossen. Die weitere fachliche Reihenfolge erhält erst beim tatsächlichen
-Release konkrete Patchnummern:
+Mit `0.3.1` ist Phase 5 vollständig veröffentlicht. Phase 5a ist bereits seit
+Version `0.2.3` vollständig veröffentlicht; ihre für Phase 7 vorgesehene
+serverseitige Deskriptorausgabe ist kein offener Bestandteil von Phase 5a. Die
+weitere fachliche Reihenfolge erhält erst beim tatsächlichen Release konkrete
+Patchnummern:
 
-1. Abschluss Phase 5: konsistente Job-Recovery, gemessene Bildlimits,
-   Job-Aufbewahrung und skalierbares Laden des Fotokatalogs
-2. Phase 5a: zustandsabgeleitete dekorative Layer, XYZ-Tile-Grid und metrische
-   Maßstabsleiste
-3. Phase 6: kontrollierter Batch-Download, Provider-Limits und Erweiterung des
+1. Phase 6: kontrollierter Batch-Download, Provider-Limits und Erweiterung des
    gemeinsamen Job-Systems
-4. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
-5. Phase 8: vollständige Dokumentation und lokalisierte Suche
-6. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
+2. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
+3. Phase 8: vollständige Dokumentation und lokalisierte Suche
+4. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
 
 Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als eigene Versionen erscheinen.
 
@@ -1461,14 +1459,19 @@ geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
   Fotoverzeichnis. maptoy persistiert Katalogmetadaten und abgeleitete Vorschauen,
   übernimmt EXIF-GPS automatisch als korrigierbare wirksame Position und scannt
   Verzeichnisse inkrementell über den gemeinsamen persistenten Jobkern.
+- Standard- und Konfigurationsobergrenzen für Fotodateien, dekodierte Pixel,
+  Vorschauen, Batches, Decoder und Dateianzahl beruhen auf dem reproduzierbaren
+  [Photo scan limits benchmark](docs/internal/photo-scan-benchmark.md).
+- Terminale Jobs bleiben standardmäßig 30 Tage erhalten; ihre Diagnosehistorie ist
+  standardmäßig auf 100 Einträge begrenzt. Beide Werte sind konfigurierbar. Die
+  Bereinigung läuft beim Start und stündlich oder wird über die API manuell
+  ausgelöst; wartende, laufende und pausierte Jobs sind geschützt.
 
 ### 16.2 Offen für verbleibende v1-Phasen
 
 | Spätestens vor | Entscheidung | Benötigtes Ergebnis |
 | --- | --- | --- |
-| Abschluss Phase 5 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Bilddateigröße, dekodierte Pixel, Vorschauabmessungen, Scan-Batchgröße und parallele Decoder? | Mit repräsentativen Bildverzeichnissen gemessene Defaults, konfigurierbare Grenzen, begrenzter Ressourcenverbrauch und verständliche Diagnose einzelner zu großer oder beschädigter Dateien, ohne den gesamten Scan abzubrechen oder die Gesamtgröße eines Verzeichnisses unnötig zu begrenzen. |
 | Phase 6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? Die Coverage-Antwort ist unabhängig davon bereits auf standardmäßig 1.024 und maximal 4.096 aggregierte Zellen begrenzt. | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_TILES_MAX_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
-| Abschluss Phase 5 | Wie lange bleiben abgeschlossene Jobs und begrenzte Fehlerhistorien erhalten? | Standardfristen, konfigurierbare Aufbewahrung, Schutz laufender und pausierter Jobs sowie ein nachvollziehbarer manueller beziehungsweise automatischer Bereinigungsweg. |
 | Phase 7 | Wie lange bleiben fertige Exportdateien erhalten? | Auf der allgemeinen Job-Aufbewahrung aufbauende Standardfrist, konfigurierbare Grenze und nachvollziehbarer Bereinigungsweg für Exportdateien. |
 | Phase 8 | Ist eine ausreichend gute Thai-Suche mit vertretbarem Aufwand möglich? | Entweder getestete Thai-Segmentierung und Suche oder eine bewusst deaktivierte Thai-Suche mit sichtbarem Verweis auf die englische Suche. |
 

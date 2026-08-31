@@ -1,0 +1,22 @@
+meta {
+  name: Jobs - Apply Retention (deletes expired data)
+  type: http
+  seq: 20
+}
+post {
+  url: {{appUrl}}/api/jobs/cleanup
+  body: none
+  auth: none
+}
+
+docs {
+  Applies MAPTOY_JOBS_RETENTION_DAYS immediately. This deletes expired completed, failed, and cancelled Jobs plus their diagnostics; queued, running, and paused Jobs remain protected.
+}
+
+tests {
+  test("applies Job retention", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.deletedJobs).to.be.a("number");
+    expect(res.body.cutoff).to.be.a("string");
+  });
+}

@@ -9,6 +9,8 @@ export const DEFAULT_LOGGING_TRAFFIC_MAX_FILES = 5;
 export const DEFAULT_TILES_PROVIDER_TIMEOUT_MILLISECONDS = 10_000;
 export const DEFAULT_TILES_MAX_BYTES = 10 * 1024 * 1024;
 export const DEFAULT_LAYERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
+export const DEFAULT_JOBS_RETENTION_DAYS = 30;
+export const DEFAULT_JOBS_ERROR_HISTORY_LIMIT = 100;
 export const DEFAULT_PHOTOS_MAX_FILE_BYTES = 100 * 1024 * 1024;
 export const DEFAULT_PHOTOS_MAX_DECODED_PIXELS = 100_000_000;
 export const DEFAULT_PHOTOS_PREVIEW_MAX_EDGE = 640;
@@ -17,12 +19,17 @@ export const DEFAULT_PHOTOS_SCAN_CONCURRENCY = 2;
 export const DEFAULT_PHOTOS_SCAN_MAX_FILES = 100_000;
 
 const PHOTOS_LIMITS = {
-  bytes: 1024 * 1024 * 1024,
-  pixels: 500_000_000,
-  previewEdge: 4096,
-  scanBatch: 10_000,
-  decoderConcurrency: 16,
-  scanFiles: 1_000_000,
+  bytes: 256 * 1024 * 1024,
+  pixels: 150_000_000,
+  previewEdge: 2048,
+  scanBatch: 1000,
+  decoderConcurrency: 4,
+  scanFiles: 250_000,
+} as const;
+
+const JOBS_LIMITS = {
+  retentionDays: 3650,
+  errorHistory: 1000,
 } as const;
 
 export type LogLevel =
@@ -50,6 +57,10 @@ export interface MaptoyConfig {
     maximumBytes: number;
   };
   layers: { assetMaximumBytes: number };
+  jobs: {
+    retentionDays: number;
+    errorHistoryLimit: number;
+  };
   photos: {
     directory: string | null;
     maximumFileBytes: number;
@@ -199,6 +210,20 @@ export function loadConfig(
         environment.MAPTOY_LAYERS_ASSET_MAX_BYTES,
         DEFAULT_LAYERS_ASSET_MAX_BYTES,
         "MAPTOY_LAYERS_ASSET_MAX_BYTES",
+      ),
+    },
+    jobs: {
+      retentionDays: parseBoundedPositiveInteger(
+        environment.MAPTOY_JOBS_RETENTION_DAYS,
+        DEFAULT_JOBS_RETENTION_DAYS,
+        JOBS_LIMITS.retentionDays,
+        "MAPTOY_JOBS_RETENTION_DAYS",
+      ),
+      errorHistoryLimit: parseBoundedPositiveInteger(
+        environment.MAPTOY_JOBS_ERROR_HISTORY_LIMIT,
+        DEFAULT_JOBS_ERROR_HISTORY_LIMIT,
+        JOBS_LIMITS.errorHistory,
+        "MAPTOY_JOBS_ERROR_HISTORY_LIMIT",
       ),
     },
     photos: {

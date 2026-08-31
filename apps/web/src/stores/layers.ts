@@ -33,10 +33,17 @@ interface JobListResponse {
   items: Job[];
 }
 
+const assetPageRequests = new Map<string, Promise<void>>();
+
+function hasOwn(record: object, key: string): boolean {
+  return Object.hasOwn(record, key);
+}
+
 export const useLayersStore = defineStore("layers", {
   state: () => ({
     items: [] as Layer[],
     assetsByLayer: {} as Record<string, LayerAsset[]>,
+    assetNextCursorByLayer: {} as Record<string, string | null>,
     photoDirectory: {
       configured: false,
       available: false,
@@ -49,6 +56,14 @@ export const useLayersStore = defineStore("layers", {
   getters: {
     defaultGridLayer: (state): Layer | null =>
       findDefaultGridLayer(state.items),
+    assetsLoaded:
+      (state) =>
+      (layerId: string): boolean =>
+        hasOwn(state.assetNextCursorByLayer, layerId),
+    hasMoreAssets:
+      (state) =>
+      (layerId: string): boolean =>
+        typeof state.assetNextCursorByLayer[layerId] === "string",
   },
   actions: {
     async load(): Promise<void> {
@@ -57,7 +72,6 @@ export const useLayersStore = defineStore("layers", {
       try {
         const response = await apiRequest<LayerListResponse>("api/layers");
         this.items = response.items;
-        await Promise.all(this.items.map((layer) => this.loadAssets(layer.id)));
         this.loaded = true;
       } catch (error) {
         this.error =
@@ -68,21 +82,70 @@ export const useLayersStore = defineStore("layers", {
       }
     },
 
-    async loadAssets(layerId: string): Promise<void> {
-      const assets: LayerAsset[] = [];
-      let cursor: string | null = null;
-      do {
-        const query: string =
-          cursor === null
-            ? ""
-            : `?cursor=${encodeURIComponent(cursor)}&limit=500`;
-        const page: AssetListResponse = await apiRequest<AssetListResponse>(
-          `api/layers/${encodeURIComponent(layerId)}/assets${query}`,
+    async loadAssets(layerId: string, limit = 200): Promise<void> {
+      await assetPageRequests.get(layerId);
+      const request = (async () => {
+        const page = await apiRequest<AssetListResponse>(
+          `api/layers/${encodeURIComponent(layerId)}/assets?limit=${limit}`,
         );
-        assets.push(...page.items);
-        cursor = page.nextCursor;
-      } while (cursor !== null);
-      this.assetsByLayer[layerId] = assets;
+        this.assetsByLayer[layerId] = page.items;
+        this.assetNextCursorByLayer[layerId] = page.nextCursor;
+      })();
+      assetPageRequests.set(layerId, request);
+      try {
+        await request;
+      } finally {
+        if (assetPageRequests.get(layerId) === request) {
+          assetPageRequests.delete(layerId);
+        }
+      }
+    },
+
+    async ensureAssets(layerId: string): Promise<void> {
+      await assetPageRequests.get(layerId);
+      if (!hasOwn(this.assetNextCursorByLayer, layerId)) {
+        await this.loadAssets(layerId);
+      }
+    },
+
+    async loadMoreAssets(layerId: string, limit = 200): Promise<void> {
+      await assetPageRequests.get(layerId);
+      if (!hasOwn(this.assetNextCursorByLayer, layerId)) {
+        await this.loadAssets(layerId, limit);
+        return;
+      }
+      const cursor = this.assetNextCursorByLayer[layerId];
+      if (typeof cursor !== "string") {
+        return;
+      }
+      const request = (async () => {
+        const page = await apiRequest<AssetListResponse>(
+          `api/layers/${encodeURIComponent(layerId)}/assets?cursor=${encodeURIComponent(cursor)}&limit=${limit}`,
+        );
+        const known = new Set(
+          (this.assetsByLayer[layerId] ?? []).map(({ id }) => id),
+        );
+        this.assetsByLayer[layerId] = [
+          ...(this.assetsByLayer[layerId] ?? []),
+          ...page.items.filter(({ id }) => !known.has(id)),
+        ];
+        this.assetNextCursorByLayer[layerId] = page.nextCursor;
+      })();
+      assetPageRequests.set(layerId, request);
+      try {
+        await request;
+      } finally {
+        if (assetPageRequests.get(layerId) === request) {
+          assetPageRequests.delete(layerId);
+        }
+      }
+    },
+
+    async loadAllAssets(layerId: string): Promise<void> {
+      await this.ensureAssets(layerId);
+      while (this.assetNextCursorByLayer[layerId] !== null) {
+        await this.loadMoreAssets(layerId, 500);
+      }
     },
 
     async loadPhotoDirectory(): Promise<void> {
@@ -109,6 +172,7 @@ export const useLayersStore = defineStore("layers", {
       });
       this.items.push(layer);
       this.assetsByLayer[layer.id] = [];
+      this.assetNextCursorByLayer[layer.id] = null;
       return layer;
     },
 
@@ -162,6 +226,7 @@ export const useLayersStore = defineStore("layers", {
       });
       this.items = this.items.filter((layer) => layer.id !== id);
       delete this.assetsByLayer[id];
+      delete this.assetNextCursorByLayer[id];
     },
 
     async uploadTrack(layerId: string, file: File): Promise<void> {

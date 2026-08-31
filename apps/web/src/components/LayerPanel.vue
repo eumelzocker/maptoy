@@ -315,6 +315,21 @@ function selectLayer(layerId: string | null): void {
   saveSelectedLayerId(layerId, browserStorage);
 }
 
+watch(
+  selectedLayer,
+  (layer) => {
+    if (layer?.pluginId === "photo-layer") {
+      void store.ensureAssets(layer.id).catch((error) => {
+        localError.value =
+          error instanceof Error
+            ? error.message
+            : "The Photo catalog could not be loaded.";
+      });
+    }
+  },
+  { immediate: true },
+);
+
 function photoAssets(layerId: string): LayerAsset[] {
   return (store.assetsByLayer[layerId] ?? []).filter(
     (asset) => asset.kind === "external-photo",
@@ -562,10 +577,43 @@ function openAsset(asset: LayerAsset): void {
 }
 
 function openFirstPhoto(layerId: string): void {
-  const asset = photoAssets(layerId)[0];
-  if (asset !== undefined) {
-    openAsset(asset);
-  }
+  void (async () => {
+    busy.value = true;
+    localError.value = null;
+    try {
+      await store.ensureAssets(layerId);
+      const asset = photoAssets(layerId)[0];
+      if (asset === undefined) {
+        localError.value = "The Photo catalog is empty.";
+        return;
+      }
+      openAsset(asset);
+    } catch (error) {
+      localError.value =
+        error instanceof Error
+          ? error.message
+          : "The Photo catalog could not be loaded.";
+    } finally {
+      busy.value = false;
+    }
+  })();
+}
+
+function loadMorePhotos(layerId: string): void {
+  void (async () => {
+    busy.value = true;
+    localError.value = null;
+    try {
+      await store.loadMoreAssets(layerId);
+    } catch (error) {
+      localError.value =
+        error instanceof Error
+          ? error.message
+          : "More Photos could not be loaded.";
+    } finally {
+      busy.value = false;
+    }
+  })();
 }
 
 function controlJob(id: string, action: "pause" | "resume" | "cancel"): void {
@@ -613,7 +661,10 @@ async function pollJobs(): Promise<void> {
   if (finished) {
     await Promise.all(
       store.items
-        .filter((layer) => layer.pluginId === "photo-layer")
+        .filter(
+          (layer) =>
+            layer.pluginId === "photo-layer" && store.assetsLoaded(layer.id),
+        )
         .map((layer) => store.loadAssets(layer.id)),
     );
     emit("changed");
@@ -704,6 +755,8 @@ onBeforeUnmount(() => {
         :active-scan-job="scanJob(selectedLayer.id)"
         :displayed-scan-job="displayedScanJob(selectedLayer.id)"
         :photo-count="photoAssets(selectedLayer.id).length"
+        :photos-loaded="store.assetsLoaded(selectedLayer.id)"
+        :has-more-photos="store.hasMoreAssets(selectedLayer.id)"
         @visibility-change="setSelectedVisibility"
         @opacity-change="setSelectedOpacity"
         @zoom-change="setSelectedZoom"
@@ -768,8 +821,14 @@ onBeforeUnmount(() => {
       <aside class="asset-list">
         <input v-model="assetSearch" type="search" placeholder="Filter photos" />
         <small v-if="filteredAssetCount > filteredPhotoAssets.length">
-          Showing {{ filteredPhotoAssets.length }} of {{ filteredAssetCount }} matches
+          Showing {{ filteredPhotoAssets.length }} of {{ filteredAssetCount }} loaded matches
         </small>
+        <button
+          v-if="store.hasMoreAssets(editingAsset.layerId)"
+          type="button"
+          :disabled="busy"
+          @click="loadMorePhotos(editingAsset.layerId)"
+        >Load more photos</button>
         <button
           v-for="asset in filteredPhotoAssets"
           :key="asset.id"

@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type {
   CoordinateSource,
   Job,
+  JobError,
   Layer,
   LayerAsset,
   LayerStatus,
@@ -69,6 +70,14 @@ interface JobRow {
   started_at: string | null;
   updated_at: string;
   finished_at: string | null;
+}
+
+interface JobErrorRow {
+  id: number;
+  code: string;
+  message: string;
+  item: string | null;
+  created_at: string;
 }
 
 export interface StoredLayerAsset extends LayerAsset {
@@ -480,6 +489,44 @@ export class JobRepository {
     }
   }
 
+  progressCursor(id: string): string | null {
+    const row = this.database
+      .prepare("SELECT progress_cursor FROM jobs WHERE id = ?")
+      .get(id) as { progress_cursor: string | null } | undefined;
+    if (row === undefined) {
+      throw new Error("The requested Job progress cursor does not exist.");
+    }
+    return row.progress_cursor;
+  }
+
+  updateProgress(job: Job, progressCursor: string): void {
+    const result = this.database
+      .prepare(
+        `UPDATE jobs SET status = ?, input_json = ?, total = ?, completed = ?,
+          skipped = ?, failed = ?, summary_json = ?, last_error = ?,
+          started_at = ?, updated_at = ?, finished_at = ?, progress_cursor = ?
+         WHERE id = ?`,
+      )
+      .run(
+        job.status,
+        JSON.stringify(job.input),
+        job.total,
+        job.completed,
+        job.skipped,
+        job.failed,
+        JSON.stringify(job.summary),
+        job.lastError,
+        job.startedAt,
+        job.updatedAt,
+        job.finishedAt,
+        progressCursor,
+        job.id,
+      );
+    if (result.changes !== 1) {
+      throw new Error("Job progress update did not affect exactly one row.");
+    }
+  }
+
   recoverInterrupted(): void {
     const timestamp = new Date().toISOString();
     this.database
@@ -488,5 +535,62 @@ export class JobRepository {
          WHERE status = 'running' AND type = 'photo-scan'`,
       )
       .run(timestamp);
+  }
+
+  listErrors(jobId: string): JobError[] {
+    const rows = this.database
+      .prepare(
+        `SELECT id, code, message, item, created_at
+         FROM job_errors WHERE job_id = ? ORDER BY id DESC`,
+      )
+      .all(jobId) as unknown as JobErrorRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      message: row.message,
+      item: row.item,
+      createdAt: row.created_at,
+    }));
+  }
+
+  addError(
+    jobId: string,
+    error: Omit<JobError, "id">,
+    historyLimit: number,
+  ): void {
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      this.database
+        .prepare(
+          `INSERT INTO job_errors (job_id, code, message, item, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(jobId, error.code, error.message, error.item, error.createdAt);
+      this.database
+        .prepare(
+          `DELETE FROM job_errors
+           WHERE job_id = ? AND id NOT IN (
+             SELECT id FROM job_errors WHERE job_id = ?
+             ORDER BY id DESC LIMIT ?
+           )`,
+        )
+        .run(jobId, jobId, historyLimit);
+      this.database.exec("COMMIT");
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  deleteExpired(cutoff: string): number {
+    return Number(
+      this.database
+        .prepare(
+          `DELETE FROM jobs
+           WHERE status IN ('completed', 'failed', 'cancelled')
+             AND finished_at IS NOT NULL AND finished_at < ?`,
+        )
+        .run(cutoff).changes,
+    );
   }
 }

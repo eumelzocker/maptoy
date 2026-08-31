@@ -78,9 +78,33 @@ describe("loadConfig", () => {
       scanMaximumFiles: 500,
     });
     expect(loadConfig({ MAPTOY_PHOTOS_DIR: "" }).photos.directory).toBeNull();
-    expect(() => loadConfig({ MAPTOY_PHOTOS_SCAN_CONCURRENCY: "17" })).toThrow(
-      "must not exceed 16",
+    expect(() => loadConfig({ MAPTOY_PHOTOS_SCAN_CONCURRENCY: "5" })).toThrow(
+      "must not exceed 4",
     );
+    for (const [name, value] of [
+      ["MAPTOY_PHOTOS_MAX_FILE_BYTES", String(256 * 1024 * 1024 + 1)],
+      ["MAPTOY_PHOTOS_MAX_DECODED_PIXELS", "150000001"],
+      ["MAPTOY_PHOTOS_PREVIEW_MAX_EDGE", "2049"],
+      ["MAPTOY_PHOTOS_SCAN_BATCH_SIZE", "1001"],
+      ["MAPTOY_PHOTOS_SCAN_MAX_FILES", "250001"],
+    ] as const) {
+      expect(() => loadConfig({ [name]: value })).toThrow(name);
+    }
+  });
+
+  it("validates Job retention and bounded error history", () => {
+    expect(
+      loadConfig({
+        MAPTOY_JOBS_RETENTION_DAYS: "14",
+        MAPTOY_JOBS_ERROR_HISTORY_LIMIT: "25",
+      }).jobs,
+    ).toEqual({ retentionDays: 14, errorHistoryLimit: 25 });
+    expect(() => loadConfig({ MAPTOY_JOBS_RETENTION_DAYS: "0" })).toThrow(
+      "MAPTOY_JOBS_RETENTION_DAYS",
+    );
+    expect(() =>
+      loadConfig({ MAPTOY_JOBS_ERROR_HISTORY_LIMIT: "1001" }),
+    ).toThrow("must not exceed 1000");
   });
 
   it("does not accept legacy environment aliases", () => {

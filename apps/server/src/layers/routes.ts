@@ -4,6 +4,8 @@ import {
   PhotoDirectoryStatusSchema,
   type PhotoScanJobInput,
   PhotoScanJobInputSchema,
+  JobCleanupResponseSchema,
+  JobErrorListResponseSchema,
   JobListResponseSchema,
   JobSchema,
   type Layer,
@@ -274,6 +276,12 @@ export function registerLayerRoutes(
     async () => ({ items: photoScans.listJobs() }),
   );
 
+  server.post(
+    "/api/jobs/cleanup",
+    { schema: { response: { 200: JobCleanupResponseSchema } } },
+    async () => photoScans.cleanupJobs(),
+  );
+
   server.get<{ Params: { id: string } }>(
     "/api/jobs/:id",
     {
@@ -283,6 +291,17 @@ export function registerLayerRoutes(
       },
     },
     async (request) => photoScans.getJob(request.params.id),
+  );
+
+  server.get<{ Params: { id: string } }>(
+    "/api/jobs/:id/errors",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: { 200: JobErrorListResponseSchema, 404: ErrorResponseSchema },
+      },
+    },
+    async (request) => ({ items: photoScans.listJobErrors(request.params.id) }),
   );
 
   for (const [action, invoke] of [

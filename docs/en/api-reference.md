@@ -99,6 +99,12 @@ valid state can be controlled with `POST api/jobs/:id/pause`,
 Photo scans additionally persist `summary` counts for `created`, `changed`,
 `unchanged`, `missing`, and `failed` files.
 
+`GET api/jobs/:id/errors` returns the newest retained per-item diagnostics. Their
+bounded history is configured with `MAPTOY_JOBS_ERROR_HISTORY_LIMIT`.
+`POST api/jobs/cleanup` applies `MAPTOY_JOBS_RETENTION_DAYS` immediately and reports
+the cutoff and number of removed terminal Jobs. The same cleanup runs at startup
+and hourly. It never removes queued, running, or paused Jobs.
+
 ## Security boundary
 
 *maptoy* v1 does not authenticate API requests. The Tile upload is a write operation

@@ -120,6 +120,11 @@ WebP preview, and records a size/mtime fingerprint. Unchanged files are skipped 
 later scans before decoding. Changed files are reprocessed. Files no longer present
 are marked `missing`; their metadata and existing preview remain available.
 
+The browser does not preload every Asset page for every Layer. Selecting a Photo
+Layer loads its first catalog page, and **Load more photos** follows the server's
+cursor when needed. The Map exhausts cursor pages only for visible Photo Layers so
+hidden catalogs do not delay initial Layer loading.
+
 EXIF GPS is immediately used as the effective point coordinate. There is no separate
 “detected” and “accepted” coordinate. Open **Manage photos** to correct or remove the
 point, or to enter west/south/east/north bounds for a raster overlay. A manual
@@ -144,4 +149,6 @@ edge, batches of 100, two concurrent decoders, and at most 100,000 files per sca
 Configure these with `MAPTOY_PHOTOS_MAX_FILE_BYTES`, `MAPTOY_PHOTOS_MAX_DECODED_PIXELS`,
 `MAPTOY_PHOTOS_PREVIEW_MAX_EDGE`, `MAPTOY_PHOTOS_SCAN_BATCH_SIZE`,
 `MAPTOY_PHOTOS_SCAN_CONCURRENCY`, and `MAPTOY_PHOTOS_SCAN_MAX_FILES`. The server
-also enforces hard ceilings to reject unsafe configuration values at startup.
+also rejects configuration above 256 MiB, 150 million decoded pixels, a 2048 px
+preview edge, batch size 1,000, four decoders, or 250,000 files at startup. The
+defaults and ceilings are backed by the reproducible Phase 5 Photo benchmark.

@@ -1,0 +1,21 @@
+meta {
+  name: Job Errors - List
+  type: http
+  seq: 19
+}
+get {
+  url: {{appUrl}}/api/jobs/{{jobId}}/errors
+  body: none
+  auth: none
+}
+
+docs {
+  Lists the newest retained per-item diagnostics for an existing Job without changing state.
+}
+
+tests {
+  test("lists bounded Job diagnostics", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.items).to.be.an("array");
+  });
+}
