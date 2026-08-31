@@ -15,7 +15,7 @@ extend for Tile Revisions, snapshots, layers, and jobs.
 
 Use `DatabaseSync` from `node:sqlite` behind repository classes. Run numbered,
 external SQL migration assets transactionally during server startup, enable foreign
-keys and WAL, and store the database as `maptoy.sqlite` below `MAPTOY_DATA_DIR`.
+keys and WAL, and store the database as `maptoy.sqlite` below `MAPTOY_STORAGE_DATA_DIR`.
 
 Schema version 4 is the production baseline. No production database uses an older
 schema; pre-baseline versions 1 through 3 were development-only steps and are not
@@ -23,10 +23,10 @@ supported upgrade sources. A new installation applies the version 4 baseline
 directly. Every future schema change uses a version greater than 4 and preserves
 data from an existing baseline-4-or-newer database.
 
-Core persistent application data remains below `MAPTOY_DATA_DIR`, making its
+Core persistent application data remains below `MAPTOY_STORAGE_DATA_DIR`, making its
 bind-mount persistence, backup, and restore behavior unambiguous. Rotating API and
 provider traffic logs are operational artifacts rather than core application state.
-They default to subdirectories of `MAPTOY_DATA_DIR`, but may use independently
+They default to subdirectories of `MAPTOY_STORAGE_DATA_DIR`, but may use independently
 configured host bind mounts and must then be backed up separately if retention
 outside maptoy's bounded log rotation is desired.
 
@@ -44,7 +44,7 @@ container. Startup fails rather than continuing with a partially applied migrati
 Tests create the version 4 baseline directly, reopen it without rerunning the
 baseline, and must preserve its data when future migrations are added.
 
-Readiness checks a database query and verifies that `MAPTOY_DATA_DIR` plus both
+Readiness checks a database query and verifies that `MAPTOY_STORAGE_DATA_DIR` plus both
 configured traffic-log directories remain writable. Losing a traffic-log bind mount
 therefore makes the instance not ready instead of silently presenting full
 operational readiness.

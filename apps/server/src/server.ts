@@ -11,11 +11,9 @@ import Fastify, {
 } from "fastify";
 import { layerPluginRegistry, mapRendererRegistry } from "./registries.js";
 import { openDatabase } from "./database.js";
-import { ImageScanService } from "./layers/imageScanner.js";
-import {
-  ImagePreviewStorage,
-  ImageRootResolver,
-} from "./layers/imageStorage.js";
+import { ImagePreviewStorage } from "./layers/imagePreviewStorage.js";
+import { PhotoDirectory } from "./layers/photoDirectory.js";
+import { PhotoScanService } from "./layers/photoScanner.js";
 import { ManagedAssetService } from "./layers/managedAssets.js";
 import { JobRepository, LayerRepository } from "./layers/repository.js";
 import { registerLayerRoutes } from "./layers/routes.js";
@@ -70,25 +68,25 @@ function defaultStaticDirectory(): string {
 }
 
 const configurationEnvironmentNames = new Set([
-  "MAPTOY_HOST",
-  "MAPTOY_PORT",
-  "MAPTOY_DATA_DIR",
-  "MAPTOY_LOG_LEVEL",
-  "MAPTOY_API_TRAFFIC_LOG_DIR",
-  "MAPTOY_PROVIDER_TRAFFIC_LOG_DIR",
-  "MAPTOY_TRAFFIC_LOG_MAX_BYTES",
-  "MAPTOY_TRAFFIC_LOG_MAX_FILES",
-  "MAPTOY_ALLOW_PRIVATE_TILE_HOSTS",
-  "MAPTOY_PROVIDER_TIMEOUT_MS",
-  "MAPTOY_MAX_TILE_BYTES",
-  "MAPTOY_MAX_LAYER_ASSET_BYTES",
-  "MAPTOY_IMAGE_ROOTS_JSON",
-  "MAPTOY_MAX_IMAGE_BYTES",
-  "MAPTOY_MAX_IMAGE_PIXELS",
-  "MAPTOY_IMAGE_PREVIEW_MAX_EDGE",
-  "MAPTOY_IMAGE_SCAN_BATCH_SIZE",
-  "MAPTOY_IMAGE_DECODER_CONCURRENCY",
-  "MAPTOY_MAX_IMAGE_SCAN_FILES",
+  "MAPTOY_SERVER_HOST",
+  "MAPTOY_SERVER_PORT",
+  "MAPTOY_STORAGE_DATA_DIR",
+  "MAPTOY_LOGGING_LEVEL",
+  "MAPTOY_LOGGING_API_TRAFFIC_DIR",
+  "MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR",
+  "MAPTOY_LOGGING_TRAFFIC_MAX_BYTES",
+  "MAPTOY_LOGGING_TRAFFIC_MAX_FILES",
+  "MAPTOY_TILES_ALLOW_PRIVATE_HOSTS",
+  "MAPTOY_TILES_PROVIDER_TIMEOUT_MS",
+  "MAPTOY_TILES_MAX_BYTES",
+  "MAPTOY_LAYERS_ASSET_MAX_BYTES",
+  "MAPTOY_PHOTOS_DIR",
+  "MAPTOY_PHOTOS_MAX_FILE_BYTES",
+  "MAPTOY_PHOTOS_MAX_DECODED_PIXELS",
+  "MAPTOY_PHOTOS_PREVIEW_MAX_EDGE",
+  "MAPTOY_PHOTOS_SCAN_BATCH_SIZE",
+  "MAPTOY_PHOTOS_SCAN_CONCURRENCY",
+  "MAPTOY_PHOTOS_SCAN_MAX_FILES",
 ]);
 
 function providerSecretValues(environment: NodeJS.ProcessEnv): string[] {
@@ -113,7 +111,7 @@ export async function buildServer(
     limits: {
       files: 1,
       fields: 0,
-      fileSize: config.maximumLayerAssetBytes,
+      fileSize: config.layers.assetMaximumBytes,
     },
   });
   server.addContentTypeParser(
@@ -122,40 +120,40 @@ export async function buildServer(
     (_request, body, done) => done(null, body),
   );
   const trafficLogOptions = {
-    maximumBytes: config.trafficLogMaxBytes,
-    maximumFiles: config.trafficLogMaxFiles,
+    maximumBytes: config.logging.trafficMaximumBytes,
+    maximumFiles: config.logging.trafficMaximumFiles,
     onError: (error: unknown) => {
       server.log.error({ error }, "Traffic log write failed");
     },
   };
   const apiTrafficLog = await RotatingTrafficLog.create({
     ...trafficLogOptions,
-    directory: config.apiTrafficLogDirectory,
+    directory: config.logging.apiTrafficDirectory,
     filename: "api-traffic.log",
   });
   const providerTrafficLog = await RotatingTrafficLog.create({
     ...trafficLogOptions,
-    directory: config.providerTrafficLogDirectory,
+    directory: config.logging.providerTrafficDirectory,
     filename: "provider-traffic.log",
   });
   registerApiTrafficLogging(server, apiTrafficLog);
-  await mkdir(config.dataDirectory, { recursive: true });
-  const database = await openDatabase(config.databasePath);
+  await mkdir(config.storage.dataDirectory, { recursive: true });
+  const database = await openDatabase(config.storage.databasePath);
   const mapSetRepository = new MapSetRepository(database.sqlite);
   const layerRepository = new LayerRepository(database.sqlite);
   const jobRepository = new JobRepository(database.sqlite);
   const tileArchiveRepository = new TileArchiveRepository(database.sqlite);
   const tileArchive = new TileArchiveService(
     tileArchiveRepository,
-    new TileStorage(config.dataDirectory),
+    new TileStorage(config.storage.dataDirectory),
   );
   await tileArchive.initialize();
   const baseProviderClient =
     options.providerClient ??
     new SafeProviderClient({
-      allowPrivateHosts: config.allowPrivateTileHosts,
-      timeoutMilliseconds: config.providerTimeoutMilliseconds,
-      maximumResponseBytes: config.maximumTileBytes,
+      allowPrivateHosts: config.tiles.allowPrivateHosts,
+      timeoutMilliseconds: config.tiles.providerTimeoutMilliseconds,
+      maximumResponseBytes: config.tiles.maximumBytes,
     });
   const providerClient = new TrafficLoggingProviderClient(
     baseProviderClient,
@@ -168,42 +166,42 @@ export async function buildServer(
     providerClient,
     tileArchive,
     {
-      allowPrivateTileHosts: config.allowPrivateTileHosts,
+      allowPrivateTileHosts: config.tiles.allowPrivateHosts,
       environment,
-      maximumTileBytes: config.maximumTileBytes,
+      maximumTileBytes: config.tiles.maximumBytes,
     },
   );
   mapSetService.initialize();
   const layerService = new LayerService(layerRepository, layerPluginRegistry);
   await layerService.initialize();
-  const imageScanService = new ImageScanService(
+  const photoScanService = new PhotoScanService(
     layerService,
     layerRepository,
     jobRepository,
-    new ImageRootResolver(config.imageRoots),
-    new ImagePreviewStorage(config.dataDirectory, {
-      maximumImageBytes: config.maximumImageBytes,
-      maximumImagePixels: config.maximumImagePixels,
-      previewMaximumEdge: config.imagePreviewMaximumEdge,
+    new PhotoDirectory(config.photos.directory),
+    new ImagePreviewStorage(config.storage.dataDirectory, {
+      maximumFileBytes: config.photos.maximumFileBytes,
+      maximumDecodedPixels: config.photos.maximumDecodedPixels,
+      previewMaximumEdge: config.photos.previewMaximumEdge,
     }),
     {
-      batchSize: config.imageScanBatchSize,
-      decoderConcurrency: config.imageDecoderConcurrency,
-      maximumFiles: config.maximumImageScanFiles,
+      batchSize: config.photos.scanBatchSize,
+      decoderConcurrency: config.photos.scanConcurrency,
+      maximumFiles: config.photos.scanMaximumFiles,
     },
   );
   const managedAssetService = new ManagedAssetService(
     layerService,
     layerPluginRegistry,
     layerRepository,
-    config.dataDirectory,
-    config.maximumLayerAssetBytes,
+    config.storage.dataDirectory,
+    config.layers.assetMaximumBytes,
   );
   await managedAssetService.initialize();
-  await imageScanService.initialize();
+  await photoScanService.initialize();
 
   server.addHook("onClose", async () => {
-    await imageScanService.shutdown();
+    await photoScanService.shutdown();
     await Promise.all([apiTrafficLog.close(), providerTrafficLog.close()]);
     database.close();
   });
@@ -219,7 +217,7 @@ export async function buildServer(
       return reply.code(413).send({
         error: {
           code: "TILE_BODY_TOO_LARGE",
-          message: "The upload exceeds MAPTOY_MAX_TILE_BYTES.",
+          message: "The upload exceeds MAPTOY_TILES_MAX_BYTES.",
         },
       });
     }
@@ -263,9 +261,9 @@ export async function buildServer(
     async (_request, reply) => {
       try {
         await Promise.all([
-          assertWritableDirectory(config.dataDirectory),
-          assertWritableDirectory(config.apiTrafficLogDirectory),
-          assertWritableDirectory(config.providerTrafficLogDirectory),
+          assertWritableDirectory(config.storage.dataDirectory),
+          assertWritableDirectory(config.logging.apiTrafficDirectory),
+          assertWritableDirectory(config.logging.providerTrafficDirectory),
         ]);
         database.assertReady();
         return { status: "ready" };
@@ -285,12 +283,12 @@ export async function buildServer(
   }));
 
   registerMapSetRoutes(server, mapSetService, tileArchive, {
-    maximumTileBytes: config.maximumTileBytes,
+    maximumTileBytes: config.tiles.maximumBytes,
   });
   registerLayerRoutes(
     server,
     layerService,
-    imageScanService,
+    photoScanService,
     managedAssetService,
   );
 

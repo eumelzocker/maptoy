@@ -16,14 +16,14 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - SQLite verwaltet Metadaten, Konfigurationen und Jobs; Tile-Dateien, Exporte,
   verwaltete Nicht-Bild-Assets und abgeleitete Bildvorschauen liegen als Dateien im
   Anwendungsdatenverzeichnis. Originalbilder verbleiben außerhalb davon in
-  ausdrücklich konfigurierten, nur lesbar eingebundenen Bildwurzeln.
+  einem ausdrücklich konfigurierten, nur lesbar eingebundenen Fotoverzeichnis.
 - Auswahl und Nutzung einer Kartenquelle erfolgen in Eigenverantwortung des Nutzers. maptoy verlinkt Nutzungsbedingungen und dokumentiert konfigurierbare technische Limits, bewertet oder erzwingt aber nicht, ob Caching, Batch-Abrufe oder Exporte rechtlich beziehungsweise vertraglich zulässig sind.
 - Anbieterbedingungen können sich ändern. Der Nutzer muss sie eigenständig prüfen und Map Sets, Limits sowie Nutzung entsprechend anpassen; die mitgelieferte Dokumentation ist keine Rechtsberatung und keine Garantie für Zulässigkeit.
 - Eine `Map Set`-Konfiguration beschreibt Kartenquelle, Renderer-Adapter, Darstellung und Cache-Regeln. Zusatzlayer bilden einen davon unabhängigen globalen Overlay-Stack; echte Server-Secrets werden nur per Environment referenziert und nicht im Klartext in Map Sets gespeichert.
 - Die erste Version konzentriert sich auf Raster-Tiles nach dem XYZ-Schema. Vector Tiles und WMTS-Sonderfälle sind mögliche spätere Erweiterungen.
 - Die Kartenansicht verwendet eine Frontend-Adapter-Schnittstelle. v1.0 implementiert ausschließlich den Leaflet-/XYZ-Adapter; ein späterer Adapter für die Google Maps JavaScript API und weitere Karten-APIs ist architektonisch vorgesehen, aber ausdrücklich nicht Bestandteil von v1.0.
 - Provider- und Renderer-Fähigkeiten wie interaktive Anzeige, Tile-Cache, Batch-Download, Export und Layer-Unterstützung werden getrennt ausgewiesen und nicht für jeden Adapter vorausgesetzt.
-- Zusatzlayer verwenden eine allgemeine Plugin-Architektur. Track- und Bildlayer
+- Zusatzlayer verwenden eine allgemeine Plugin-Architektur. Track- und Fotolayer
   sind die datenbasierten Referenzimplementierungen und verwenden dieselben
   fachlichen Daten in interaktiver Karte und Bitmapexport. Zustandsabgeleitete
   dekorative Layer verwenden denselben Lebenszyklus, erzeugen ihre Darstellung
@@ -32,7 +32,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - v1.0 lädt ausschließlich vertrauenswürdige Layer-Plugins, die beim Build beziehungsweise Deployment registriert werden. Installation oder Upload beliebigen ausführbaren Plugin-Codes über die Weboberfläche ist nicht vorgesehen.
 - Das Backend dient gleichzeitig als API, Tile-Proxy und statischer Webserver für das gebaute Frontend.
 - Eine optionale, generische Firefox-Erweiterung kann passende Browserantworten unverändert an frei konfigurierte HTTP-Ziele weiterleiten. Sie ist ein eigenständig versioniertes Workspace-Paket mit eigenen Build- und Testabläufen und wird weder im maptoy-Container gebaut noch ausgeliefert.
-- Länger laufende Bildverzeichnisscans, Downloads und Exporte werden als persistente
+- Länger laufende Fotoverzeichnisscans, Downloads und Exporte werden als persistente
   Jobs ausgeführt, sodass Status, Fortschritt, Abbruch und Fehler nachvollziehbar
   sind.
 - Die Dokumentationsquellen liegen versioniert im Repository, werden beim Frontend-Build validiert und zusammen mit der Anwendung ausgeliefert. Sie benötigen zur Anzeige keine externe Dokumentationsplattform.
@@ -51,8 +51,8 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Cache-Abdeckung für ein Gebiet und Zoomstufen sichtbar machen
 - Batch-Downloads für Gebiet und Zoomstufen planen, starten, beobachten, pausieren beziehungsweise abbrechen und erneut versuchen
 - vertrauenswürdige Layer-Plugins registrieren, konfigurieren und im XYZ-Renderer sowie im Export verwenden
-- Track- und Bildlayer als vollständige Referenz-Plugins einschließlich
-  GPS-getaggter Bilder und inkrementell scanbarer externer Bildverzeichnisse
+- Track- und Fotolayer als vollständige Referenz-Plugins einschließlich
+  GPS-getaggter Fotos und inkrementell scanbarer externer Fotoverzeichnisse
   bereitstellen
 - einen dekorativen Tile-Grid-Layer ohne importierte Fachdaten bereitstellen, der
   sichtbare XYZ-Tiles mit `z/x/y` beschriftet und eine koordinatenabhängige
@@ -72,7 +72,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Allgemeine Unterstützung aller proprietären Kartenprotokolle
 - konkrete Implementierung eines Google-Maps-, Vector-Tile- oder sonstigen alternativen Frontend-Adapters
 - Installation nicht vertrauenswürdiger oder zur Laufzeit hochgeladener Plugins über die Weboberfläche
-- eigenständige Layer-, Asset- oder Bildkatalog-Hauptansicht; Layerbedienung bleibt
+- eigenständige Layer-, Asset- oder Fotokatalog-Hauptansicht; Layerbedienung bleibt
   in v1 Bestandteil der normalen Kartenansicht
 - Native Desktop- oder Mobile-App
 - Verteilter Job-Worker oder horizontale Skalierung
@@ -93,7 +93,7 @@ Node.js HTTP server (one port)
   -> job control and export download
        |-> SQLite metadata
        |-> filesystem: tiles, managed non-image assets, image previews, temporary files, exports
-       |-> configured read-only image roots outside the application data directory
+       |-> configured read-only photo directory outside the application data directory
        |-> configured external tile providers
 ```
 
@@ -135,7 +135,7 @@ maptoy/
 │   └── leaflet-xyz/         # einziger in v1 implementierter Kartenadapter
 ├── plugins/
 │   ├── track-layer/         # GPX-/GeoJSON-Referenz-Plugin
-│   └── image-layer/         # GPS-/Bounds-Bild-Referenz-Plugin
+│   └── photo-layer/         # GPS-/Bounds-Bild-Referenz-Plugin
 ├── extensions/
 │   └── firefox/             # generische, separat versionierte Response-Weiterleitung
 ├── docs/
@@ -212,7 +212,7 @@ Die Registry wird beim Build aus explizit zugelassenen Paketen erzeugt. Ein Plug
 Die Referenz-Plugins definieren die Mindestqualität der Schnittstelle:
 
 - `track-layer`: Import von GPX und GeoJSON, normalisierte Geometrie, Linien-/Punktstil, interaktive Anzeige und Export
-- `image-layer`: sichere Bilddekodierung, EXIF-Ausrichtung, optionale GPS-Extraktion, explizite Punktkoordinate oder geografische Bounds, Vorschaubild, Marker-/Popup-Anzeige und Export
+- `photo-layer`: sichere Bilddekodierung, EXIF-Ausrichtung, optionale GPS-Extraktion, explizite Punktkoordinate oder geografische Bounds, Vorschaubild, Marker-/Popup-Anzeige und Export
 - `tile-grid-layer`: assetfreie, zustandsabgeleitete Darstellung sichtbarer
   XYZ-Tile-Grenzen und `z/x/y`-Koordinaten sowie einer metrischen Maßstabsleiste
 
@@ -289,7 +289,7 @@ Ein Download-Gebiet besteht in der ersten Version aus einem Rechteck in WGS84. P
 
 Ein Job speichert:
 
-- Typ (`image-scan`, `tile-download`, `map-export`, später weitere Typen)
+- Typ (`photo-scan`, `tile-download`, `map-export`, später weitere Typen)
 - Eingabeparameter als validiertes, versioniertes JSON
 - Status `queued`, `running`, `paused`, `completed`, `failed` oder `cancelled`
 - Gesamtzahl, erledigte, übersprungene und fehlgeschlagene Einheiten
@@ -300,9 +300,9 @@ Ein Job speichert:
 Jobs müssen nach einem Prozessneustart konsistent fortsetzbar oder als unterbrochen erkennbar sein. Ein einzelner Tile-Fehler beendet nicht automatisch den gesamten Batch. Retries verwenden exponentielles Backoff und respektieren `Retry-After`.
 
 Der minimale persistente Jobkern wird mit dem ersten länger laufenden
-Bildverzeichnisscan in Phase 5 eingeführt. Phase 6 erweitert denselben Jobkern um
+Fotoverzeichnisscan in Phase 5 eingeführt. Phase 6 erweitert denselben Jobkern um
 Downloadschätzung, Provider-Limits und Tile-Download-Worker; Phase 7 ergänzt
-Exportjobs. Es wird keine separate, nur für Bildscans gültige
+Exportjobs. Es wird keine separate, nur für Fotoscans gültige
 Hintergrundverarbeitung aufgebaut.
 
 ### 5.4 Layer-Plugins und Layer-Instanzen
@@ -311,7 +311,7 @@ Eine Layer-Instanz ist eine persistente Verwendung eines registrierten Plugins u
 
 - stabile ID, verpflichtender Anzeigename als `/`-segmentierbarer Hierarchiepfad und Plugin-ID
 - eine vom Plugin-Manifest deklarierte Kategorie als erste Hierarchieebene, zum
-  Beispiel `Tracks`, `Images`, `Decorations` oder künftig `POIs`
+  Beispiel `Tracks`, `Photos`, `Decorations` oder künftig `POIs`
 - Plugin- und Schema-Version
 - globale Verfügbarkeit unabhängig vom aktuell gewählten Map Set
 - validierte, pluginabhängige Konfiguration
@@ -338,29 +338,29 @@ Layer-Instanz referenziert anschließend ausschließlich die Asset-ID. Assetstat
 Fehler bleiben als `pending`, `ready`, `changed`, `missing` oder `failed`
 nachvollziehbar.
 
-Originalbilder werden von maptoy weder dauerhaft hochgeladen noch in das
-Anwendungsdatenverzeichnis kopiert. Der Betreiber konfiguriert stattdessen benannte
-Bildwurzeln, die im Container ausschließlich lesbar eingebunden werden. Persistiert
-werden die Wurzel-ID, ein normalisierter relativer Pfad, Dateiname, tatsächlicher
+Originalfotos werden von maptoy weder dauerhaft hochgeladen noch in das
+Anwendungsdatenverzeichnis kopiert. Der Betreiber konfiguriert stattdessen ein
+Fotoverzeichnis, das im Container ausschließlich lesbar eingebunden wird. Persistiert
+werden ein normalisierter relativer Pfad, Dateiname, tatsächlicher
 Medientyp, Größe, Bildabmessungen, relevante EXIF-Metadaten, Änderungsfingerprint,
 optionaler Content-Hash, Scanstatus und die fachliche Punktposition beziehungsweise
 geografischen Bounds. Absolute Host- oder Containerpfade werden weder an Plugins
 noch an das Frontend ausgegeben. Plugin-Hooks greifen nur über kontrollierte
 Asset-Resolver auf Original oder Vorschau zu.
 
-Bildvorschauen sind abgeleitete, von maptoy verwaltete Assets unter
-`MAPTOY_DATA_DIR`. Sie werden EXIF-orientiert, größen- und pixelbegrenzt,
+Fotovorschauen sind abgeleitete, von maptoy verwaltete Assets unter
+`MAPTOY_STORAGE_DATA_DIR`. Sie werden EXIF-orientiert, größen- und pixelbegrenzt,
 metadatenbereinigt, hashbasiert und atomar erzeugt. Temporäre Bildbytes werden nach
 der Verarbeitung entfernt. Die interaktive Karte verwendet grundsätzlich die
 Vorschau; ein hochauflösender Export darf das externe Original kontrolliert und nur
-bei passendem gespeicherten Fingerprint erneut lesen. Ist eine Bildwurzel oder Datei
+bei passendem gespeicherten Fingerprint erneut lesen. Ist das Fotoverzeichnis oder eine Datei
 nicht verfügbar, bleiben Metadaten und Vorschau erhalten und das Asset wird
 verständlich als `missing` beziehungsweise `changed` diagnostiziert.
 
-Ein Bildverzeichnisscan arbeitet wahlweise rekursiv, inkrementell und als
+Ein Fotoverzeichnisscan arbeitet wahlweise rekursiv, inkrementell und als
 persistenter Job. Er verarbeitet nur unterstützte Dateien innerhalb einer
-konfigurierten Bildwurzel, vergleicht zunächst relativen Pfad, Größe und
-Änderungszeit und dekodiert neue oder geänderte Bilder. Neu gefundene Inhalte werden
+konfigurierten Fotoverzeichnisses, vergleicht zunächst relativen Pfad, Größe und
+Änderungszeit und dekodiert neue oder geänderte Fotos. Neu gefundene Inhalte werden
 angelegt, geänderte Inhalte neu ausgewertet und nicht mehr auffindbare Dateien nur
 als `missing` markiert; ein Scan löscht weder Metadaten noch Vorschauen oder
 Nutzerkorrekturen automatisch. Ein Content-Hash darf verzögert für neue oder
@@ -454,16 +454,16 @@ Die Abdeckungs- und Vergleichsantworten sollen nicht Millionen Einzelkacheln an 
   verwalteter Nicht-Bild-Assets mit Größenlimit und Statusantwort
 - `GET api/layers/:id/assets/:assetId` – kontrollierte Auslieferung eines
   verwalteten Assets beziehungsweise einer abgeleiteten Bildvorschau
-- `GET api/image-roots` – konfigurierte Bildwurzeln mit stabiler ID,
-  Verfügbarkeit und ungefährlichen Anzeigemetadaten, aber ohne absolute Serverpfade
-- `POST api/layers/:id/image-scan-jobs` – persistenten, optional rekursiven und
-  inkrementellen Scan einer Bildwurzel oder eines relativen Unterverzeichnisses
+- `GET api/photos/directory` – Konfigurations- und Verfügbarkeitsstatus des
+  Fotoverzeichnisses, aber ohne absolute Serverpfade
+- `POST api/layers/:id/photo-scan-jobs` – persistenten, optional rekursiven und
+  inkrementellen Scan des Fotoverzeichnisses oder eines relativen Unterverzeichnisses
   starten
 
 Die API bleibt generisch und verzweigt anhand der registrierten Plugin-ID in dessen Schemas und Hooks. Es gibt in v1.0 keinen Endpunkt zum Installieren oder Hochladen von Plugin-Code.
 
-Scanrequests referenzieren ausschließlich eine konfigurierte Wurzel-ID und einen
-validierten relativen Unterpfad. Sie akzeptieren keine absoluten Dateisystempfade.
+Scanrequests referenzieren ausschließlich einen validierten relativen Unterpfad.
+Sie akzeptieren keine absoluten Dateisystempfade.
 Bildoriginale werden über keinen Asset-Endpunkt dauerhaft in maptoy übernommen.
 
 ### 6.5 Jobs und Exporte
@@ -487,7 +487,7 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 ### 7.1 Hauptansichten
 
 1. **Map** – ausgewähltes Map Set im aktiven Renderer-Adapter, optional
-   einblendbares Layer-Panel mit Plugin-Auswahl, Import, Bildverzeichnisscan,
+   einblendbares Layer-Panel mit Plugin-Auswahl, Import, Fotoverzeichnisscan,
    Konfiguration, Reihenfolge, Sichtbarkeit und Status, Koordinatenanzeige und
    Navigation.
 2. **Map Sets** – Übersicht, Editor, Validierung und Testabruf.
@@ -498,15 +498,15 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 7. **Jobs** – gemeinsame Historie mit Fehlerdetails und Wiederaufnahmeaktionen.
 8. **Documentation** – mehrsprachige Hilfe, API-Referenz, Provider-, Adapter-, Plugin- und Projektionsinformationen, Glossar und Fehlersuche.
 
-Für Layer, Assets und Bildkatalog wird in v1 keine eigene Hauptansicht und keine
+Für Layer, Assets und Fotokatalog wird in v1 keine eigene Hauptansicht und keine
 eigene `/layers`-Route angelegt. Die Kartenansicht bleibt während Auswahl,
 Konfiguration und Import sichtbar. Ein kompaktes, schließbares Layer-Panel bietet
 oberhalb genau eines Layer-Editors einen durchsuchbaren Dropdown-Baum für den
 globalen Overlay-Stack. Checkboxen an Layern, Kategorien und Ordnern erlauben die
 schnelle, bei Gruppen dreistufig dargestellte Sichtbarkeitssteuerung. Der ausgewählte
 Layer stellt Deckkraft, Reihenfolge, Zoomgrenzen und Diagnosestatus im einzigen
-Editor des Panels dar. Plugin-Auswahl, Trackimport, Bildwurzelauswahl,
-Verzeichnisscan, Detailbearbeitung und Diagnose öffnen fokussierte Dialoge oder
+Editor des Panels dar. Plugin-Auswahl, Trackimport, Fotoverzeichnisscan,
+Detailbearbeitung und Diagnose öffnen fokussierte Dialoge oder
 Unterpanels innerhalb dieser Ansicht.
 
 `Add layer` erstellt einen global verfügbaren Layer. Beim Wechsel des Map Sets wird
@@ -568,12 +568,12 @@ bei Bedarf mit Standardkonfiguration; die Detailbearbeitung bleibt im Layer-Pane
   Track-Konfiguration mit zusätzlicher Linien-Deckkraft wird verlustfrei migriert,
   indem beide bisherigen Faktoren in den allgemeinen Layerwert überführt werden.
 - Plugin-Editoren erscheinen innerhalb einer einheitlichen Layer-Oberfläche und dürfen Navigation, globale Stores oder andere Plugins nicht direkt manipulieren. Einfache Konfigurationen verwenden den gemeinsamen schemabasierten Editor; Spezialeditoren werden über die Registry aufgelöst und nicht durch Plugin-ID-Verzweigungen in der Shell eingebaut.
-- Bildverzeichnisscans zeigen Fortschritt, neue, geänderte, fehlende und
+- Fotoverzeichnisscans zeigen Fortschritt, neue, geänderte, fehlende und
   fehlgeschlagene Dateien, ohne pro EXIF-GPS-Position eine Bestätigung zu verlangen.
   Automatisch übernommene Positionen lassen sich anschließend einzeln korrigieren
   oder entfernen.
 - Die Coverage-Ansicht bleibt auf Abdeckung und Zustand des Tile-Archivs
-  konzentriert. Phase 5 ergänzt dort weder Layerverwaltung noch Bildkatalog; eine
+  konzentriert. Phase 5 ergänzt dort weder Layerverwaltung noch Fotokatalog; eine
   spätere optionale Einblendung fachlicher Layer zur Orientierung ist davon
   unabhängig.
 - Formulare verwenden gemeinsame Schemas, damit Frontend- und Backend-Validierung übereinstimmen.
@@ -588,14 +588,14 @@ Die Dokumentation ist ein fester Teil der SPA und über die Hauptnavigation sowi
 
 **Inhaltsbereiche**
 
-- **App-Handbuch:** Schnellstart, Navigation und vollständige Anleitungen für Map Sets, Tile-Revisionen, externes Tile-Seeding, Snapshots, Vergleiche, Coverage, Downloads, Jobs, Layer-Plugins, externe Bildwurzeln, Bildverzeichnisscans und Exporte
+- **App-Handbuch:** Schnellstart, Navigation und vollständige Anleitungen für Map Sets, Tile-Revisionen, externes Tile-Seeding, Snapshots, Vergleiche, Coverage, Downloads, Jobs, Layer-Plugins, das externe Fotoverzeichnis, Fotoverzeichnisscans und Exporte
 - **API:** authentizitätsgetreue OpenAPI-Referenz, Request-/Response-Beispiele einschließlich des binären Tile-Uploads, Fehlercodes, relative URL-Nutzung und Versionshinweise
 - **Map-Provider:** Konfigurationsfelder, URL-Templates, Attribution, Header, API-Schlüssel, Rate-Limits, technische Cache-/Export-Fähigkeiten sowie Links zu offiziellen Nutzungsbedingungen und Provider-Dokumentationen
 - **Erweiterungen:** Renderer-Adapter- und Layer-Plugin-Verträge, Capability-Modell, Referenz-Plugins, Versionskompatibilität und klarer Hinweis, dass Google Maps in v1.0 noch nicht implementiert ist
 - **Projektionen:** unterstützte EPSG-Codes, typische Einsatzfälle, Grenzen, Quell-/Zielprojektion und Auswirkungen der Reprojektion
 - **Glossar:** Abkürzungen und Begriffe wie XYZ, EPSG, WGS84, Web Mercator, Tile, Bounds, GPX, GeoJSON, DPI und SSRF
 - **Betrieb und Fehlersuche:** Environment-Variablen, Host-Bind-Mounts einschließlich
-  externer Read-only-Bildwurzeln, Reverse-Proxy, Backup/Restore, Migrationen, Logs,
+  des externen Read-only-Fotoverzeichnisses, Reverse-Proxy, Backup/Restore, Migrationen, Logs,
   fehlende beziehungsweise geänderte Bildquellen und typische Fehlerszenarien
 - **Sicherheit und Verantwortung:** Secret-Verwaltung, Netzwerkzugriffe, Betriebsgrenzen unauthentifizierter Schreibendpunkte und klare Eigenverantwortung des Nutzers für Prüfung und Einhaltung der jeweils aktuellen Provider-Nutzungsbedingungen; keine Rechtsberatung oder Zulässigkeitsgarantie durch maptoy
 - **Version und Änderungen:** App-Version, Dokumentationsversion und Link zum zugehörigen Changelog
@@ -632,39 +632,42 @@ Die Dokumentation ist ein fester Teil der SPA und über die Hauptnavigation sowi
 
 ### 8.1 Environment-Konfiguration
 
-Alle Variablen erhalten das Präfix `MAPTOY_`. Eine `.env.example` dokumentiert mindestens:
+Alle Variablen folgen dem Schema `MAPTOY_<DOMÄNE>_<EIGENSCHAFT>`. Die Domäne
+steht unmittelbar nach `MAPTOY_`; insbesondere verwendet der gesamte externe
+Fotokatalog die Domäne `PHOTOS`. Alte, anders angeordnete Namen werden weder als
+Alias noch als Fallback unterstützt. Eine `.env.example` dokumentiert mindestens:
 
 ```dotenv
-MAPTOY_HOST=0.0.0.0
-MAPTOY_PORT=4004
-MAPTOY_DATA_DIR=./.data
-MAPTOY_LOG_LEVEL=info
-MAPTOY_API_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/api
-MAPTOY_PROVIDER_TRAFFIC_LOG_DIR=${MAPTOY_DATA_DIR}/logs/provider
-MAPTOY_TRAFFIC_LOG_MAX_BYTES=10485760
-MAPTOY_TRAFFIC_LOG_MAX_FILES=5
-MAPTOY_MAX_TILE_BYTES=10485760
-MAPTOY_MAX_CONCURRENT_JOBS=1
-MAPTOY_MAX_EXPORT_PIXELS=100000000
-MAPTOY_TEMP_DIR=${MAPTOY_DATA_DIR}/tmp
-# Stable IDs mapped to container paths; configure matching read-only bind mounts.
-MAPTOY_IMAGE_ROOTS_JSON={}
+MAPTOY_SERVER_HOST=0.0.0.0
+MAPTOY_SERVER_PORT=4004
+MAPTOY_STORAGE_DATA_DIR=./.data
+MAPTOY_LOGGING_LEVEL=info
+MAPTOY_LOGGING_API_TRAFFIC_DIR=${MAPTOY_STORAGE_DATA_DIR}/logs/api
+MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR=${MAPTOY_STORAGE_DATA_DIR}/logs/provider
+MAPTOY_LOGGING_TRAFFIC_MAX_BYTES=10485760
+MAPTOY_LOGGING_TRAFFIC_MAX_FILES=5
+MAPTOY_TILES_MAX_BYTES=10485760
+MAPTOY_JOBS_MAX_CONCURRENCY=1
+MAPTOY_EXPORTS_MAX_PIXELS=100000000
+MAPTOY_STORAGE_TEMP_DIR=${MAPTOY_STORAGE_DATA_DIR}/tmp
+MAPTOY_PHOTOS_DIR=./.photos
 # Provider-specific secrets, for example:
 # MAPTOY_EXAMPLE_API_KEY=
 ```
 
 Beim Start wird die gesamte Konfiguration validiert. Fehlerhafte oder fehlende Pflichtwerte führen zu einer klaren Fehlermeldung. Konfigurationsschemata unterscheiden `server-secret`, `public-client` und `public`. Das Backend gibt echte Server-Secrets weder an das Frontend noch in Logs oder Jobparameter weiter. Die Kategorie `public-client` ist als Adapter-Vertrag vorgesehen, wird in v1.0 aber von keinem ausgelieferten Adapter benötigt.
 
-`MAPTOY_MAX_TILE_BYTES` begrenzt sowohl Providerantworten als auch den Body der Tile-Upload-Route. Das Limit wird für Uploads routenspezifisch angewendet und darf insbesondere Map-Set-JSON oder andere API-Bodies nicht unbeabsichtigt begrenzen.
+`MAPTOY_TILES_MAX_BYTES` begrenzt sowohl Providerantworten als auch den Body der Tile-Upload-Route. Das Limit wird für Uploads routenspezifisch angewendet und darf insbesondere Map-Set-JSON oder andere API-Bodies nicht unbeabsichtigt begrenzen.
 
-`MAPTOY_IMAGE_ROOTS_JSON` ordnet stabile, technisch validierte Wurzel-IDs absoluten
-Containerpfaden zu. Diese Pfade sind ausschließlich serverseitige Konfiguration und
-werden nicht über die öffentliche Konfiguration oder Layer-API ausgegeben. Für
+`MAPTOY_PHOTOS_DIR` bezeichnet das bestehende Fotoverzeichnis auf dem Host. Docker
+Compose bindet es automatisch read-only nach `/photos` ein und übergibt maptoy nur
+diesen festen internen Pfad. Weder Host- noch Containerpfad werden über die API
+ausgegeben. Für
 Bilddateigröße, dekodierte Pixelzahl, Vorschauabmessungen und Scanumfang gelten
 eigene konfigurierbare Grenzen; ihre Defaults und Hartgrenzen werden in Phase 5 mit
 repräsentativen Bildbeständen gemessen und nicht vom Tile-Bytelimit abgeleitet.
 
-`MAPTOY_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Pfad für persistente Fachdaten. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Anwendungsdatenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr sind Betriebsartefakte und erhalten eigene konfigurierbare Hostverzeichnisse und Bind-Mounts; ihre Vorgaben liegen unterhalb von `MAPTOY_DATA_DIR`, dürfen aber auf andere Hostpfade zeigen. Für persistente Fachdaten oder Traffic-Logs werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Bildvorschauen, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar. Ein Backup des Anwendungsdatenverzeichnisses umfasst Bildkatalog, Metadaten und Vorschauen, aber ausdrücklich nicht die extern referenzierten Originalbilder. Konfigurierte Bildwurzeln und extern konfigurierte Traffic-Logs müssen bei gewünschter Erhaltung separat gesichert werden.
+`MAPTOY_STORAGE_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Pfad für persistente Fachdaten. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Anwendungsdatenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr sind Betriebsartefakte und erhalten eigene konfigurierbare Hostverzeichnisse und Bind-Mounts; ihre Vorgaben liegen unterhalb von `MAPTOY_STORAGE_DATA_DIR`, dürfen aber auf andere Hostpfade zeigen. Für persistente Fachdaten oder Traffic-Logs werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Fotovorschauen, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar. Ein Backup des Anwendungsdatenverzeichnisses umfasst Fotokatalog, Metadaten und Vorschauen, aber ausdrücklich nicht die extern referenzierten Originalfotos. Das konfigurierte Fotoverzeichnis und extern konfigurierte Traffic-Logs müssen bei gewünschter Erhaltung separat gesichert werden.
 
 Schema-Version 4 ist die produktive Datenbank-Baseline. Frühere, ausschließlich während der Entwicklung verwendete Schema-Versionen sind keine unterstützten Upgradequellen und existieren nicht im Produktivbetrieb. Alle neuen Datenbanken werden direkt mit Baseline 4 angelegt; künftige nummerierte SQL-Migrationen beginnen oberhalb dieser Version und müssen bestehende Baseline-4-Daten erhalten.
 
@@ -682,9 +685,9 @@ Schema-Version 4 ist die produktive Datenbank-Baseline. Frühere, ausschließlic
 - Mehrstufiger Build: Dependencies, Test/Build, minimale Runtime
 - Betrieb als nicht privilegierter Benutzer
 - genau ein veröffentlichter HTTP-Port
-- explizite Host-Bind-Mounts von `MAPTOY_DATA_DIR` nach `/data` sowie der beiden getrennt konfigurierbaren Traffic-Log-Verzeichnisse; weder für Fachdaten noch Traffic-Logs benannte oder anonyme Docker-Volumes
-- explizite, ausschließlich lesbare Host-Bind-Mounts für jede konfigurierte
-  Bildwurzel; der Container erhält dort keine Schreibberechtigung
+- explizite Host-Bind-Mounts von `MAPTOY_STORAGE_DATA_DIR` nach `/data` sowie der beiden getrennt konfigurierbaren Traffic-Log-Verzeichnisse; weder für Fachdaten noch Traffic-Logs benannte oder anonyme Docker-Volumes
+- expliziter, ausschließlich lesbarer Host-Bind-Mount für `MAPTOY_PHOTOS_DIR`;
+  der Container erhält dort keine Schreibberechtigung
 - Healthcheck gegen den Liveness-Endpunkt
 - Readiness-Prüfung für Datenbank und Schreibbarkeit des Anwendungsdatenverzeichnisses sowie beider konfigurierter Traffic-Log-Verzeichnisse
 - sauberer Shutdown: keine neuen Jobs, laufende Dateischreibvorgänge abschließen, Jobstatus sichern
@@ -721,8 +724,8 @@ Auch als private Anwendung verarbeitet maptoy fremde URLs und potenziell große 
 - Upload-Dateien außerhalb öffentlich ausgelieferter Verzeichnisse speichern;
   Bildoriginale ausschließlich extern referenzieren und nicht in das
   Anwendungsdatenverzeichnis kopieren
-- Bildwurzeln ausschließlich serverseitig konfigurieren und lesbar einbinden;
-  Scan- und Assetzugriffe auf Wurzel-ID und normalisierte relative Pfade begrenzen,
+- Fotoverzeichnis ausschließlich serverseitig konfigurieren und lesbar einbinden;
+  Scan- und Assetzugriffe auf normalisierte relative Pfade begrenzen,
   Symlink-Ausbrüche verhindern und absolute Pfade nicht an Client oder Plugins geben
 - EXIF- und andere Bildmetadaten nur gezielt übernehmen, die Herkunft automatisch
   übernommener GPS-Koordinaten nachvollziehbar speichern und nicht benötigte
@@ -779,7 +782,7 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
   Bildschirmbreiten und Breitengrade
 - Plugin-Manifest, Schemas, Versionskompatibilität und Datenmigrationen
 - GPX-/GeoJSON-Normalisierung sowie EXIF-Ausrichtung und GPS-Extraktion
-- Bildscan-Fingerprints, inkrementelle Änderungsentscheidung und Regeln für
+- Fotoscan-Fingerprints, inkrementelle Änderungsentscheidung und Regeln für
   `coordinateSource=exif|manual|none`, insbesondere Schutz manueller Korrekturen
   und bewusster Entfernung bei erneutem Scan
 - Dokumentations-Metadaten, Sprach-Fallback, Ankererzeugung und sprachbezogener Suchindex
@@ -805,14 +808,14 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
   Breitengraden sowie konsistente Neuberechnung nach Viewport- und Map-Set-Wechsel
 - Plugin-Registry und isolierter Aufruf von Import-, Asset- und Export-Hooks
 - Verhalten bei fehlendem oder inkompatiblem Plugin ohne Verlust persistierter Layerdaten
-- Scan einer konfigurierten Read-only-Bildwurzel mit automatischer EXIF-Position,
+- Scan des konfigurierten Read-only-Fotoverzeichnisses mit automatischer EXIF-Position,
   atomarer Vorschauerzeugung und Nachweis, dass kein Originalbild unter
-  `MAPTOY_DATA_DIR` gespeichert wird
-- inkrementeller erneuter Bildscan mit unveränderten, geänderten und fehlenden
+  `MAPTOY_STORAGE_DATA_DIR` gespeichert wird
+- inkrementeller erneuter Fotoscan mit unveränderten, geänderten und fehlenden
   Dateien; manuell korrigierte oder entfernte Positionen bleiben erhalten, während
   weiterhin aus EXIF stammende Positionen geänderter Quelldateien aktualisiert werden
-- Abbruch, Wiederaufnahme und Neustart-Recovery eines persistenten Bildscan-Jobs
-  sowie verständliche Diagnose einer nicht verfügbaren Bildwurzel
+- Abbruch, Wiederaufnahme und Neustart-Recovery eines persistenten Fotoscan-Jobs
+  sowie verständliche Diagnose eines nicht verfügbaren Fotoverzeichnisses
 - Contract-Test des Leaflet-/XYZ-Adapters und eines minimalen Fake-Adapters
 - Darstellung, Aktualisierung, Reihenfolge und Entfernung der gemeinsamen Punkt-,
   Linien- und Flächendeskriptoren im Leaflet-/XYZ-Adapter und Fake-Adapter
@@ -839,12 +842,12 @@ Tests verwenden keine echten öffentlichen Tile-Dienste.
 - englische und deutsche Suche prüfen; für Thai entweder funktionsfähige Suche oder den ausdrücklich deaktivierten Zustand mit Verweis auf die englische Suche prüfen
 - Anwendung unter einem Präfix-entfernenden Reverse-Proxy-Unterpfad laden; Assets, API, Tiles, Downloads, Dokumentation, Suche und pfadbasierte Deep Links funktionieren
 - Container mit leeren sowie vorhandenen Host-Bind-Mounts für Anwendungsdaten und
-  Traffic-Logs sowie einer externen Read-only-Bildwurzel starten
+  Traffic-Logs sowie des externen Read-only-Fotoverzeichnisses starten
 - SIGTERM während eines Jobs und anschließender konsistenter Neustart
 
 ### 11.4 Manuelle API-Tests mit Bruno
 
-Die unter `tests/bruno/` versionierte Bruno Collection ergänzt automatisierte Tests um nachvollziehbare manuelle Diagnose- und Smoke-Abläufe. Sie enthält mindestens Health/Readiness, Map-Set-Verwaltung, Tile-Abruf mit allen Refresh-Modi, Tile-Upload, Revisionshistorie und Snapshot-Vergleich, Batch-Jobs, Layer-Asset-Upload, Bildwurzeln, Bildscan-Jobs und Export. Zustandsverändernde oder löschende Requests sind eindeutig benannt und nicht Teil eines unabsichtlichen Standardlaufs.
+Die unter `tests/bruno/` versionierte Bruno Collection ergänzt automatisierte Tests um nachvollziehbare manuelle Diagnose- und Smoke-Abläufe. Sie enthält mindestens Health/Readiness, Map-Set-Verwaltung, Tile-Abruf mit allen Refresh-Modi, Tile-Upload, Revisionshistorie und Snapshot-Vergleich, Batch-Jobs, Layer-Asset-Upload, Fotoverzeichnisstatus, Fotoscan-Jobs und Export. Zustandsverändernde oder löschende Requests sind eindeutig benannt und nicht Teil eines unabsichtlichen Standardlaufs.
 
 Eine eingecheckte lokale Beispielumgebung definiert die relative beziehungsweise konfigurierbare `baseUrl`, aber keine echten Secrets. Lokale Secret-Dateien werden ignoriert. Die Collection ist zunächst ein manuelles Werkzeug; ein späterer `bru`-CLI-Smoke-Lauf kann ergänzt werden, ist für v1.0 aber kein verpflichtendes Qualitäts-Gate.
 
@@ -896,7 +899,7 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 
 - Ein Befehl startet die Entwicklungsumgebung, ein weiterer alle Qualitätschecks.
 - Der Container startet ohne Root-Rechte, liefert SPA und API auf einem Port und wird gesund gemeldet.
-- Datenbank und spätere persistente Fachdaten liegen über `MAPTOY_DATA_DIR` in einem direkt zugänglichen Hostverzeichnis; separat konfigurierte Betriebsartefakte verwenden ebenfalls explizite Host-Bind-Mounts, und Compose legt keine Docker-verwalteten Volumes an.
+- Datenbank und spätere persistente Fachdaten liegen über `MAPTOY_STORAGE_DATA_DIR` in einem direkt zugänglichen Hostverzeichnis; separat konfigurierte Betriebsartefakte verwenden ebenfalls explizite Host-Bind-Mounts, und Compose legt keine Docker-verwalteten Volumes an.
 - Die vollständige englische Startseite sowie deutsche und thailändische Routen mit funktionierendem Englisch-Fallback sind über die Hauptnavigation erreichbar.
 - Ein automatisierter Test bestätigt den Betrieb hinter einem Präfix-entfernenden Proxy-Unterpfad.
 - Der Abschluss der Phase 1 ist als gemeinsame Version `0.0.1` in allen Paketmanifesten und im Changelog nachvollziehbar.
@@ -960,7 +963,7 @@ Nicht offensichtliche Invarianten, Sicherheits- und Vertrauensannahmen, Recovery
 
 - die Entstehungsquelle einer Tile-Revision (`provider` oder `upload`) über eine nummerierte SQL-Migration oberhalb der produktiven Schema-Baseline 4 ergänzen und vorhandene Baseline-4-Daten verlustfrei als Providerrevisionen übernehmen
 - gemeinsamen Servicepfad für Providerinhalte und hochgeladene Tile-Bytes schaffen, ohne Providerabruf beim Upload
-- `POST api/map-sets/:id/tiles/:z/:x/:y` mit unverändertem Bild-Body, gemeinsamem Antwortschema und routenspezifischem `MAPTOY_MAX_TILE_BYTES`-Limit implementieren
+- `POST api/map-sets/:id/tiles/:z/:x/:y` mit unverändertem Bild-Body, gemeinsamem Antwortschema und routenspezifischem `MAPTOY_TILES_MAX_BYTES`-Limit implementieren
 - Content-Type und Dateisignatur gegen das konfigurierte Tile-Format prüfen sowie Koordinaten-, Bounds-, Cache-Policy-, Capability-, Größen- und Speicherregeln wiederverwenden
 - Upload, Providerabruf und Revalidierung je logischem Tile gemeinsam koordinieren; Hash-Deduplizierung, zeitliche Revisionen und atomare Dateischreibvorgänge beibehalten
 - präzise Fehlerverträge für Media-Type, Bildinhalt, deaktiviertes Archiv, Bodylimit und Speicherlimit dokumentieren
@@ -1003,11 +1006,12 @@ erst mit dem Download-Worker ergänzt.
 - Aktueller Stand, Snapshots und Zeitstände lassen sich in aggregierten Rasterzellen untersuchen.
 - Die Anzeige stimmt in Stichproben mit dem Dateisystem und den Cache-Metadaten überein.
 
-### Phase 5: Layer-Plugin-System und externer Bildkatalog
+### Phase 5: Layer-Plugin-System und externer Fotokatalog
 
 **Status:** Kernumfang am 28. August 2026 als Version `0.2.0` veröffentlicht;
 Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
-`0.2.1` verfeinert; Abschluss nach den unten aufgeführten Restarbeiten
+`0.2.1` verfeinert; Photo-Domäne und Betriebskonfiguration am 31. August 2026 mit
+Version `0.3.0` konsolidiert; Abschluss nach den unten aufgeführten Restarbeiten
 
 **Aufgaben**
 
@@ -1035,13 +1039,13 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
   verwenden bei leerem Feld einen freien, je Kategorie nummerierten Standardnamen
 - Datei-Upload verwalteter Nicht-Bild-Assets über Frontend/API mit generierten
   Asset-IDs, Status, Hash und kontrolliertem Speicherort umsetzen
-- benannte, serverseitig konfigurierte und ausschließlich lesbare Bildwurzeln sowie
-  sichere Auflösung von Wurzel-ID und relativem Pfad ohne Offenlegung absoluter
+- ein serverseitig konfiguriertes und ausschließlich lesbares Fotoverzeichnis sowie
+  sichere Auflösung relativer Pfade ohne Offenlegung absoluter
   Serverpfade implementieren
 - minimalen persistenten Jobkern mit Polling, Fortschritt, Pause, Fortsetzung,
   Abbruch und Neustart-Recovery implementieren und einen optional rekursiven,
-  inkrementellen Bildverzeichnisscan als ersten Jobtyp bereitstellen
-- Bildkatalog und Vorschau-Speicher so umsetzen, dass Originalbilder extern bleiben,
+  inkrementellen Fotoverzeichnisscan als ersten Jobtyp bereitstellen
+- Fotokatalog und Vorschau-Speicher so umsetzen, dass Originalfotos extern bleiben,
   nur Metadaten und abgeleitete Vorschauen persistiert und geänderte beziehungsweise
   fehlende Quellen ohne automatische Löschung erkannt werden
 - kontrollierte Frontend-, Import-, Asset- und Server-Rendering-Hooks bereitstellen
@@ -1081,10 +1085,10 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
   Dialoge im Standard-Map-View erreichbar; es gibt keine eigene Layer-Hauptansicht
   oder `/layers`-Route, und die Coverage-Ansicht bleibt unverändert auf das
   Tile-Archiv fokussiert.
-- Eine konfigurierte Read-only-Bildwurzel kann rekursiv und inkrementell als
+- Das konfigurierte Read-only-Fotoverzeichnis kann rekursiv und inkrementell als
   persistenter Job gescannt werden. Originalbilder verbleiben außerhalb des
   Anwendungsdatenverzeichnisses; SQLite enthält den Katalog und
-  `MAPTOY_DATA_DIR` ausschließlich abgeleitete Vorschauen und temporäre
+  `MAPTOY_STORAGE_DATA_DIR` ausschließlich abgeleitete Vorschauen und temporäre
   Verarbeitungsartefakte.
 - EXIF-GPS-Positionen sind ohne Einzelbestätigung unmittelbar nutzbar. Manuelle
   Korrekturen und bewusst entfernte Positionen überleben erneute Scans; fehlende oder
@@ -1103,7 +1107,7 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
 
 **Offene Restarbeiten vor Abschluss der Phase**
 
-- Fortschrittszähler und Zusammenfassungen von Bildscan-Jobs bei Pause,
+- Fortschrittszähler und Zusammenfassungen von Fotoscan-Jobs bei Pause,
   Fortsetzung und Neustart-Recovery konsistent halten. Eine erneut begonnene
   inkrementelle Verarbeitung darf bereits gezählte Dateien nicht ein zweites Mal
   addieren; Integrationsprüfungen decken Pause, Fortsetzung, Abbruch und Recovery
@@ -1117,10 +1121,10 @@ Layer-Bedienung, Schemamigration und Navigation am 29. August 2026 mit Version
   Aufbewahrungsstrategie sowie einen nachvollziehbaren manuellen beziehungsweise
   automatischen Bereinigungsweg umsetzen. Laufende und pausierte Jobs bleiben
   geschützt; Phase 7 erweitert dieselbe Entscheidung um fertige Exportdateien.
-- Den Bildkatalog im Frontend bedarfsgerecht und cursor-basiert laden, statt beim
+- Den Fotokatalog im Frontend bedarfsgerecht und cursor-basiert laden, statt beim
   Initialisieren sämtliche Assetseiten aller Layer abzurufen und anschließend nur
   einen Ausschnitt anzuzeigen. Verwaltung und Kartenanzeige bleiben auch bei großen
-  konfigurierten Bildkatalogen kontrolliert nutzbar.
+  konfigurierten Fotokatalogen kontrolliert nutzbar.
 
 ### Phase 5a: Zustandsabgeleitete dekorative Layer
 
@@ -1311,10 +1315,11 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.1.0` | eigenständig versionierte Firefox-Erweiterung, bereinigter Rendering-Spike und kleinere Metadatenkorrekturen |
 | `0.1.1` | Phase 4: aggregierte Cache-Abdeckung, Zustandsvergleiche, Drill-down und Coverage-Kartenansicht |
 | `0.1.2` | Coverage-Ansicht bereinigt und präzisiert, gemeinsame Zoom-Steuerung sowie Dokumentationsverbesserungen |
-| `0.2.0` | Kernumfang von Phase 5: Layer-Plugin-System, Track-/Bildlayer, globaler Overlay-Stack, externer Bildkatalog und persistente Scan-Jobs |
+| `0.2.0` | Kernumfang von Phase 5: Layer-Plugin-System, Track-/Fotolayer, globaler Overlay-Stack, externer Fotokatalog und persistente Scan-Jobs |
 | `0.2.1` | Skalierbare Layer- und Hauptnavigation, vereinheitlichte Track-Deckkraftmigration sowie gruppierte Dokumentationsnavigation |
 | `0.2.2` | Koordinatenformate, verfeinerte Map-Set-Auswahl und Tile-Vorschau sowie OpenTopoMap als zugangsdatenfreie Erststartvorgabe |
 | `0.2.3` | Dekorativer Tile-Grid-Layer mit lokalen Maßstabsleisten, schnellem Display-Schalter und Mapping-Ressourcen |
+| `0.3.0` | Konsistentes Environment-Schema, vereinfachter Fotokatalog und überarbeitete Dialog- und Kartenwerkzeuge |
 
 ### 13.2 Weitere Releases
 
@@ -1324,7 +1329,7 @@ Phase 6 werden die bei Phase 5 dokumentierten Restarbeiten und anschließend Pha
 Release konkrete Patchnummern:
 
 1. Abschluss Phase 5: konsistente Job-Recovery, gemessene Bildlimits,
-   Job-Aufbewahrung und skalierbares Laden des Bildkatalogs
+   Job-Aufbewahrung und skalierbares Laden des Fotokatalogs
 2. Phase 5a: zustandsabgeleitete dekorative Layer, XYZ-Tile-Grid und metrische
    Maßstabsleiste
 3. Phase 6: kontrollierter Batch-Download, Provider-Limits und Erweiterung des
@@ -1360,8 +1365,8 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 | Tile-Grid zeigt bei Viertel-Zoom, 512-Pixel-Tiles oder World-Wrapping andere Koordinaten als die Basiskarte tatsächlich lädt | Diagnose und gezielter Tile-Abruf verwenden falsche `z/x/y`-Werte | tatsächlichen ganzzahligen Source-Zoom und kanonische Tile-Koordinaten im Renderer bestimmen, gemeinsame XYZ-Mathematik aus `map-core` verwenden und alle Offset-/Wrap-Fälle testen |
 | Maßstabsleiste unterscheidet sich zwischen Browser und Export oder ist in hohen Breitengraden falsch | kartografisch irreführende Längenangabe | gemeinsame geodätische Distanz- und Rundungslogik, Berechnung am Mittelpunkt jedes Source-Tiles sowie numerische Tests über mehrere Breitengrade und Projektionen |
 | Plugin oder Dateiimport verarbeitet schädliche Inhalte | Codeausführung, Datenleck oder Ressourcenverbrauch | nur vertrauenswürdige Buildzeit-Plugins, kontrollierte Hooks, sichere Decoder und harte Limits |
-| Konfigurierte Bildwurzel oder Originalbild fehlt beziehungsweise wurde geändert | Bildanzeige oder reproduzierbarer hochauflösender Export ist eingeschränkt | Metadaten und Vorschau erhalten, Fingerprint prüfen, Zustand `missing`/`changed` anzeigen und keine automatische Löschung oder unbemerkte Ersetzung |
-| Bildscan verlässt über Pfad oder Symlink die konfigurierte Wurzel | Zugriff auf nicht freigegebene Hostdateien | nur Wurzel-IDs und normalisierte relative Pfade akzeptieren, reale Zielpfade gegen die Read-only-Wurzel prüfen und absolute Pfade nicht offenlegen |
+| Konfiguriertes Fotoverzeichnis oder Originalfoto fehlt beziehungsweise wurde geändert | Fotoanzeige oder reproduzierbarer hochauflösender Export ist eingeschränkt | Metadaten und Vorschau erhalten, Fingerprint prüfen, Zustand `missing`/`changed` anzeigen und keine automatische Löschung oder unbemerkte Ersetzung |
+| Fotoscan verlässt über Pfad oder Symlink die konfigurierte Wurzel | Zugriff auf nicht freigegebene Hostdateien | nur Wurzel-IDs und normalisierte relative Pfade akzeptieren, reale Zielpfade gegen die Read-only-Wurzel prüfen und absolute Pfade nicht offenlegen |
 | EXIF-GPS-Daten werden unbeabsichtigt weitergegeben | Datenschutzproblem | nur eine nachvollziehbar als `exif` gekennzeichnete wirksame Position übernehmen, nachträgliche Korrektur/Entfernung ermöglichen und nicht benötigte Metadaten aus Vorschauen/Exporten entfernen |
 | Dokumentation und Verhalten laufen auseinander | Fehlbedienung und falsche API-Nutzung | API-Referenz generieren, Feature-DoD um Dokumentation ergänzen und versionsgleich veröffentlichen |
 | Englische Dokumentation ist unvollständig oder lokalisierter Fallback ist defekt | fehlende Hilfe und widersprüchliche Navigation | Englisch als Build-Gate, stabile Dokument-/Abschnitts-IDs, Fallback-Tests und Übersetzungsstatusbericht |
@@ -1383,7 +1388,7 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 - Batch-Jobs konfigurierte technische Limits und Provider-Signale respektieren sowie Neustart, Pause und Abbruch konsistent behandeln;
 - die Coverage-Ansicht große Caches und Vergleiche aggregiert und verständlich darstellt;
 - das allgemeine Layer-Plugin-System versionierte Manifeste, Schemas, Migrationen sowie Frontend-/Server-Hooks bereitstellt und seine Contract-Tests besteht;
-- Layerauswahl, Import, Bildscan, Konfiguration, Reihenfolge, Sichtbarkeit und
+- Layerauswahl, Import, Fotoscan, Konfiguration, Reihenfolge, Sichtbarkeit und
   Diagnosen im optionalen Panel beziehungsweise in Dialogen des Standard-Map-View
   funktionieren, ohne eigene Layer-Hauptansicht oder `/layers`-Route und ohne die
   fachliche Aufgabe der Coverage-Ansicht zu erweitern;
@@ -1400,9 +1405,9 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 - verwaltete Nicht-Bild-Assets über Frontend und API hochgeladen und validiert werden
   können und sämtliche Layer ausschließlich kontrollierte Asset-IDs statt frei
   zusammengesetzter Dateipfade referenzieren;
-- externe Read-only-Bildwurzeln rekursiv und inkrementell über persistente Jobs
-  gescannt werden können, ohne Originalbilder in `MAPTOY_DATA_DIR` zu kopieren;
-  SQLite enthält den Bildkatalog, das Anwendungsdatenverzeichnis nur abgeleitete
+- das externe Read-only-Fotoverzeichnis rekursiv und inkrementell über persistente Jobs
+  gescannt werden können, ohne Originalbilder in `MAPTOY_STORAGE_DATA_DIR` zu kopieren;
+  SQLite enthält den Fotokatalog, das Anwendungsdatenverzeichnis nur abgeleitete
   Vorschauen und temporäre Verarbeitungsartefakte;
 - EXIF-GPS automatisch als wirksame, mit Herkunft markierte Position übernommen wird
   und nachträgliche Korrektur beziehungsweise Entfernung bei erneutem Scan erhalten
@@ -1453,7 +1458,7 @@ geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
   geografische Bounds. Worldfiles und GeoTIFF-Metadaten sind nicht Bestandteil des
   v1-Umfangs.
 - Bildoriginale verbleiben in konfigurierten, nur lesbar eingebundenen externen
-  Bildwurzeln. maptoy persistiert Katalogmetadaten und abgeleitete Vorschauen,
+  Fotoverzeichnis. maptoy persistiert Katalogmetadaten und abgeleitete Vorschauen,
   übernimmt EXIF-GPS automatisch als korrigierbare wirksame Position und scannt
   Verzeichnisse inkrementell über den gemeinsamen persistenten Jobkern.
 
@@ -1462,7 +1467,7 @@ geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
 | Spätestens vor | Entscheidung | Benötigtes Ergebnis |
 | --- | --- | --- |
 | Abschluss Phase 5 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Bilddateigröße, dekodierte Pixel, Vorschauabmessungen, Scan-Batchgröße und parallele Decoder? | Mit repräsentativen Bildverzeichnissen gemessene Defaults, konfigurierbare Grenzen, begrenzter Ressourcenverbrauch und verständliche Diagnose einzelner zu großer oder beschädigter Dateien, ohne den gesamten Scan abzubrechen oder die Gesamtgröße eines Verzeichnisses unnötig zu begrenzen. |
-| Phase 6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? Die Coverage-Antwort ist unabhängig davon bereits auf standardmäßig 1.024 und maximal 4.096 aggregierte Zellen begrenzt. | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_MAX_TILE_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
+| Phase 6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? Die Coverage-Antwort ist unabhängig davon bereits auf standardmäßig 1.024 und maximal 4.096 aggregierte Zellen begrenzt. | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_TILES_MAX_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
 | Abschluss Phase 5 | Wie lange bleiben abgeschlossene Jobs und begrenzte Fehlerhistorien erhalten? | Standardfristen, konfigurierbare Aufbewahrung, Schutz laufender und pausierter Jobs sowie ein nachvollziehbarer manueller beziehungsweise automatischer Bereinigungsweg. |
 | Phase 7 | Wie lange bleiben fertige Exportdateien erhalten? | Auf der allgemeinen Job-Aufbewahrung aufbauende Standardfrist, konfigurierbare Grenze und nachvollziehbarer Bereinigungsweg für Exportdateien. |
 | Phase 8 | Ist eine ausreichend gute Thai-Suche mit vertretbarem Aufwand möglich? | Entweder getestete Thai-Segmentierung und Suche oder eine bewusst deaktivierte Thai-Suche mit sichtbarem Verweis auf die englische Suche. |

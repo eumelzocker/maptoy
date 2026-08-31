@@ -35,6 +35,7 @@ Thumbs.db
 # Local persistent application data
 /.data/
 /data/
+/.photos/
 
 # Temporary files
 .tmp/

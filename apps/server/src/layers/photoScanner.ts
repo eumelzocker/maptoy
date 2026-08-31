@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import type {
-  ImageScanJobInput,
+  PhotoScanJobInput,
   Job,
   LayerAsset,
   LayerAssetPatch,
@@ -14,11 +14,8 @@ import type {
   LayerRepository,
   StoredLayerAsset,
 } from "./repository.js";
-import type {
-  ImagePreviewStorage,
-  ImageRootResolver,
-  ResolvedImageFile,
-} from "./imageStorage.js";
+import type { ImagePreviewStorage } from "./imagePreviewStorage.js";
+import type { PhotoDirectory, ResolvedPhotoFile } from "./photoDirectory.js";
 
 const executeFile = promisify(execFile);
 
@@ -44,7 +41,6 @@ export class JobStateError extends Error {
 
 interface StoredScanInput extends Record<string, unknown> {
   layerId: string;
-  rootId: string;
   relativeDirectory: string;
   recursive: boolean;
 }
@@ -111,6 +107,7 @@ function publicAsset(asset: StoredLayerAsset): LayerAsset {
   const {
     managedPath: _managedPath,
     previewPath: _previewPath,
+    sourceRootId: _sourceRootId,
     sourceFingerprint: _sourceFingerprint,
     metadata: _metadata,
     ...result
@@ -118,7 +115,7 @@ function publicAsset(asset: StoredLayerAsset): LayerAsset {
   return result;
 }
 
-export class ImageScanService {
+export class PhotoScanService {
   private activeRun: Promise<void> | null = null;
   private shuttingDown = false;
 
@@ -126,7 +123,7 @@ export class ImageScanService {
     private readonly layers: LayerService,
     private readonly layerRepository: LayerRepository,
     private readonly jobs: JobRepository,
-    readonly roots: ImageRootResolver,
+    readonly directory: PhotoDirectory,
     private readonly previews: ImagePreviewStorage,
     private readonly limits: {
       batchSize: number;
@@ -209,7 +206,7 @@ export class ImageScanService {
       (hasCoordinate && patch.bounds !== null)
     ) {
       throw new JobStateError(
-        "Use either a complete point coordinate or valid image bounds.",
+        "Use either a complete point coordinate or valid photo bounds.",
       );
     }
     const updated: StoredLayerAsset = {
@@ -244,17 +241,17 @@ export class ImageScanService {
     );
   }
 
-  start(layerId: string, input: ImageScanJobInput): Job {
+  start(layerId: string, input: PhotoScanJobInput): Job {
     const layer = this.layers.get(layerId);
-    if (layer.pluginId !== "image-layer") {
+    if (layer.pluginId !== "photo-layer") {
       throw new JobStateError(
-        "Image scans can only target an image-layer instance.",
+        "Photo scans can only target a photo-layer instance.",
       );
     }
     const timestamp = new Date().toISOString();
     const job: Job = {
       id: randomUUID(),
-      type: "image-scan",
+      type: "photo-scan",
       status: "queued",
       input: { layerId, ...input },
       total: 0,
@@ -339,7 +336,7 @@ export class ImageScanService {
     }
     const next = this.jobs
       .list()
-      .filter((job) => job.type === "image-scan" && job.status === "queued")
+      .filter((job) => job.type === "photo-scan" && job.status === "queued")
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
     if (next === undefined) {
       return;
@@ -365,14 +362,13 @@ export class ImageScanService {
     };
     this.jobs.update(job);
     try {
-      const files = await this.roots.files(
-        input.rootId,
+      const files = await this.directory.files(
         input.relativeDirectory,
         input.recursive,
       );
       if (files.length > this.limits.maximumFiles) {
         throw new Error(
-          `The scan found ${files.length} images; MAPTOY_MAX_IMAGE_SCAN_FILES allows ${this.limits.maximumFiles}.`,
+          `The scan found ${files.length} photos; MAPTOY_PHOTOS_SCAN_MAX_FILES allows ${this.limits.maximumFiles}.`,
         );
       }
       job = {
@@ -381,10 +377,7 @@ export class ImageScanService {
         updatedAt: new Date().toISOString(),
       };
       this.jobs.update(job);
-      const existing = this.layerRepository.listExternalAssets(
-        input.layerId,
-        input.rootId,
-      );
+      const existing = this.layerRepository.listExternalPhotos(input.layerId);
       const seen = new Set<string>();
       for (
         let batchStart = 0;
@@ -418,17 +411,11 @@ export class ImageScanService {
           const results = await Promise.all(
             chunk.map(async (file) => {
               seen.add(file.relativePath);
-              const previous = this.layerRepository.getExternalAsset(
+              const previous = this.layerRepository.getExternalPhoto(
                 input.layerId,
-                input.rootId,
                 file.relativePath,
               );
-              return this.processFile(
-                input.layerId,
-                input.rootId,
-                file,
-                previous,
-              );
+              return this.processFile(input.layerId, file, previous);
             }),
           );
           const progress = results.reduce(
@@ -473,8 +460,8 @@ export class ImageScanService {
           this.layerRepository.upsertAsset({
             ...asset,
             status: "missing",
-            errorCode: "IMAGE_SOURCE_MISSING",
-            errorMessage: "The external image file is no longer available.",
+            errorCode: "PHOTO_SOURCE_MISSING",
+            errorMessage: "The external photo file is no longer available.",
             updatedAt: new Date().toISOString(),
           });
           missing += 1;
@@ -498,7 +485,7 @@ export class ImageScanService {
         ...this.getJob(job.id),
         status: "failed",
         lastError:
-          error instanceof Error ? error.message : "The image scan failed.",
+          error instanceof Error ? error.message : "The photo scan failed.",
         updatedAt: timestamp,
         finishedAt: timestamp,
       });
@@ -507,8 +494,7 @@ export class ImageScanService {
 
   private async processFile(
     layerId: string,
-    rootId: string,
-    file: ResolvedImageFile,
+    file: ResolvedPhotoFile,
     previous: StoredLayerAsset | undefined,
   ): Promise<"created" | "changed" | "unchanged" | "failed"> {
     const timestamp = new Date().toISOString();
@@ -541,13 +527,13 @@ export class ImageScanService {
       const asset: StoredLayerAsset = {
         id: assetId,
         layerId,
-        kind: "external-image",
+        kind: "external-photo",
         status: "ready",
         fileName: path.basename(file.relativePath),
         contentType: processed.contentType,
         byteLength: processed.byteLength,
         contentHash: processed.contentHash,
-        sourceRootId: rootId,
+        sourceRootId: "photos",
         relativePath: file.relativePath,
         sourceModifiedAt: processed.sourceModifiedAt,
         width: processed.width,
@@ -590,13 +576,13 @@ export class ImageScanService {
       this.layerRepository.upsertAsset({
         id: assetId,
         layerId,
-        kind: "external-image",
+        kind: "external-photo",
         status: "failed",
         fileName: path.basename(file.relativePath),
         contentType: previous?.contentType ?? null,
         byteLength: previous?.byteLength ?? null,
         contentHash: previous?.contentHash ?? null,
-        sourceRootId: rootId,
+        sourceRootId: "photos",
         relativePath: file.relativePath,
         sourceModifiedAt: previous?.sourceModifiedAt ?? null,
         width: previous?.width ?? null,
@@ -605,9 +591,9 @@ export class ImageScanService {
         latitude: previous?.latitude ?? null,
         coordinateSource: previous?.coordinateSource ?? "none",
         previewAvailable: previous?.previewAvailable ?? false,
-        errorCode: "IMAGE_PROCESSING_FAILED",
+        errorCode: "PHOTO_PROCESSING_FAILED",
         errorMessage:
-          error instanceof Error ? error.message : "Image processing failed.",
+          error instanceof Error ? error.message : "Photo processing failed.",
         createdAt: previous?.createdAt ?? timestamp,
         updatedAt: timestamp,
         managedPath: null,

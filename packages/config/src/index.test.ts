@@ -4,92 +4,100 @@ import { loadConfig } from "./index.js";
 
 describe("loadConfig", () => {
   it("uses the project-specific default HTTP port", () => {
-    expect(loadConfig({}).port).toBe(4004);
+    expect(loadConfig({}).server.port).toBe(4004);
   });
 
   it("validates the HTTP port", () => {
-    expect(() => loadConfig({ MAPTOY_PORT: "70000" })).toThrow();
+    expect(() => loadConfig({ MAPTOY_SERVER_PORT: "70000" })).toThrow();
   });
 
   it("validates the log level", () => {
-    expect(() => loadConfig({ MAPTOY_LOG_LEVEL: "verbose" })).toThrow();
-    expect(loadConfig({ MAPTOY_LOG_LEVEL: "debug" })).toMatchObject({
-      logLevel: "debug",
+    expect(() => loadConfig({ MAPTOY_LOGGING_LEVEL: "verbose" })).toThrow();
+    expect(loadConfig({ MAPTOY_LOGGING_LEVEL: "debug" })).toMatchObject({
+      logging: { level: "debug" },
     });
   });
 
   it("derives the database path and validates provider safety options", () => {
-    const config = loadConfig({ MAPTOY_DATA_DIR: "test-data" });
-    expect(config.databasePath).toBe(
-      path.join(config.dataDirectory, "maptoy.sqlite"),
+    const config = loadConfig({ MAPTOY_STORAGE_DATA_DIR: "test-data" });
+    expect(config.storage.databasePath).toBe(
+      path.join(config.storage.dataDirectory, "maptoy.sqlite"),
     );
     expect(
-      loadConfig({ MAPTOY_ALLOW_PRIVATE_TILE_HOSTS: "true" })
-        .allowPrivateTileHosts,
+      loadConfig({ MAPTOY_TILES_ALLOW_PRIVATE_HOSTS: "true" }).tiles
+        .allowPrivateHosts,
     ).toBe(true);
     expect(() =>
-      loadConfig({ MAPTOY_ALLOW_PRIVATE_TILE_HOSTS: "sometimes" }),
-    ).toThrow("MAPTOY_ALLOW_PRIVATE_TILE_HOSTS");
-    expect(() => loadConfig({ MAPTOY_MAX_TILE_BYTES: "0" })).toThrow(
-      "MAPTOY_MAX_TILE_BYTES",
+      loadConfig({ MAPTOY_TILES_ALLOW_PRIVATE_HOSTS: "sometimes" }),
+    ).toThrow("MAPTOY_TILES_ALLOW_PRIVATE_HOSTS");
+    expect(() => loadConfig({ MAPTOY_TILES_MAX_BYTES: "0" })).toThrow(
+      "MAPTOY_TILES_MAX_BYTES",
     );
   });
 
   it("derives independently configurable traffic log directories", () => {
     const config = loadConfig({
-      MAPTOY_DATA_DIR: "test-data",
-      MAPTOY_API_TRAFFIC_LOG_DIR: "$" + "{MAPTOY_DATA_DIR}/custom-api",
-      MAPTOY_PROVIDER_TRAFFIC_LOG_DIR: "outside/provider",
-      MAPTOY_TRAFFIC_LOG_MAX_BYTES: "2048",
-      MAPTOY_TRAFFIC_LOG_MAX_FILES: "3",
+      MAPTOY_STORAGE_DATA_DIR: "test-data",
+      MAPTOY_LOGGING_API_TRAFFIC_DIR:
+        "$" + "{MAPTOY_STORAGE_DATA_DIR}/custom-api",
+      MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR: "outside/provider",
+      MAPTOY_LOGGING_TRAFFIC_MAX_BYTES: "2048",
+      MAPTOY_LOGGING_TRAFFIC_MAX_FILES: "3",
     });
 
-    expect(config.apiTrafficLogDirectory).toBe(
-      path.join(config.dataDirectory, "custom-api"),
+    expect(config.logging.apiTrafficDirectory).toBe(
+      path.join(config.storage.dataDirectory, "custom-api"),
     );
-    expect(config.providerTrafficLogDirectory).toBe(
+    expect(config.logging.providerTrafficDirectory).toBe(
       path.resolve("outside/provider"),
     );
-    expect(config.trafficLogMaxBytes).toBe(2048);
-    expect(config.trafficLogMaxFiles).toBe(3);
-    expect(() => loadConfig({ MAPTOY_TRAFFIC_LOG_MAX_FILES: "0" })).toThrow(
-      "MAPTOY_TRAFFIC_LOG_MAX_FILES",
+    expect(config.logging.trafficMaximumBytes).toBe(2048);
+    expect(config.logging.trafficMaximumFiles).toBe(3);
+    expect(() => loadConfig({ MAPTOY_LOGGING_TRAFFIC_MAX_FILES: "0" })).toThrow(
+      "MAPTOY_LOGGING_TRAFFIC_MAX_FILES",
     );
   });
 
-  it("validates named absolute read-only image roots and image limits", () => {
+  it("resolves the read-only Photo directory and validates Photo limits", () => {
     const config = loadConfig({
-      MAPTOY_IMAGE_ROOTS_JSON: JSON.stringify({
-        photos: "/images/photos",
-        "photo-archive": "/images/archive",
-      }),
+      MAPTOY_PHOTOS_DIR: "photos",
+      MAPTOY_PHOTOS_MAX_FILE_BYTES: "2048",
+      MAPTOY_PHOTOS_MAX_DECODED_PIXELS: "4096",
+      MAPTOY_PHOTOS_PREVIEW_MAX_EDGE: "320",
+      MAPTOY_PHOTOS_SCAN_BATCH_SIZE: "25",
+      MAPTOY_PHOTOS_SCAN_CONCURRENCY: "1",
+      MAPTOY_PHOTOS_SCAN_MAX_FILES: "500",
+    });
+    expect(config.photos.directory).toBe(path.resolve("photos"));
+    expect(config.photos).toMatchObject({
+      maximumFileBytes: 2048,
+      maximumDecodedPixels: 4096,
+      previewMaximumEdge: 320,
+      scanBatchSize: 25,
+      scanConcurrency: 1,
+      scanMaximumFiles: 500,
+    });
+    expect(loadConfig({ MAPTOY_PHOTOS_DIR: "" }).photos.directory).toBeNull();
+    expect(() => loadConfig({ MAPTOY_PHOTOS_SCAN_CONCURRENCY: "17" })).toThrow(
+      "must not exceed 16",
+    );
+  });
+
+  it("does not accept legacy environment aliases", () => {
+    const config = loadConfig({
+      MAPTOY_HOST: "127.0.0.1",
+      MAPTOY_PORT: "1234",
+      MAPTOY_DATA_DIR: "/legacy-data",
+      MAPTOY_IMAGE_ROOTS_JSON: '{"legacy":"/photos"}',
       MAPTOY_MAX_IMAGE_BYTES: "2048",
-      MAPTOY_MAX_IMAGE_PIXELS: "4096",
-      MAPTOY_IMAGE_PREVIEW_MAX_EDGE: "320",
-      MAPTOY_IMAGE_SCAN_BATCH_SIZE: "25",
-      MAPTOY_IMAGE_DECODER_CONCURRENCY: "1",
-      MAPTOY_MAX_IMAGE_SCAN_FILES: "500",
     });
-    expect(config.imageRoots).toEqual([
-      { id: "photos", path: "/images/photos" },
-      { id: "photo-archive", path: "/images/archive" },
-    ]);
-    expect(config).toMatchObject({
-      maximumImageBytes: 2048,
-      maximumImagePixels: 4096,
-      imagePreviewMaximumEdge: 320,
-      imageScanBatchSize: 25,
-      imageDecoderConcurrency: 1,
-      maximumImageScanFiles: 500,
+
+    expect(config.server).toEqual({
+      host: "0.0.0.0",
+      port: 4004,
     });
-    expect(() =>
-      loadConfig({ MAPTOY_IMAGE_ROOTS_JSON: '{"bad id":"/images"}' }),
-    ).toThrow("lowercase stable IDs");
-    expect(() =>
-      loadConfig({ MAPTOY_IMAGE_ROOTS_JSON: '{"photos":"relative"}' }),
-    ).toThrow("must be absolute");
-    expect(() =>
-      loadConfig({ MAPTOY_IMAGE_DECODER_CONCURRENCY: "17" }),
-    ).toThrow("must not exceed 16");
+    expect(config.storage.dataDirectory).not.toBe("/legacy-data");
+    expect(config.photos.directory).toBeNull();
+    expect(config.photos.maximumFileBytes).toBe(100 * 1024 * 1024);
   });
 });

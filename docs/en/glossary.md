@@ -18,7 +18,7 @@ configured attribution in the interactive map and in exports where applicable.
 
 A rectangular geographic extent, usually expressed by its western, southern,
 eastern, and northern edges. In *maptoy*, bounds can define a download area, export
-area, or the placement of an image layer.
+area, or the placement of a photo layer.
 
 ## Cache
 

@@ -1,22 +1,22 @@
 import path from "node:path";
 
-export const DEFAULT_HTTP_HOST = "0.0.0.0";
-export const DEFAULT_HTTP_PORT = 4004;
-export const DEFAULT_DATA_DIR = ".data";
-export const DEFAULT_LOG_LEVEL = "info";
-export const DEFAULT_TRAFFIC_LOG_MAX_BYTES = 10 * 1024 * 1024;
-export const DEFAULT_TRAFFIC_LOG_MAX_FILES = 5;
-export const DEFAULT_PROVIDER_TIMEOUT_MILLISECONDS = 10_000;
-export const DEFAULT_MAX_TILE_BYTES = 10 * 1024 * 1024;
-export const DEFAULT_MAX_IMAGE_BYTES = 100 * 1024 * 1024;
-export const DEFAULT_MAX_LAYER_ASSET_BYTES = 25 * 1024 * 1024;
-export const DEFAULT_MAX_IMAGE_PIXELS = 100_000_000;
-export const DEFAULT_IMAGE_PREVIEW_MAX_EDGE = 640;
-export const DEFAULT_IMAGE_SCAN_BATCH_SIZE = 100;
-export const DEFAULT_IMAGE_DECODER_CONCURRENCY = 2;
-export const DEFAULT_MAX_IMAGE_SCAN_FILES = 100_000;
+export const DEFAULT_SERVER_HOST = "0.0.0.0";
+export const DEFAULT_SERVER_PORT = 4004;
+export const DEFAULT_STORAGE_DATA_DIR = ".data";
+export const DEFAULT_LOGGING_LEVEL = "info";
+export const DEFAULT_LOGGING_TRAFFIC_MAX_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_LOGGING_TRAFFIC_MAX_FILES = 5;
+export const DEFAULT_TILES_PROVIDER_TIMEOUT_MILLISECONDS = 10_000;
+export const DEFAULT_TILES_MAX_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_LAYERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
+export const DEFAULT_PHOTOS_MAX_FILE_BYTES = 100 * 1024 * 1024;
+export const DEFAULT_PHOTOS_MAX_DECODED_PIXELS = 100_000_000;
+export const DEFAULT_PHOTOS_PREVIEW_MAX_EDGE = 640;
+export const DEFAULT_PHOTOS_SCAN_BATCH_SIZE = 100;
+export const DEFAULT_PHOTOS_SCAN_CONCURRENCY = 2;
+export const DEFAULT_PHOTOS_SCAN_MAX_FILES = 100_000;
 
-const IMAGE_LIMITS = {
+const PHOTOS_LIMITS = {
   bytes: 1024 * 1024 * 1024,
   pixels: 500_000_000,
   previewEdge: 4096,
@@ -24,11 +24,6 @@ const IMAGE_LIMITS = {
   decoderConcurrency: 16,
   scanFiles: 1_000_000,
 } as const;
-
-export interface ImageRootConfig {
-  id: string;
-  path: string;
-}
 
 export type LogLevel =
   | "fatal"
@@ -40,26 +35,30 @@ export type LogLevel =
   | "silent";
 
 export interface MaptoyConfig {
-  host: string;
-  port: number;
-  dataDirectory: string;
-  databasePath: string;
-  logLevel: LogLevel;
-  apiTrafficLogDirectory: string;
-  providerTrafficLogDirectory: string;
-  trafficLogMaxBytes: number;
-  trafficLogMaxFiles: number;
-  allowPrivateTileHosts: boolean;
-  providerTimeoutMilliseconds: number;
-  maximumTileBytes: number;
-  maximumLayerAssetBytes: number;
-  imageRoots: readonly ImageRootConfig[];
-  maximumImageBytes: number;
-  maximumImagePixels: number;
-  imagePreviewMaximumEdge: number;
-  imageScanBatchSize: number;
-  imageDecoderConcurrency: number;
-  maximumImageScanFiles: number;
+  server: { host: string; port: number };
+  storage: { dataDirectory: string; databasePath: string };
+  logging: {
+    level: LogLevel;
+    apiTrafficDirectory: string;
+    providerTrafficDirectory: string;
+    trafficMaximumBytes: number;
+    trafficMaximumFiles: number;
+  };
+  tiles: {
+    allowPrivateHosts: boolean;
+    providerTimeoutMilliseconds: number;
+    maximumBytes: number;
+  };
+  layers: { assetMaximumBytes: number };
+  photos: {
+    directory: string | null;
+    maximumFileBytes: number;
+    maximumDecodedPixels: number;
+    previewMaximumEdge: number;
+    scanBatchSize: number;
+    scanConcurrency: number;
+    scanMaximumFiles: number;
+  };
 }
 
 function parseLogDirectory(
@@ -67,7 +66,7 @@ function parseLogDirectory(
   dataDirectory: string,
   defaultName: string,
 ): string {
-  const dataDirectoryReference = "$" + "{MAPTOY_DATA_DIR}";
+  const dataDirectoryReference = "$" + "{MAPTOY_STORAGE_DATA_DIR}";
   const configured = value
     ?.trim()
     .replaceAll(dataDirectoryReference, dataDirectory);
@@ -78,23 +77,25 @@ function parseLogDirectory(
 
 function parsePort(value: string | undefined): number {
   if (value === undefined || value === "") {
-    return DEFAULT_HTTP_PORT;
+    return DEFAULT_SERVER_PORT;
   }
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error("MAPTOY_PORT must be an integer between 1 and 65535.");
+    throw new Error(
+      "MAPTOY_SERVER_PORT must be an integer between 1 and 65535.",
+    );
   }
   return port;
 }
 
 function parseLogLevel(value: string | undefined): LogLevel {
-  const logLevel = value?.trim() || DEFAULT_LOG_LEVEL;
+  const logLevel = value?.trim() || DEFAULT_LOGGING_LEVEL;
   if (
     !["fatal", "error", "warn", "info", "debug", "trace", "silent"].includes(
       logLevel,
     )
   ) {
-    throw new Error("MAPTOY_LOG_LEVEL is invalid.");
+    throw new Error("MAPTOY_LOGGING_LEVEL is invalid.");
   }
   return logLevel as LogLevel;
 }
@@ -137,129 +138,107 @@ function parseBoundedPositiveInteger(
   return parsed;
 }
 
-function parseImageRoots(
-  value: string | undefined,
-): readonly ImageRootConfig[] {
-  if (value === undefined || value.trim() === "") {
-    return [];
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    throw new Error("MAPTOY_IMAGE_ROOTS_JSON must be valid JSON.");
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("MAPTOY_IMAGE_ROOTS_JSON must be a JSON object.");
-  }
-  return Object.entries(parsed).map(([id, configuredPath]) => {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
-      throw new Error(
-        "MAPTOY_IMAGE_ROOTS_JSON keys must be lowercase stable IDs.",
-      );
-    }
-    if (
-      typeof configuredPath !== "string" ||
-      !path.isAbsolute(configuredPath)
-    ) {
-      throw new Error(
-        `MAPTOY_IMAGE_ROOTS_JSON path for ${id} must be absolute.`,
-      );
-    }
-    return { id, path: path.normalize(configuredPath) };
-  });
+function parsePhotoDirectory(value: string | undefined): string | null {
+  const configured = value?.trim();
+  return configured ? path.resolve(configured) : null;
 }
 
 export function loadConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): MaptoyConfig {
-  const host = environment.MAPTOY_HOST?.trim() || DEFAULT_HTTP_HOST;
+  const host = environment.MAPTOY_SERVER_HOST?.trim() || DEFAULT_SERVER_HOST;
   const dataDirectory = path.resolve(
-    environment.MAPTOY_DATA_DIR?.trim() || DEFAULT_DATA_DIR,
+    environment.MAPTOY_STORAGE_DATA_DIR?.trim() || DEFAULT_STORAGE_DATA_DIR,
   );
   const databasePath = path.join(dataDirectory, "maptoy.sqlite");
 
   return {
-    host,
-    port: parsePort(environment.MAPTOY_PORT),
-    dataDirectory,
-    databasePath,
-    logLevel: parseLogLevel(environment.MAPTOY_LOG_LEVEL),
-    apiTrafficLogDirectory: parseLogDirectory(
-      environment.MAPTOY_API_TRAFFIC_LOG_DIR,
-      dataDirectory,
-      "api",
-    ),
-    providerTrafficLogDirectory: parseLogDirectory(
-      environment.MAPTOY_PROVIDER_TRAFFIC_LOG_DIR,
-      dataDirectory,
-      "provider",
-    ),
-    trafficLogMaxBytes: parsePositiveInteger(
-      environment.MAPTOY_TRAFFIC_LOG_MAX_BYTES,
-      DEFAULT_TRAFFIC_LOG_MAX_BYTES,
-      "MAPTOY_TRAFFIC_LOG_MAX_BYTES",
-    ),
-    trafficLogMaxFiles: parsePositiveInteger(
-      environment.MAPTOY_TRAFFIC_LOG_MAX_FILES,
-      DEFAULT_TRAFFIC_LOG_MAX_FILES,
-      "MAPTOY_TRAFFIC_LOG_MAX_FILES",
-    ),
-    allowPrivateTileHosts: parseBoolean(
-      environment.MAPTOY_ALLOW_PRIVATE_TILE_HOSTS,
-      "MAPTOY_ALLOW_PRIVATE_TILE_HOSTS",
-    ),
-    providerTimeoutMilliseconds: parsePositiveInteger(
-      environment.MAPTOY_PROVIDER_TIMEOUT_MS,
-      DEFAULT_PROVIDER_TIMEOUT_MILLISECONDS,
-      "MAPTOY_PROVIDER_TIMEOUT_MS",
-    ),
-    maximumTileBytes: parsePositiveInteger(
-      environment.MAPTOY_MAX_TILE_BYTES,
-      DEFAULT_MAX_TILE_BYTES,
-      "MAPTOY_MAX_TILE_BYTES",
-    ),
-    maximumLayerAssetBytes: parsePositiveInteger(
-      environment.MAPTOY_MAX_LAYER_ASSET_BYTES,
-      DEFAULT_MAX_LAYER_ASSET_BYTES,
-      "MAPTOY_MAX_LAYER_ASSET_BYTES",
-    ),
-    imageRoots: parseImageRoots(environment.MAPTOY_IMAGE_ROOTS_JSON),
-    maximumImageBytes: parseBoundedPositiveInteger(
-      environment.MAPTOY_MAX_IMAGE_BYTES,
-      DEFAULT_MAX_IMAGE_BYTES,
-      IMAGE_LIMITS.bytes,
-      "MAPTOY_MAX_IMAGE_BYTES",
-    ),
-    maximumImagePixels: parseBoundedPositiveInteger(
-      environment.MAPTOY_MAX_IMAGE_PIXELS,
-      DEFAULT_MAX_IMAGE_PIXELS,
-      IMAGE_LIMITS.pixels,
-      "MAPTOY_MAX_IMAGE_PIXELS",
-    ),
-    imagePreviewMaximumEdge: parseBoundedPositiveInteger(
-      environment.MAPTOY_IMAGE_PREVIEW_MAX_EDGE,
-      DEFAULT_IMAGE_PREVIEW_MAX_EDGE,
-      IMAGE_LIMITS.previewEdge,
-      "MAPTOY_IMAGE_PREVIEW_MAX_EDGE",
-    ),
-    imageScanBatchSize: parseBoundedPositiveInteger(
-      environment.MAPTOY_IMAGE_SCAN_BATCH_SIZE,
-      DEFAULT_IMAGE_SCAN_BATCH_SIZE,
-      IMAGE_LIMITS.scanBatch,
-      "MAPTOY_IMAGE_SCAN_BATCH_SIZE",
-    ),
-    imageDecoderConcurrency: parseBoundedPositiveInteger(
-      environment.MAPTOY_IMAGE_DECODER_CONCURRENCY,
-      DEFAULT_IMAGE_DECODER_CONCURRENCY,
-      IMAGE_LIMITS.decoderConcurrency,
-      "MAPTOY_IMAGE_DECODER_CONCURRENCY",
-    ),
-    maximumImageScanFiles: parseBoundedPositiveInteger(
-      environment.MAPTOY_MAX_IMAGE_SCAN_FILES,
-      DEFAULT_MAX_IMAGE_SCAN_FILES,
-      IMAGE_LIMITS.scanFiles,
-      "MAPTOY_MAX_IMAGE_SCAN_FILES",
-    ),
+    server: { host, port: parsePort(environment.MAPTOY_SERVER_PORT) },
+    storage: { dataDirectory, databasePath },
+    logging: {
+      level: parseLogLevel(environment.MAPTOY_LOGGING_LEVEL),
+      apiTrafficDirectory: parseLogDirectory(
+        environment.MAPTOY_LOGGING_API_TRAFFIC_DIR,
+        dataDirectory,
+        "api",
+      ),
+      providerTrafficDirectory: parseLogDirectory(
+        environment.MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR,
+        dataDirectory,
+        "provider",
+      ),
+      trafficMaximumBytes: parsePositiveInteger(
+        environment.MAPTOY_LOGGING_TRAFFIC_MAX_BYTES,
+        DEFAULT_LOGGING_TRAFFIC_MAX_BYTES,
+        "MAPTOY_LOGGING_TRAFFIC_MAX_BYTES",
+      ),
+      trafficMaximumFiles: parsePositiveInteger(
+        environment.MAPTOY_LOGGING_TRAFFIC_MAX_FILES,
+        DEFAULT_LOGGING_TRAFFIC_MAX_FILES,
+        "MAPTOY_LOGGING_TRAFFIC_MAX_FILES",
+      ),
+    },
+    tiles: {
+      allowPrivateHosts: parseBoolean(
+        environment.MAPTOY_TILES_ALLOW_PRIVATE_HOSTS,
+        "MAPTOY_TILES_ALLOW_PRIVATE_HOSTS",
+      ),
+      providerTimeoutMilliseconds: parsePositiveInteger(
+        environment.MAPTOY_TILES_PROVIDER_TIMEOUT_MS,
+        DEFAULT_TILES_PROVIDER_TIMEOUT_MILLISECONDS,
+        "MAPTOY_TILES_PROVIDER_TIMEOUT_MS",
+      ),
+      maximumBytes: parsePositiveInteger(
+        environment.MAPTOY_TILES_MAX_BYTES,
+        DEFAULT_TILES_MAX_BYTES,
+        "MAPTOY_TILES_MAX_BYTES",
+      ),
+    },
+    layers: {
+      assetMaximumBytes: parsePositiveInteger(
+        environment.MAPTOY_LAYERS_ASSET_MAX_BYTES,
+        DEFAULT_LAYERS_ASSET_MAX_BYTES,
+        "MAPTOY_LAYERS_ASSET_MAX_BYTES",
+      ),
+    },
+    photos: {
+      directory: parsePhotoDirectory(environment.MAPTOY_PHOTOS_DIR),
+      maximumFileBytes: parseBoundedPositiveInteger(
+        environment.MAPTOY_PHOTOS_MAX_FILE_BYTES,
+        DEFAULT_PHOTOS_MAX_FILE_BYTES,
+        PHOTOS_LIMITS.bytes,
+        "MAPTOY_PHOTOS_MAX_FILE_BYTES",
+      ),
+      maximumDecodedPixels: parseBoundedPositiveInteger(
+        environment.MAPTOY_PHOTOS_MAX_DECODED_PIXELS,
+        DEFAULT_PHOTOS_MAX_DECODED_PIXELS,
+        PHOTOS_LIMITS.pixels,
+        "MAPTOY_PHOTOS_MAX_DECODED_PIXELS",
+      ),
+      previewMaximumEdge: parseBoundedPositiveInteger(
+        environment.MAPTOY_PHOTOS_PREVIEW_MAX_EDGE,
+        DEFAULT_PHOTOS_PREVIEW_MAX_EDGE,
+        PHOTOS_LIMITS.previewEdge,
+        "MAPTOY_PHOTOS_PREVIEW_MAX_EDGE",
+      ),
+      scanBatchSize: parseBoundedPositiveInteger(
+        environment.MAPTOY_PHOTOS_SCAN_BATCH_SIZE,
+        DEFAULT_PHOTOS_SCAN_BATCH_SIZE,
+        PHOTOS_LIMITS.scanBatch,
+        "MAPTOY_PHOTOS_SCAN_BATCH_SIZE",
+      ),
+      scanConcurrency: parseBoundedPositiveInteger(
+        environment.MAPTOY_PHOTOS_SCAN_CONCURRENCY,
+        DEFAULT_PHOTOS_SCAN_CONCURRENCY,
+        PHOTOS_LIMITS.decoderConcurrency,
+        "MAPTOY_PHOTOS_SCAN_CONCURRENCY",
+      ),
+      scanMaximumFiles: parseBoundedPositiveInteger(
+        environment.MAPTOY_PHOTOS_SCAN_MAX_FILES,
+        DEFAULT_PHOTOS_SCAN_MAX_FILES,
+        PHOTOS_LIMITS.scanFiles,
+        "MAPTOY_PHOTOS_SCAN_MAX_FILES",
+      ),
+    },
   };
 }

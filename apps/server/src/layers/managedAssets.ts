@@ -148,6 +148,7 @@ export class ManagedAssetService {
       const {
         managedPath: _managedPath,
         previewPath: _previewPath,
+        sourceRootId: _sourceRootId,
         sourceFingerprint: _sourceFingerprint,
         metadata: _metadata,
         ...asset
@@ -168,7 +169,7 @@ export class ManagedAssetTooLargeError extends Error {
   readonly statusCode = 413;
 
   constructor() {
-    super("The upload exceeds MAPTOY_MAX_LAYER_ASSET_BYTES.");
+    super("The upload exceeds MAPTOY_LAYERS_ASSET_MAX_BYTES.");
     this.name = "ManagedAssetTooLargeError";
   }
 }

@@ -7,7 +7,7 @@ language: en
 # Tile Cache
 
 *maptoy* stores successfully validated raster tiles as immutable revisions below
-`MAPTOY_DATA_DIR/tiles`. SQLite contains the revision history and current pointers;
+`MAPTOY_STORAGE_DATA_DIR/tiles`. SQLite contains the revision history and current pointers;
 the image bytes remain directly accessible in the host data directory.
 
 ## Refresh modes
@@ -40,7 +40,7 @@ provider:
 curl --request POST \
   --header 'Content-Type: image/png' \
   --data-binary '@tile.png' \
-  "$MAPTOY_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
+  "$MAPTOY_SERVER_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
 ```
 
 The request body is the unmodified PNG, JPEG, or WebP file; this endpoint does not
@@ -48,7 +48,7 @@ use multipart encoding. The file must decode successfully; its media type and
 actual image format must match the Map Set's configured Tile format, and its width
 and height must equal the configured Tile size. Coordinates must be inside the Map Set's zoom and XYZ
 bounds, its Tile Archive capability and cache policy must be enabled, and both
-`MAPTOY_MAX_TILE_BYTES` and the Map Set storage limit apply.
+`MAPTOY_TILES_MAX_BYTES` and the Map Set storage limit apply.
 
 A new immutable revision returns `201` and
 `{ "revisionId": "...", "created": true }`. Uploading bytes equal to the current
@@ -64,7 +64,7 @@ Upload errors use these contracts:
 - `400 TILE_CONTENT_INVALID` when the image cannot be decoded or its actual format
   or dimensions do not match the Map Set.
 - `409 TILE_ARCHIVE_DISABLED` when archival capability or cache policy is disabled.
-- `413 TILE_BODY_TOO_LARGE` when the route-specific `MAPTOY_MAX_TILE_BYTES` limit is
+- `413 TILE_BODY_TOO_LARGE` when the route-specific `MAPTOY_TILES_MAX_BYTES` limit is
   exceeded.
 - `507 TILE_STORAGE_LIMIT` when the Map Set's storage limit would be exceeded.
 

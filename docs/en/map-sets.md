@@ -97,12 +97,12 @@ Provider requests allow HTTPS by default. Localhost, private, and link-local
 addresses are rejected both when configured as literal IP addresses and after DNS
 resolution. Redirect destinations are checked again. A self-hosted private tile
 server requires the explicit server setting
-`MAPTOY_ALLOW_PRIVATE_TILE_HOSTS=true`; this also permits HTTP and should be enabled
+`MAPTOY_TILES_ALLOW_PRIVATE_HOSTS=true`; this also permits HTTP and should be enabled
 only in a trusted network.
 
 Provider responses have a configurable timeout and byte limit. The defaults are
 10 seconds and 10 MiB per tile. Configure them with
-`MAPTOY_PROVIDER_TIMEOUT_MS` and `MAPTOY_MAX_TILE_BYTES`.
+`MAPTOY_TILES_PROVIDER_TIMEOUT_MS` and `MAPTOY_TILES_MAX_BYTES`.
 
 ## Capabilities and current scope
 

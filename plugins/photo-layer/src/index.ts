@@ -6,15 +6,15 @@ import {
   type PointFeature,
 } from "@maptoy/layer-plugin-sdk";
 
-export const IMAGE_LAYER_PLUGIN_ID = "image-layer";
+export const PHOTO_LAYER_PLUGIN_ID = "photo-layer";
 
-export interface ImageLayerConfiguration {
+export interface PhotoLayerConfiguration {
   pointColor: string;
   pointRadius: number;
   showPreviews: boolean;
 }
 
-const defaultConfiguration: ImageLayerConfiguration = {
+const defaultConfiguration: PhotoLayerConfiguration = {
   pointColor: "#2e77d0",
   pointRadius: 7,
   showPreviews: true,
@@ -22,12 +22,12 @@ const defaultConfiguration: ImageLayerConfiguration = {
 
 function requireRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("Image layer values must be objects.");
+    throw new Error("Photo layer values must be objects.");
   }
   return value as Record<string, unknown>;
 }
 
-function validateConfiguration(value: unknown): ImageLayerConfiguration {
+function validateConfiguration(value: unknown): PhotoLayerConfiguration {
   const input = requireRecord(value);
   const pointColor = input.pointColor ?? defaultConfiguration.pointColor;
   const pointRadius = input.pointRadius ?? defaultConfiguration.pointRadius;
@@ -41,19 +41,19 @@ function validateConfiguration(value: unknown): ImageLayerConfiguration {
     pointRadius > 30 ||
     typeof showPreviews !== "boolean"
   ) {
-    throw new Error("Image layer configuration is invalid.");
+    throw new Error("Photo layer configuration is invalid.");
   }
   return { pointColor, pointRadius, showPreviews };
 }
 
-interface ImagePointProperties {
+interface PhotoPointProperties {
   fileName: string;
   previewUrl?: string;
 }
 
-function imagePointFeatures(
+function photoPointFeatures(
   input: InteractiveLayerInput,
-): Array<PointFeature<ImagePointProperties>> {
+): Array<PointFeature<PhotoPointProperties>> {
   return input.assets
     .filter(
       (asset) =>
@@ -87,7 +87,7 @@ function imagePointFeatures(
 function descriptor(input: InteractiveLayerInput) {
   const configuration = validateConfiguration(input.configuration);
   const ready = input.assets.filter((asset) => asset.status === "ready");
-  const points = imagePointFeatures(input);
+  const points = photoPointFeatures(input);
   return {
     type: "composite" as const,
     data: {
@@ -131,13 +131,13 @@ function descriptor(input: InteractiveLayerInput) {
   };
 }
 
-export const imageLayerPlugin = {
+export const photoLayerPlugin = {
   manifest: {
-    id: IMAGE_LAYER_PLUGIN_ID,
+    id: PHOTO_LAYER_PLUGIN_ID,
     version: "0.2.0",
     sdkVersion: LAYER_PLUGIN_SDK_VERSION,
-    displayName: "Image layer",
-    category: { id: "images", displayName: "Images" },
+    displayName: "Photo layer",
+    category: { id: "photos", displayName: "Photos" },
     schemaVersion: 1,
     configurationSchema: {
       type: "object",

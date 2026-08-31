@@ -1,0 +1,23 @@
+meta {
+  name: Photo Directory - Status
+  type: http
+  seq: 15
+}
+get {
+  url: {{appUrl}}/api/photos/directory
+  body: none
+  auth: none
+}
+
+docs {
+  Reports whether MAPTOY_PHOTOS_DIR is configured and available without disclosing its path.
+}
+
+tests {
+  test("does not disclose the Photo path", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.configured).to.be.a("boolean");
+    expect(res.body.available).to.be.a("boolean");
+    expect(JSON.stringify(res.body)).not.to.include("/photos");
+  });
+}

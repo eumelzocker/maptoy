@@ -22,7 +22,7 @@ Providerinformationen. Provider-URLs bleiben serverseitig; der Browser lädt Til
 
 ## Docker-Datenverzeichnis
 
-Kopiere `.env.example` nach `.env`, trage mit `MAPTOY_DATA_DIR` ein
+Kopiere `.env.example` nach `.env`, trage mit `MAPTOY_STORAGE_DATA_DIR` ein
 Hostverzeichnis ein und lege es vor dem Compose-Start an. Die Vorgabe verwendet:
 
 ```sh
@@ -30,6 +30,15 @@ cp .env.example .env
 mkdir -p .data/logs/api .data/logs/provider
 docker compose up --build
 ```
+
+Laufzeitvariablen folgen `MAPTOY_<DOMÄNE>_<EIGENSCHAFT>`. Die aktuellen Domänen
+sind `SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS` und `PHOTOS`; bei
+Provider-Secrets bildet der Providername die Domäne. Frühere Variablennamen werden
+nicht unterstützt.
+
+Für den Fotokatalog verweist `MAPTOY_PHOTOS_DIR` auf ein vorhandenes
+Hostverzeichnis. Die normale Compose-Datei bindet es automatisch read-only ein;
+eine zusätzliche Compose-Datei oder ein besonderer Startbefehl ist nicht nötig.
 
 Compose bind-mountet dieses Hostverzeichnis im Container nach `/data`. Darin liegt
 die SQLite-Datenbank als `maptoy.sqlite`; spätere Tile-Archive und Exporte verwenden
@@ -44,21 +53,21 @@ einschließlich der Revisionsherkunft aus Version 5. Die Versionen 1 bis 3 waren
 ausschließlich Entwicklungsschemas und sind keine unterstützten Upgradequellen;
 produktive Datenbanken vor Version 4 existieren nicht.
 
-`MAPTOY_MAX_TILE_BYTES` begrenzt sowohl Providerantworten als auch den Raw-Body der
+`MAPTOY_TILES_MAX_BYTES` begrenzt sowohl Providerantworten als auch den Raw-Body der
 Tile-Seeding-Route. Das Uploadlimit gilt routenspezifisch und verkleinert nicht die
 zulässige Größe von Map-Set-JSON oder anderen API-Requests.
 
 ## Traffic-Logs
 
 *maptoy* protokolliert Client/API-Traffic und Backend/Tile-Provider-Traffic getrennt
-als JSON Lines. Compose bind-mountet die mit `MAPTOY_API_TRAFFIC_LOG_DIR` und
-`MAPTOY_PROVIDER_TRAFFIC_LOG_DIR` konfigurierten Verzeichnisse. Standardmäßig
-liegen sie unterhalb von `MAPTOY_DATA_DIR`; beide dürfen aber auf beliebige andere
+als JSON Lines. Compose bind-mountet die mit `MAPTOY_LOGGING_API_TRAFFIC_DIR` und
+`MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR` konfigurierten Verzeichnisse. Standardmäßig
+liegen sie unterhalb von `MAPTOY_STORAGE_DATA_DIR`; beide dürfen aber auf beliebige andere
 Hostpfade zeigen. Die aktiven Dateien heißen `api-traffic.log` und
 `provider-traffic.log`.
 
-`MAPTOY_TRAFFIC_LOG_MAX_BYTES` begrenzt die Größe jeder Datei vor der Rotation.
-`MAPTOY_TRAFFIC_LOG_MAX_FILES` bestimmt je Traffic-Typ die Gesamtzahl der
+`MAPTOY_LOGGING_TRAFFIC_MAX_BYTES` begrenzt die Größe jeder Datei vor der Rotation.
+`MAPTOY_LOGGING_TRAFFIC_MAX_FILES` bestimmt je Traffic-Typ die Gesamtzahl der
 aufbewahrten Dateien einschließlich der aktiven Datei. Authentifizierungsheader,
 Cookies und übliche geheime Query-Parameter werden redigiert. Die
 Logverzeichnisse müssen vor dem Compose-Start existieren und für UID `1000`
@@ -68,7 +77,7 @@ weiterhin und stellt den Containerzustand bereit.
 
 Der Readiness-Endpunkt prüft die Datenbank sowie fortlaufend die Schreibbarkeit des
 Anwendungsdatenverzeichnisses und beider Traffic-Log-Verzeichnisse. Außerhalb von
-`MAPTOY_DATA_DIR` konfigurierte Traffic-Logs gehören nicht zum Backup der fachlichen
+`MAPTOY_STORAGE_DATA_DIR` konfigurierte Traffic-Logs gehören nicht zum Backup der fachlichen
 Anwendungsdaten und müssen nur separat gesichert werden, wenn diese begrenzten
 Betriebsprotokolle erhalten bleiben sollen.
 

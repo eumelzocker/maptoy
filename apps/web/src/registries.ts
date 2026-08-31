@@ -1,4 +1,4 @@
-import { imageLayerPlugin } from "@maptoy/image-layer";
+import { photoLayerPlugin } from "@maptoy/photo-layer";
 import {
   createLayerPluginRegistry,
   type LayerPluginRegistry,
@@ -24,7 +24,7 @@ export const mapRendererFactoryRegistry = createMapRendererFactoryRegistry([
 
 export const layerPluginRegistry = createLayerPluginRegistry([
   trackLayerPlugin,
-  imageLayerPlugin,
+  photoLayerPlugin,
   tileGridLayerPlugin,
 ]);
 

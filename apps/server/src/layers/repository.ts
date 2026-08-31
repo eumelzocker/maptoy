@@ -29,7 +29,7 @@ interface LayerRow {
 interface AssetRow {
   id: string;
   layer_id: string;
-  kind: "managed" | "external-image";
+  kind: "managed" | "external-photo";
   status: LayerAsset["status"];
   file_name: string;
   content_type: string | null;
@@ -72,6 +72,7 @@ interface JobRow {
 }
 
 export interface StoredLayerAsset extends LayerAsset {
+  sourceRootId: string | null;
   managedPath: string | null;
   previewPath: string | null;
   sourceFingerprint: string | null;
@@ -320,14 +321,14 @@ export class LayerRepository {
     ).map(assetFromRow);
   }
 
-  listExternalAssets(layerId: string, rootId: string): StoredLayerAsset[] {
+  listExternalPhotos(layerId: string): StoredLayerAsset[] {
     return (
       this.database
         .prepare(
           `SELECT ${assetColumns} FROM layer_assets
            WHERE layer_id = ? AND source_root_id = ? ORDER BY relative_path`,
         )
-        .all(layerId, rootId) as unknown as AssetRow[]
+        .all(layerId, "photos") as unknown as AssetRow[]
     ).map(assetFromRow);
   }
 
@@ -338,9 +339,8 @@ export class LayerRepository {
     return row === undefined ? undefined : assetFromRow(row);
   }
 
-  getExternalAsset(
+  getExternalPhoto(
     layerId: string,
-    rootId: string,
     relativePath: string,
   ): StoredLayerAsset | undefined {
     const row = this.database
@@ -348,7 +348,7 @@ export class LayerRepository {
         `SELECT ${assetColumns} FROM layer_assets
          WHERE layer_id = ? AND source_root_id = ? AND relative_path = ?`,
       )
-      .get(layerId, rootId, relativePath) as AssetRow | undefined;
+      .get(layerId, "photos", relativePath) as AssetRow | undefined;
     return row === undefined ? undefined : assetFromRow(row);
   }
 
@@ -485,7 +485,7 @@ export class JobRepository {
     this.database
       .prepare(
         `UPDATE jobs SET status = 'queued', updated_at = ?
-         WHERE status = 'running' AND type = 'image-scan'`,
+         WHERE status = 'running' AND type = 'photo-scan'`,
       )
       .run(timestamp);
   }

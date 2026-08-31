@@ -43,26 +43,33 @@ async function testConfig(): Promise<MaptoyConfig> {
   );
   temporaryDirectories.push(dataDirectory);
   return {
-    host: "127.0.0.1",
-    port: 4004,
-    dataDirectory,
-    databasePath: path.join(dataDirectory, "maptoy.sqlite"),
-    logLevel: "silent",
-    apiTrafficLogDirectory: path.join(dataDirectory, "logs", "api"),
-    providerTrafficLogDirectory: path.join(dataDirectory, "logs", "provider"),
-    trafficLogMaxBytes: 1024 * 1024,
-    trafficLogMaxFiles: 3,
-    allowPrivateTileHosts: true,
-    providerTimeoutMilliseconds: 1000,
-    maximumTileBytes: 1024 * 1024,
-    maximumLayerAssetBytes: 1024 * 1024,
-    imageRoots: [],
-    maximumImageBytes: 10 * 1024 * 1024,
-    maximumImagePixels: 10_000_000,
-    imagePreviewMaximumEdge: 320,
-    imageScanBatchSize: 10,
-    imageDecoderConcurrency: 1,
-    maximumImageScanFiles: 1000,
+    server: { host: "127.0.0.1", port: 4004 },
+    storage: {
+      dataDirectory,
+      databasePath: path.join(dataDirectory, "maptoy.sqlite"),
+    },
+    logging: {
+      level: "silent",
+      apiTrafficDirectory: path.join(dataDirectory, "logs", "api"),
+      providerTrafficDirectory: path.join(dataDirectory, "logs", "provider"),
+      trafficMaximumBytes: 1024 * 1024,
+      trafficMaximumFiles: 3,
+    },
+    tiles: {
+      allowPrivateHosts: true,
+      providerTimeoutMilliseconds: 1000,
+      maximumBytes: 1024 * 1024,
+    },
+    layers: { assetMaximumBytes: 1024 * 1024 },
+    photos: {
+      directory: null,
+      maximumFileBytes: 10 * 1024 * 1024,
+      maximumDecodedPixels: 10_000_000,
+      previewMaximumEdge: 320,
+      scanBatchSize: 10,
+      scanConcurrency: 1,
+      scanMaximumFiles: 1000,
+    },
   };
 }
 
@@ -297,11 +304,14 @@ describe("maptoy server", () => {
     await server.close();
 
     const apiLog = await readFile(
-      path.join(config.apiTrafficLogDirectory, "api-traffic.log"),
+      path.join(config.logging.apiTrafficDirectory, "api-traffic.log"),
       "utf8",
     );
     const providerLog = await readFile(
-      path.join(config.providerTrafficLogDirectory, "provider-traffic.log"),
+      path.join(
+        config.logging.providerTrafficDirectory,
+        "provider-traffic.log",
+      ),
       "utf8",
     );
     expect(health.statusCode).toBe(200);
@@ -356,9 +366,9 @@ describe("maptoy server", () => {
           category: { id: "tracks", displayName: "Tracks" },
         },
         {
-          id: "image-layer",
+          id: "photo-layer",
           sdkVersion: "1.2.0",
-          category: { id: "images", displayName: "Images" },
+          category: { id: "photos", displayName: "Photos" },
         },
         {
           id: "tile-grid-layer",
@@ -370,11 +380,11 @@ describe("maptoy server", () => {
     await server.close();
   });
 
-  it("manages layers, imports a Track, and scans external images without copying originals", async () => {
+  it("manages layers, imports a Track, and scans external photos without copying originals", async () => {
     const config = await testConfig();
-    const imageRoot = `${config.dataDirectory}-external-photos`;
-    await mkdir(imageRoot, { recursive: true });
-    temporaryDirectories.push(imageRoot);
+    const photoRoot = `${config.storage.dataDirectory}-external-photos`;
+    await mkdir(photoRoot, { recursive: true });
+    temporaryDirectories.push(photoRoot);
     await sharp({
       create: {
         width: 48,
@@ -384,30 +394,33 @@ describe("maptoy server", () => {
       },
     })
       .jpeg()
-      .toFile(path.join(imageRoot, "photo.jpg"));
+      .toFile(path.join(photoRoot, "photo.jpg"));
     await executeFile("exiftool", [
       "-overwrite_original",
       "-GPSLatitude=52.52",
       "-GPSLatitudeRef=N",
       "-GPSLongitude=13.405",
       "-GPSLongitudeRef=E",
-      path.join(imageRoot, "photo.jpg"),
+      path.join(photoRoot, "photo.jpg"),
     ]);
     const server = await buildServer({
       config: {
         ...config,
-        imageRoots: [{ id: "photos", path: imageRoot }],
+        photos: {
+          ...config.photos,
+          directory: photoRoot,
+        },
       },
       providerClient,
       serveWeb: false,
     });
 
-    const imageLayerResponse = await server.inject({
+    const photoLayerResponse = await server.inject({
       method: "POST",
       url: "/api/layers",
       payload: {
         name: "Trips / Photos",
-        pluginId: "image-layer",
+        pluginId: "photo-layer",
         configuration: {},
         data: {},
         visible: true,
@@ -417,23 +430,22 @@ describe("maptoy server", () => {
         maximumZoom: null,
       },
     });
-    expect(imageLayerResponse.statusCode, imageLayerResponse.body).toBe(201);
-    expect(imageLayerResponse.json().name).toBe("Trips/Photos");
-    const imageLayerId = imageLayerResponse.json().id as string;
+    expect(photoLayerResponse.statusCode, photoLayerResponse.body).toBe(201);
+    expect(photoLayerResponse.json().name).toBe("Trips/Photos");
+    const photoLayerId = photoLayerResponse.json().id as string;
     expect(
       (
         await server.inject({
           method: "GET",
-          url: "/api/image-roots",
+          url: "/api/photos/directory",
         })
       ).json(),
-    ).toEqual({ items: [{ id: "photos", available: true }] });
+    ).toEqual({ configured: true, available: true });
 
     const scanResponse = await server.inject({
       method: "POST",
-      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      url: `/api/layers/${photoLayerId}/photo-scan-jobs`,
       payload: {
-        rootId: "photos",
         relativeDirectory: "",
         recursive: true,
       },
@@ -455,13 +467,13 @@ describe("maptoy server", () => {
     );
     const assetsResponse = await server.inject({
       method: "GET",
-      url: `/api/layers/${imageLayerId}/assets`,
+      url: `/api/layers/${photoLayerId}/assets`,
     });
     expect(assetsResponse.statusCode, assetsResponse.body).toBe(200);
     expect(assetsResponse.json()).toMatchObject({
       items: [
         {
-          kind: "external-image",
+          kind: "external-photo",
           status: "ready",
           fileName: "photo.jpg",
           coordinateSource: "exif",
@@ -471,19 +483,19 @@ describe("maptoy server", () => {
         },
       ],
     });
-    const imageAssetId = assetsResponse.json().items[0].id as string;
+    const photoAssetId = assetsResponse.json().items[0].id as string;
     const preview = await server.inject({
       method: "GET",
-      url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+      url: `/api/layers/${photoLayerId}/assets/${photoAssetId}`,
     });
     expect(preview.statusCode).toBe(200);
     expect(preview.headers["content-type"]).toBe("image/webp");
     await expect(
-      readFile(path.join(config.dataDirectory, "photo.jpg")),
+      readFile(path.join(config.storage.dataDirectory, "photo.jpg")),
     ).rejects.toThrow();
     const manualPosition = await server.inject({
       method: "PATCH",
-      url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+      url: `/api/layers/${photoLayerId}/assets/${photoAssetId}`,
       payload: {
         longitude: 13.405,
         latitude: 52.52,
@@ -497,9 +509,8 @@ describe("maptoy server", () => {
     });
     const repeatedScan = await server.inject({
       method: "POST",
-      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      url: `/api/layers/${photoLayerId}/photo-scan-jobs`,
       payload: {
-        rootId: "photos",
         relativeDirectory: "",
         recursive: true,
       },
@@ -520,14 +531,14 @@ describe("maptoy server", () => {
       (
         await server.inject({
           method: "GET",
-          url: `/api/layers/${imageLayerId}/assets`,
+          url: `/api/layers/${photoLayerId}/assets`,
         })
       ).json().items[0],
     ).toMatchObject({ coordinateSource: "manual", longitude: 13.405 });
 
     const removedPosition = await server.inject({
       method: "PATCH",
-      url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+      url: `/api/layers/${photoLayerId}/assets/${photoAssetId}`,
       payload: { longitude: null, latitude: null, bounds: null },
     });
     expect(removedPosition.json()).toMatchObject({
@@ -544,12 +555,11 @@ describe("maptoy server", () => {
       },
     })
       .jpeg()
-      .toFile(path.join(imageRoot, "photo.jpg"));
+      .toFile(path.join(photoRoot, "photo.jpg"));
     const changedScan = await server.inject({
       method: "POST",
-      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      url: `/api/layers/${photoLayerId}/photo-scan-jobs`,
       payload: {
-        rootId: "photos",
         relativeDirectory: "",
         recursive: true,
       },
@@ -570,7 +580,7 @@ describe("maptoy server", () => {
       (
         await server.inject({
           method: "GET",
-          url: `/api/layers/${imageLayerId}/assets`,
+          url: `/api/layers/${photoLayerId}/assets`,
         })
       ).json().items[0],
     ).toMatchObject({
@@ -580,12 +590,11 @@ describe("maptoy server", () => {
       width: 49,
     });
 
-    await unlink(path.join(imageRoot, "photo.jpg"));
+    await unlink(path.join(photoRoot, "photo.jpg"));
     const missingScan = await server.inject({
       method: "POST",
-      url: `/api/layers/${imageLayerId}/image-scan-jobs`,
+      url: `/api/layers/${photoLayerId}/photo-scan-jobs`,
       payload: {
-        rootId: "photos",
         relativeDirectory: "",
         recursive: true,
       },
@@ -605,7 +614,7 @@ describe("maptoy server", () => {
       (
         await server.inject({
           method: "GET",
-          url: `/api/layers/${imageLayerId}/assets`,
+          url: `/api/layers/${photoLayerId}/assets`,
         })
       ).json().items[0],
     ).toMatchObject({ status: "missing", coordinateSource: "none" });
@@ -613,7 +622,7 @@ describe("maptoy server", () => {
       (
         await server.inject({
           method: "GET",
-          url: `/api/layers/${imageLayerId}/assets/${imageAssetId}`,
+          url: `/api/layers/${photoLayerId}/assets/${photoAssetId}`,
         })
       ).statusCode,
     ).toBe(200);
@@ -679,7 +688,7 @@ describe("maptoy server", () => {
       ).json(),
     ).toMatchObject({
       items: [
-        { id: imageLayerId, name: "Trips/Photos" },
+        { id: photoLayerId, name: "Trips/Photos" },
         { id: trackLayerId, name: "Trips/Track" },
       ],
     });
@@ -713,30 +722,30 @@ describe("maptoy server", () => {
     ).toBe(204);
     expect(
       await readdir(
-        path.join(config.dataDirectory, "layer-assets", trackLayerId),
+        path.join(config.storage.dataDirectory, "layer-assets", trackLayerId),
       ),
     ).toEqual([]);
     expect(
       (
         await server.inject({
           method: "DELETE",
-          url: `/api/layers/${imageLayerId}`,
+          url: `/api/layers/${photoLayerId}`,
         })
       ).statusCode,
     ).toBe(204);
     expect(
-      await readdir(path.join(config.dataDirectory, "layer-previews")),
+      await readdir(path.join(config.storage.dataDirectory, "layer-previews")),
     ).toEqual([]);
 
     await server.close();
   });
 
-  it.each(["apiTrafficLogDirectory", "providerTrafficLogDirectory"] as const)(
+  it.each(["apiTrafficDirectory", "providerTrafficDirectory"] as const)(
     "reports not-ready when %s is no longer writable",
     async (key) => {
       const config = await testConfig();
       const server = await buildServer({ config, serveWeb: false });
-      const directory = config[key];
+      const directory = config.logging[key];
       await rename(directory, `${directory}-moved`);
       await writeFile(directory, "blocks directory recreation");
 
@@ -1005,7 +1014,7 @@ describe("maptoy server", () => {
 
   it("accepts bounded raw Tile uploads and exposes their revision origin", async () => {
     const config = await testConfig();
-    config.maximumTileBytes = 1024;
+    config.tiles.maximumBytes = 1024;
     const requestProvider = vi.fn(async () => ({
       statusCode: 200,
       headers: { "content-type": "image/png" },
@@ -1142,7 +1151,7 @@ describe("maptoy server", () => {
       method: "POST",
       url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
       headers: { "content-type": "image/png" },
-      payload: Buffer.alloc(config.maximumTileBytes + 1),
+      payload: Buffer.alloc(config.tiles.maximumBytes + 1),
     });
     expect(tooLarge).toMatchObject({ statusCode: 413 });
     expect(tooLarge.json()).toMatchObject({

@@ -30,6 +30,7 @@ describe("database migrations", () => {
       { version: 6 },
       { version: 7 },
       { version: 8 },
+      { version: 9 },
     ]);
     expect(
       database.sqlite
@@ -180,6 +181,7 @@ describe("database migrations", () => {
       { version: 6 },
       { version: 7 },
       { version: 8 },
+      { version: 9 },
     ]);
     expect(
       reopened.sqlite
@@ -193,6 +195,157 @@ describe("database migrations", () => {
       origin: "provider",
     });
     reopened.assertReady();
+    reopened.close();
+  });
+
+  it("migrates existing image catalog data to the photo domain", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "maptoy-db-v8-test-"));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "maptoy.sqlite");
+
+    const baseline = new DatabaseSync(databasePath);
+    baseline.exec("PRAGMA foreign_keys = ON;");
+    baseline.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      ) STRICT;
+    `);
+    for (const [version, filename] of [
+      [4, "0004-initial-schema.sql"],
+      [5, "0005-tile-revision-origin.sql"],
+      [6, "0006-layer-plugins-and-jobs.sql"],
+      [7, "0007-global-layer-instances.sql"],
+      [8, "0008-layer-version-opacity.sql"],
+    ] as const) {
+      baseline.exec(
+        await readFile(
+          new URL(`../migrations/${filename}`, import.meta.url),
+          "utf8",
+        ),
+      );
+      baseline
+        .prepare(
+          "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+        )
+        .run(version, "2026-08-30T00:00:00.000Z");
+    }
+    baseline
+      .prepare(
+        `INSERT INTO layer_instances (
+          id, name, plugin_id, plugin_version, schema_version,
+          configuration_json, data_json, visible, display_order, opacity,
+          minimum_zoom, maximum_zoom, status, diagnostic, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "00000000-0000-4000-8000-000000000010",
+        "Preserved catalog",
+        "image-layer",
+        "1.0.0",
+        1,
+        "{}",
+        "{}",
+        1,
+        0,
+        1,
+        null,
+        null,
+        "ready",
+        null,
+        "2026-08-30T00:00:00.000Z",
+        "2026-08-30T00:00:00.000Z",
+      );
+    baseline
+      .prepare(
+        `INSERT INTO layer_assets (
+          id, layer_id, kind, status, file_name, content_type, byte_length,
+          content_hash, managed_path, preview_path, source_root_id, relative_path,
+          source_modified_at, source_fingerprint, width, height, longitude,
+          latitude, coordinate_source, bounds_json, metadata_json, error_code,
+          error_message, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )`,
+      )
+      .run(
+        "00000000-0000-4000-8000-000000000011",
+        "00000000-0000-4000-8000-000000000010",
+        "external-image",
+        "ready",
+        "photo.jpg",
+        "image/jpeg",
+        123,
+        "photo-hash",
+        null,
+        "layer-previews/photo.webp",
+        "family",
+        "2026/photo.jpg",
+        "2026-08-30T00:00:00.000Z",
+        "123:456",
+        640,
+        480,
+        13.4,
+        52.5,
+        "exif",
+        null,
+        '{"capturedAt":"2026-08-30"}',
+        null,
+        null,
+        "2026-08-30T00:00:00.000Z",
+        "2026-08-30T00:00:00.000Z",
+      );
+    baseline
+      .prepare(
+        `INSERT INTO jobs (
+          id, type, status, input_json, total, completed, skipped, failed,
+          summary_json, last_error, created_at, started_at, updated_at, finished_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "00000000-0000-4000-8000-000000000012",
+        "image-scan",
+        "completed",
+        '{"layerId":"00000000-0000-4000-8000-000000000010","rootId":"family"}',
+        1,
+        1,
+        0,
+        0,
+        '{"created":1}',
+        null,
+        "2026-08-30T00:00:00.000Z",
+        "2026-08-30T00:00:00.000Z",
+        "2026-08-30T00:00:01.000Z",
+        "2026-08-30T00:00:01.000Z",
+      );
+    baseline.close();
+
+    const reopened = await openDatabase(databasePath);
+    expect(
+      reopened.sqlite.prepare("SELECT plugin_id FROM layer_instances").get(),
+    ).toEqual({ plugin_id: "photo-layer" });
+    expect(
+      reopened.sqlite
+        .prepare(
+          "SELECT kind, source_root_id, relative_path, content_hash FROM layer_assets",
+        )
+        .get(),
+    ).toEqual({
+      kind: "external-photo",
+      source_root_id: "photos",
+      relative_path: "2026/photo.jpg",
+      content_hash: "photo-hash",
+    });
+    expect(
+      reopened.sqlite
+        .prepare("SELECT type, status, total, input_json FROM jobs")
+        .get(),
+    ).toEqual({
+      type: "photo-scan",
+      status: "completed",
+      total: 1,
+      input_json: '{"layerId":"00000000-0000-4000-8000-000000000010"}',
+    });
     reopened.close();
   });
 });

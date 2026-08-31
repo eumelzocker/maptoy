@@ -29,7 +29,7 @@ provider request. Set `Content-Type` to the Map Set's configured `image/png`,
 must be decodable, its actual format must match the configured format, and its
 width and height must both equal the Map Set's configured Tile size.
 
-The binary request schema is bounded by `MAPTOY_MAX_TILE_BYTES`. A successful JSON
+The binary request schema is bounded by `MAPTOY_TILES_MAX_BYTES`. A successful JSON
 response follows this contract:
 
 ```json
@@ -50,7 +50,7 @@ return `200` and `created: false`. Both include the same revision ID in
 | `400` | `TILE_CONTENT_INVALID` | Image cannot be decoded or its actual format or dimensions do not match the Map Set. |
 | `404` | `MAP_SET_NOT_FOUND` | The Map Set does not exist. |
 | `409` | `TILE_ARCHIVE_DISABLED` | Cache policy or Tile Archive capability is disabled. |
-| `413` | `TILE_BODY_TOO_LARGE` | Raw body exceeds `MAPTOY_MAX_TILE_BYTES`. |
+| `413` | `TILE_BODY_TOO_LARGE` | Raw body exceeds `MAPTOY_TILES_MAX_BYTES`. |
 | `415` | `TILE_MEDIA_TYPE_INVALID` | Content-Type is missing, unsupported, or mismatched. |
 | `507` | `TILE_STORAGE_LIMIT` | The Map Set storage limit would be exceeded. |
 
@@ -81,22 +81,22 @@ hierarchy below the plugin category.
 
 `GET api/layers/:id/assets` cursor-paginates the Asset catalog. `POST` to the same
 path accepts one plugin-validated `multipart/form-data` non-image file. Its maximum
-size is `MAPTOY_MAX_LAYER_ASSET_BYTES`. `GET api/layers/:id/assets/:assetId` returns
-the controlled managed file or an external image's derived WebP preview. It never
-returns an external image original. `PATCH` updates an image's complete point or
+size is `MAPTOY_LAYERS_ASSET_MAX_BYTES`. `GET api/layers/:id/assets/:assetId` returns
+the controlled managed file or an external photo's derived WebP preview. It never
+returns an external photo original. `PATCH` updates a photo's complete point or
 geographic bounds; the two forms are mutually exclusive.
 
-`GET api/image-roots` lists stable IDs and availability without absolute paths.
-`POST api/layers/:id/image-scan-jobs` accepts `rootId`, a relative
-`relativeDirectory`, and `recursive`. It creates a persistent scan Job.
+`GET api/photos/directory` reports whether `MAPTOY_PHOTOS_DIR` is configured and
+available without returning its path. `POST api/layers/:id/photo-scan-jobs` accepts
+a relative `relativeDirectory` and `recursive`. It creates a persistent scan Job.
 
 ## Jobs
 
-`GET api/jobs` lists Jobs and `GET api/jobs/:id` reads one Job. An image scan in a
+`GET api/jobs` lists Jobs and `GET api/jobs/:id` reads one Job. A photo scan in a
 valid state can be controlled with `POST api/jobs/:id/pause`,
 `POST api/jobs/:id/resume`, and `POST api/jobs/:id/cancel`. Responses include
 `total`, `completed`, `skipped`, `failed`, status timestamps, and a safe last error.
-Image scans additionally persist `summary` counts for `created`, `changed`,
+Photo scans additionally persist `summary` counts for `created`, `changed`,
 `unchanged`, `missing`, and `failed` files.
 
 ## Security boundary

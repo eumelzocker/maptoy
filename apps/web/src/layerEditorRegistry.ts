@@ -1,5 +1,5 @@
 import type { Component } from "vue";
-import ImageLayerPluginEditor from "./components/ImageLayerPluginEditor.vue";
+import PhotoLayerPluginEditor from "./components/PhotoLayerPluginEditor.vue";
 import SchemaLayerEditor from "./components/SchemaLayerEditor.vue";
 import TrackLayerPluginEditor from "./components/TrackLayerPluginEditor.vue";
 
@@ -19,11 +19,11 @@ const presentations = new Map<string, LayerTypePresentation>([
     },
   ],
   [
-    "image-layer",
+    "photo-layer",
     {
       icon: "mdi-image-marker",
-      defaultName: "Image",
-      editor: ImageLayerPluginEditor,
+      defaultName: "Photo",
+      editor: PhotoLayerPluginEditor,
     },
   ],
   [

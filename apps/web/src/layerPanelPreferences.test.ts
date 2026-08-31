@@ -56,7 +56,7 @@ describe("Layer panel preferences", () => {
       loadSelectedLayerId({
         getItem: (key) =>
           key === "maptoy:expanded-layer-configurations"
-            ? '["track", "images"]'
+            ? '["track", "photos"]'
             : null,
         setItem: () => undefined,
       }),

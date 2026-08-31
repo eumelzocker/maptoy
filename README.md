@@ -1,6 +1,6 @@
 # maptoy
 
-*maptoy* is a self-hosted application for viewing, archiving, and exporting maps and map layers.
+*maptoy* is a self-hosted application for viewing, archiving, and exporting maps and map custom layers.
 
 <img src="docs/assets/screenshot0.webp" alt="Screenshot 0" width="600">
 <img src="docs/assets/screenshot1.webp" alt="Screenshot 1" width="600">
@@ -11,11 +11,12 @@
 > - Map Sets
 > - Immutable tile revisions
 > - Snapshots
-> - Cache overview
-> - Track and external image layers
+> - Cache coverage overview
+> - Track and external photo layers
 > - Integrated documentation
 >
-> Batch downloads and exports in additional map projections will be added soon. Support for vector maps comes in v2.
+> Batch downloads and exports in additional map projections will be added soon.
+> Support for vector maps comes in v2.
 
 ## Start with Docker Compose 🐳
 
@@ -29,28 +30,25 @@ docker compose up --build
 
 Open <http://localhost:4004>.
 
-When the server starts with an empty Map Set table, *maptoy* creates an
-**OpenTopoMap** Map Set automatically. It uses no provider secret and includes the
-OpenTopoMap CC-BY-SA and OpenStreetMap contributor attribution. Existing Map Sets
-are never changed or supplemented; if all Map Sets are deleted, the default is
-created again on the next server start. Review the linked provider information
-before using the service beyond low-volume exploration.
+When the server starts with an empty Map Set table, *maptoy* creates an **OpenTopoMap** Map Set automatically. It uses no provider secret and includes the OpenTopoMap CC-BY-SA and OpenStreetMap contributor attribution. Existing Map Sets are never changed or supplemented; if all Map Sets are deleted, the default is created again on the next server start. Review the linked provider information before using the service beyond low-volume exploration.
 
-Compose bind-mounts the host directory configured by `MAPTOY_DATA_DIR` and the two traffic-log directories. They must exist and be writable by the container user. The defaults created above keep all of them below `.data`.
+Compose bind-mounts the host directory configured by `MAPTOY_STORAGE_DATA_DIR` and the two traffic-log directories. They must exist and be writable by the container user. The defaults created above keep all of them below `.data`.
 
 Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](http://localhost:4004/docs/en/getting-started)** and **[Map Sets](http://localhost:4004/docs/en/map-sets)** documentation.
 
-To scan an existing photo directory without copying originals into *maptoy*, use the
-read-only example override:
+To scan an existing photo directory without copying originals into *maptoy*, set the absolute host path in `.env`:
 
-```sh
-MAPTOY_PHOTOS_DIR=/srv/photos docker compose \
-  -f compose.yaml -f compose.images.example.yaml up --build
+```dotenv
+MAPTOY_PHOTOS_DIR=/srv/photos
 ```
 
-This names the root `photos` and exposes only that ID to the browser. See **Layers,
-tracks, and external images** in the integrated documentation for storage rules and
-limits.
+Then start maptoy normally:
+
+```sh
+docker compose up --build
+```
+
+Compose mounts the directory read-only at a fixed internal path; neither that path nor the host path is exposed to the browser. See **Layers, tracks, and external photos** in the integrated documentation for storage rules and limits.
 
 To stop the application without deleting its data:
 

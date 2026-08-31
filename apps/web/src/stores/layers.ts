@@ -1,5 +1,5 @@
 import type {
-  ImageScanJobInput,
+  PhotoScanJobInput,
   Job,
   Layer,
   LayerAsset,
@@ -24,8 +24,9 @@ interface AssetListResponse {
   nextCursor: string | null;
 }
 
-interface ImageRootListResponse {
-  items: Array<{ id: string; available: boolean }>;
+interface PhotoDirectoryStatus {
+  configured: boolean;
+  available: boolean;
 }
 
 interface JobListResponse {
@@ -36,7 +37,10 @@ export const useLayersStore = defineStore("layers", {
   state: () => ({
     items: [] as Layer[],
     assetsByLayer: {} as Record<string, LayerAsset[]>,
-    imageRoots: [] as Array<{ id: string; available: boolean }>,
+    photoDirectory: {
+      configured: false,
+      available: false,
+    } as PhotoDirectoryStatus,
     jobs: [] as Job[],
     loading: false,
     loaded: false,
@@ -81,10 +85,10 @@ export const useLayersStore = defineStore("layers", {
       this.assetsByLayer[layerId] = assets;
     },
 
-    async loadImageRoots(): Promise<void> {
-      const response =
-        await apiRequest<ImageRootListResponse>("api/image-roots");
-      this.imageRoots = response.items;
+    async loadPhotoDirectory(): Promise<void> {
+      this.photoDirectory = await apiRequest<PhotoDirectoryStatus>(
+        "api/photos/directory",
+      );
     },
 
     async create(pluginId: string, name: string): Promise<Layer> {
@@ -190,12 +194,12 @@ export const useLayersStore = defineStore("layers", {
       return asset;
     },
 
-    async startImageScan(
+    async startPhotoScan(
       layerId: string,
-      input: ImageScanJobInput,
+      input: PhotoScanJobInput,
     ): Promise<Job> {
       const job = await apiRequest<Job>(
-        `api/layers/${encodeURIComponent(layerId)}/image-scan-jobs`,
+        `api/layers/${encodeURIComponent(layerId)}/photo-scan-jobs`,
         {
           method: "POST",
           body: JSON.stringify(input),

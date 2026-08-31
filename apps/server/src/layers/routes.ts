@@ -1,9 +1,9 @@
 import { createReadStream } from "node:fs";
 import {
   ErrorResponseSchema,
-  type ImageScanJobInput,
-  ImageScanJobInputSchema,
-  ImageRootListResponseSchema,
+  PhotoDirectoryStatusSchema,
+  type PhotoScanJobInput,
+  PhotoScanJobInputSchema,
   JobListResponseSchema,
   JobSchema,
   type Layer,
@@ -20,7 +20,7 @@ import {
   LayerSchema,
 } from "@maptoy/contracts";
 import type { FastifyInstance } from "fastify";
-import type { ImageScanService } from "./imageScanner.js";
+import type { PhotoScanService } from "./photoScanner.js";
 import type { ManagedAssetService } from "./managedAssets.js";
 import type { LayerService } from "./service.js";
 
@@ -47,7 +47,7 @@ const assetParametersSchema = {
 export function registerLayerRoutes(
   server: FastifyInstance,
   layers: LayerService,
-  imageScans: ImageScanService,
+  photoScans: PhotoScanService,
   managedAssets: ManagedAssetService,
 ): void {
   server.get(
@@ -119,9 +119,9 @@ export function registerLayerRoutes(
     { schema: { params: idParametersSchema } },
     async (request, reply) => {
       layers.get(request.params.id);
-      imageScans.assertLayerIdle(request.params.id);
+      photoScans.assertLayerIdle(request.params.id);
       await Promise.all([
-        imageScans.deleteLayerPreviews(request.params.id),
+        photoScans.deleteLayerPreviews(request.params.id),
         managedAssets.deleteLayerFiles(request.params.id),
       ]);
       layers.delete(request.params.id);
@@ -154,7 +154,7 @@ export function registerLayerRoutes(
       },
     },
     async (request) =>
-      imageScans.listAssets(
+      photoScans.listAssets(
         request.params.id,
         request.query.limit ?? 200,
         request.query.cursor,
@@ -197,14 +197,14 @@ export function registerLayerRoutes(
     "/api/layers/:id/assets/:assetId",
     { schema: { params: assetParametersSchema } },
     async (request, reply) => {
-      const asset = imageScans.getAsset(
+      const asset = photoScans.getAsset(
         request.params.id,
         request.params.assetId,
       );
       const filePath =
         asset.kind === "managed"
           ? managedAssets.resolveAssetPath(asset)
-          : imageScans.previewPath(request.params.id, request.params.assetId);
+          : photoScans.previewPath(request.params.id, request.params.assetId);
       return reply
         .type(
           asset.kind === "managed"
@@ -234,7 +234,7 @@ export function registerLayerRoutes(
       },
     },
     async (request) =>
-      imageScans.updateAsset(
+      photoScans.updateAsset(
         request.params.id,
         request.params.assetId,
         request.body,
@@ -242,20 +242,20 @@ export function registerLayerRoutes(
   );
 
   server.get(
-    "/api/image-roots",
-    { schema: { response: { 200: ImageRootListResponseSchema } } },
-    async () => ({ items: await imageScans.roots.list() }),
+    "/api/photos/directory",
+    { schema: { response: { 200: PhotoDirectoryStatusSchema } } },
+    async () => photoScans.directory.status(),
   );
 
   server.post<{
     Params: { id: string };
-    Body: ImageScanJobInput;
+    Body: PhotoScanJobInput;
   }>(
-    "/api/layers/:id/image-scan-jobs",
+    "/api/layers/:id/photo-scan-jobs",
     {
       schema: {
         params: idParametersSchema,
-        body: ImageScanJobInputSchema,
+        body: PhotoScanJobInputSchema,
         response: {
           201: JobSchema,
           400: ErrorResponseSchema,
@@ -265,13 +265,13 @@ export function registerLayerRoutes(
       },
     },
     async (request, reply) =>
-      reply.code(201).send(imageScans.start(request.params.id, request.body)),
+      reply.code(201).send(photoScans.start(request.params.id, request.body)),
   );
 
   server.get(
     "/api/jobs",
     { schema: { response: { 200: JobListResponseSchema } } },
-    async () => ({ items: imageScans.listJobs() }),
+    async () => ({ items: photoScans.listJobs() }),
   );
 
   server.get<{ Params: { id: string } }>(
@@ -282,13 +282,13 @@ export function registerLayerRoutes(
         response: { 200: JobSchema, 404: ErrorResponseSchema },
       },
     },
-    async (request) => imageScans.getJob(request.params.id),
+    async (request) => photoScans.getJob(request.params.id),
   );
 
   for (const [action, invoke] of [
-    ["pause", (id: string) => imageScans.pause(id)],
-    ["resume", (id: string) => imageScans.resume(id)],
-    ["cancel", (id: string) => imageScans.cancel(id)],
+    ["pause", (id: string) => photoScans.pause(id)],
+    ["resume", (id: string) => photoScans.resume(id)],
+    ["cancel", (id: string) => photoScans.cancel(id)],
   ] as const) {
     server.post<{ Params: { id: string } }>(
       `/api/jobs/:id/${action}`,

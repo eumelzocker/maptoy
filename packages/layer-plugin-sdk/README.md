@@ -31,7 +31,7 @@ that must preserve appearance while changing configuration can use `migrateLayer
 to migrate configuration, data, and opacity atomically; data-only migrations keep
 using `migrate`.
 
-The reference packages `plugins/track-layer`, `plugins/image-layer`, and
+The reference packages `plugins/track-layer`, `plugins/photo-layer`, and
 `plugins/tile-grid-layer` demonstrate line, point/raster-overlay, and asset-free
 state-derived specializations. Executable plugin upload or runtime installation is
 outside the v1 trust model.

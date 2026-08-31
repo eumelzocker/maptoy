@@ -37,7 +37,7 @@ function layer(
 describe("Layer hierarchy", () => {
   const categories = [
     { id: "tracks", label: "Tracks", pluginIds: ["track-layer"] },
-    { id: "images", label: "Images", pluginIds: ["image-layer"] },
+    { id: "photos", label: "Photos", pluginIds: ["photo-layer"] },
   ];
 
   it("groups by plugin category and slash-separated name segments", () => {
@@ -45,7 +45,7 @@ describe("Layer hierarchy", () => {
       [
         layer("berlin", "track-layer", "Trips/2026/Berlin", 1),
         layer("alps", "track-layer", "Trips/2026/Alps", 0),
-        layer("photo", "image-layer", "Trips/Day 1", 2),
+        layer("photo", "photo-layer", "Trips/Day 1", 2),
       ],
       categories,
     );
@@ -58,7 +58,7 @@ describe("Layer hierarchy", () => {
       { kind: "folder", label: "2026", depth: 2 },
       { kind: "layer", label: "Alps", depth: 3 },
       { kind: "layer", label: "Berlin", depth: 3 },
-      { kind: "category", label: "Images", depth: 0 },
+      { kind: "category", label: "Photos", depth: 0 },
       { kind: "folder", label: "Trips", depth: 1 },
       { kind: "layer", label: "Day 1", depth: 2 },
     ]);
@@ -75,7 +75,7 @@ describe("Layer hierarchy", () => {
         [
           layer("first", "track-layer", "Track 1", 0),
           layer("nested", "track-layer", "Trips/Track 2", 1),
-          layer("image", "image-layer", "Track 2", 2),
+          layer("photo", "photo-layer", "Track 2", 2),
         ],
         ["track-layer"],
         "Track",
@@ -88,7 +88,7 @@ describe("Layer hierarchy", () => {
       [
         layer("alps", "track-layer", "Trips/2026/Alps", 0),
         layer("berlin", "track-layer", "Trips/Berlin", 1),
-        layer("photo", "image-layer", "Trips/Day 1", 2),
+        layer("photo", "photo-layer", "Trips/Day 1", 2),
       ],
       categories,
     );
@@ -100,8 +100,8 @@ describe("Layer hierarchy", () => {
     ).toEqual([
       "category:tracks",
       "folder:tracks:Trips",
-      "category:images",
-      "folder:images:Trips",
+      "category:photos",
+      "folder:photos:Trips",
       "layer:photo",
     ]);
     expect(
@@ -110,8 +110,8 @@ describe("Layer hierarchy", () => {
       ),
     ).toEqual([
       "category:tracks",
-      "category:images",
-      "folder:images:Trips",
+      "category:photos",
+      "folder:photos:Trips",
       "layer:photo",
     ]);
     expect(layerHierarchyAncestorKeys("tracks", "Trips/2026/Alps")).toEqual([

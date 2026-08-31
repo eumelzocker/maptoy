@@ -6,28 +6,26 @@ import type { Job, Layer } from "@maptoy/contracts";
 defineProps<{
   configuration: Layer["configuration"];
   busy: boolean;
-  imageRoots: readonly { id: string; available: boolean }[];
-  rootId: string;
+  photoDirectory: { configured: boolean; available: boolean };
   scanDirectory: string;
   recursive: boolean;
   activeJob: Job | undefined;
   displayedJob: Job | undefined;
-  imageCount: number;
+  photoCount: number;
 }>();
 
 const emit = defineEmits<{
   configurationChange: [key: string, value: string | number | boolean];
-  "update:rootId": [value: string];
   "update:scanDirectory": [value: string];
   "update:recursive": [value: boolean];
   startScan: [];
   jobAction: [action: "pause" | "resume" | "cancel"];
-  manageImages: [];
+  managePhotos: [];
 }>();
 </script>
 
 <template>
-  <section class="plugin-editor" aria-label="Image style and data">
+  <section class="plugin-editor" aria-label="Photo style and data">
     <div class="plugin-fields">
       <label>
         <span>Marker</span>
@@ -60,25 +58,13 @@ const emit = defineEmits<{
       </label>
     </div>
 
-    <div class="image-tools">
-      <label>
-        <span>Image root</span>
-        <select
-          :value="rootId"
-          :disabled="busy"
-          @change="emit('update:rootId', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">Select…</option>
-          <option
-            v-for="root in imageRoots"
-            :key="root.id"
-            :value="root.id"
-            :disabled="!root.available"
-          >
-            {{ root.id }}{{ root.available ? '' : ' (unavailable)' }}
-          </option>
-        </select>
-      </label>
+    <div class="photo-tools">
+      <p v-if="!photoDirectory.configured" class="scan-status">
+        Configure MAPTOY_PHOTOS_DIR before scanning photos.
+      </p>
+      <p v-else-if="!photoDirectory.available" class="scan-status">
+        The configured photo directory is unavailable.
+      </p>
       <label>
         <span>Subdirectory</span>
         <input
@@ -101,7 +87,7 @@ const emit = defineEmits<{
       <button
         type="button"
         data-layer-primary-action
-        :disabled="busy || activeJob !== undefined"
+        :disabled="busy || activeJob !== undefined || !photoDirectory.available"
         @click="emit('startScan')"
       >
         <i class="mdi mdi-folder-search-outline" aria-hidden="true"></i>Scan directory
@@ -122,8 +108,8 @@ const emit = defineEmits<{
         <button v-else type="button" @click="emit('jobAction', 'resume')">Resume</button>
         <button type="button" @click="emit('jobAction', 'cancel')">Cancel</button>
       </div>
-      <button v-if="imageCount > 0" type="button" @click="emit('manageImages')">
-        Manage {{ imageCount }} images
+      <button v-if="photoCount > 0" type="button" @click="emit('managePhotos')">
+        Manage {{ photoCount }} photos
       </button>
     </div>
   </section>
@@ -131,7 +117,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .plugin-editor,
-.image-tools {
+.photo-tools {
   display: grid;
   gap: 0.55rem;
 }
@@ -143,7 +129,7 @@ const emit = defineEmits<{
 }
 
 .plugin-fields > label,
-.image-tools > label {
+.photo-tools > label {
   display: grid;
   flex: 1;
   gap: 0.2rem;

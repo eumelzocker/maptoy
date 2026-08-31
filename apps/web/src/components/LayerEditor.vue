@@ -12,13 +12,12 @@ const props = defineProps<{
   busy: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
-  imageRoots: readonly { id: string; available: boolean }[];
-  imageRootId: string;
+  photoDirectory: { configured: boolean; available: boolean };
   scanDirectory: string;
   recursiveScan: boolean;
   activeScanJob: Job | undefined;
   displayedScanJob: Job | undefined;
-  imageCount: number;
+  photoCount: number;
 }>();
 
 const pluginEditor = computed(
@@ -34,12 +33,11 @@ const emit = defineEmits<{
   move: [direction: -1 | 1];
   remove: [];
   uploadTrack: [file: File];
-  "update:imageRootId": [value: string];
   "update:scanDirectory": [value: string];
   "update:recursiveScan": [value: boolean];
   startScan: [];
   scanJobAction: [action: "pause" | "resume" | "cancel"];
-  manageImages: [];
+  managePhotos: [];
 }>();
 
 function nullableNumber(event: Event): number | null {
@@ -129,21 +127,19 @@ function emitConfigurationChange(
       :configuration="layer.configuration"
       :configuration-schema="configurationSchema"
       :busy="busy"
-      :image-roots="imageRoots"
-      :image-root-id="imageRootId"
+      :photo-directory="photoDirectory"
       :scan-directory="scanDirectory"
       :recursive-scan="recursiveScan"
       :active-scan-job="activeScanJob"
       :displayed-scan-job="displayedScanJob"
-      :image-count="imageCount"
+      :photo-count="photoCount"
       @configuration-change="emitConfigurationChange"
       @upload-track="emit('uploadTrack', $event)"
-      @update:image-root-id="emit('update:imageRootId', $event)"
       @update:scan-directory="emit('update:scanDirectory', $event)"
       @update:recursive-scan="emit('update:recursiveScan', $event)"
       @start-scan="emit('startScan')"
       @scan-job-action="emit('scanJobAction', $event)"
-      @manage-images="emit('manageImages')"
+      @manage-photos="emit('managePhotos')"
     />
 
     <p v-if="compatibilityDiagnostic || layer.diagnostic" class="layer-status">

@@ -1,16 +1,16 @@
 import { exerciseLayerPluginContract } from "@maptoy/layer-plugin-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { imageLayerPlugin } from "./index.js";
+import { photoLayerPlugin } from "./index.js";
 
-describe("image layer plugin", () => {
+describe("Photo layer plugin", () => {
   it("passes the shared plugin contract", async () => {
     const drawPoint = vi.fn();
     await expect(
-      exerciseLayerPluginContract(imageLayerPlugin, {
+      exerciseLayerPluginContract(photoLayerPlugin, {
         configuration: {},
         data: {},
         frontendContext: {
-          instanceId: "images",
+          instanceId: "photos",
           publishLayer: vi.fn(),
           clearLayer: vi.fn(),
           resolveAssetUrl: (assetId) => `api/assets/${assetId}`,
@@ -20,7 +20,7 @@ describe("image layer plugin", () => {
           data: {},
           assets: [
             {
-              assetId: "image",
+              assetId: "photo",
               longitude: 13.4,
               latitude: 52.5,
             },

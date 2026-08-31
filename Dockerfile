@@ -24,7 +24,7 @@ COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/layer-plugin-sdk/package.json packages/layer-plugin-sdk/package.json
 COPY packages/map-adapter-sdk/package.json packages/map-adapter-sdk/package.json
 COPY packages/map-core/package.json packages/map-core/package.json
-COPY plugins/image-layer/package.json plugins/image-layer/package.json
+COPY plugins/photo-layer/package.json plugins/photo-layer/package.json
 COPY plugins/tile-grid-layer/package.json plugins/tile-grid-layer/package.json
 COPY plugins/track-layer/package.json plugins/track-layer/package.json
 
@@ -44,12 +44,12 @@ RUN apt-get update \
   && apt-get install --yes --no-install-recommends ca-certificates gdal-bin libimage-exiftool-perl proj-bin tini \
   && rm -rf /var/lib/apt/lists/*
 
-ENV MAPTOY_HOST=0.0.0.0
-ENV MAPTOY_PORT=4004
-ENV MAPTOY_DATA_DIR=/data
-ENV MAPTOY_LOG_LEVEL=info
-ENV MAPTOY_TRAFFIC_LOG_MAX_BYTES=10485760
-ENV MAPTOY_TRAFFIC_LOG_MAX_FILES=5
+ENV MAPTOY_SERVER_HOST=0.0.0.0
+ENV MAPTOY_SERVER_PORT=4004
+ENV MAPTOY_STORAGE_DATA_DIR=/data
+ENV MAPTOY_LOGGING_LEVEL=info
+ENV MAPTOY_LOGGING_TRAFFIC_MAX_BYTES=10485760
+ENV MAPTOY_LOGGING_TRAFFIC_MAX_FILES=5
 ENV NODE_ENV=production
 
 WORKDIR /app

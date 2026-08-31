@@ -17,7 +17,7 @@ try {
 const config = loadConfig();
 const server = await buildServer({
   config,
-  logger: { level: config.logLevel },
+  logger: { level: config.logging.level },
 });
 
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
@@ -28,4 +28,4 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
-await server.listen({ host: config.host, port: config.port });
+await server.listen({ host: config.server.host, port: config.server.port });

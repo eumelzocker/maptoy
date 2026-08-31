@@ -297,7 +297,7 @@ export class TileArchiveService {
     if (input.body.byteLength > input.maximumTileBytes) {
       throw new TileArchiveError(
         "TILE_BODY_TOO_LARGE",
-        "The upload exceeds MAPTOY_MAX_TILE_BYTES.",
+        "The upload exceeds MAPTOY_TILES_MAX_BYTES.",
         413,
       );
     }

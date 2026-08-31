@@ -7,7 +7,7 @@ language: de
 # Tile-Cache
 
 *maptoy* speichert erfolgreich geprüfte Raster-Tiles als unveränderliche Revisionen
-unterhalb von `MAPTOY_DATA_DIR/tiles`. SQLite enthält Revisionshistorie und aktuelle
+unterhalb von `MAPTOY_STORAGE_DATA_DIR/tiles`. SQLite enthält Revisionshistorie und aktuelle
 Zeiger; die Bilddateien bleiben direkt im Datenverzeichnis des Hosts zugänglich.
 
 ## Aktualisierungsmodi
@@ -42,7 +42,7 @@ konfigurierten Provider zu kontaktieren:
 curl --request POST \
   --header 'Content-Type: image/png' \
   --data-binary '@tile.png' \
-  "$MAPTOY_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
+  "$MAPTOY_SERVER_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
 ```
 
 Der Request-Body ist die unveränderte PNG-, JPEG- oder WebP-Datei; dieser Endpunkt
@@ -51,7 +51,7 @@ und tatsächliches Bildformat müssen zum konfigurierten Tile-Format des Map Set
 passen und Breite sowie Höhe müssen der konfigurierten Tile-Größe entsprechen.
 Koordinaten müssen innerhalb der Zoom- und
 XYZ-Grenzen liegen, Tile-Archiv-Capability und Cache-Policy müssen aktiv sein und
-sowohl `MAPTOY_MAX_TILE_BYTES` als auch das Speicherlimit des Map Sets gelten.
+sowohl `MAPTOY_TILES_MAX_BYTES` als auch das Speicherlimit des Map Sets gelten.
 
 Eine neue unveränderliche Revision antwortet mit `201` und
 `{ "revisionId": "...", "created": true }`. Entsprechen die Bytes der aktuellen
@@ -69,7 +69,7 @@ Für Uploadfehler gelten folgende Verträge:
 - `409 TILE_ARCHIVE_DISABLED`, wenn Archiv-Capability oder Cache-Policy deaktiviert
   ist.
 - `413 TILE_BODY_TOO_LARGE` beim Überschreiten des routenspezifischen Limits
-  `MAPTOY_MAX_TILE_BYTES`.
+  `MAPTOY_TILES_MAX_BYTES`.
 - `507 TILE_STORAGE_LIMIT`, wenn das Speicherlimit des Map Sets überschritten würde.
 
 *maptoy* v1 besitzt keine Anwendungsauthentifizierung. Dieser schreibende Endpunkt ist

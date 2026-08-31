@@ -105,12 +105,12 @@ Providerabrufe erlauben standardmäßig nur HTTPS. Localhost sowie private und
 Link-Local-Adressen werden sowohl als direkte IP-Adresse als auch nach der
 DNS-Auflösung abgewiesen. Redirect-Ziele werden erneut geprüft. Ein selbst
 gehosteter privater Tile-Server benötigt die ausdrückliche Servereinstellung
-`MAPTOY_ALLOW_PRIVATE_TILE_HOSTS=true`; diese erlaubt zugleich HTTP und sollte nur
+`MAPTOY_TILES_ALLOW_PRIVATE_HOSTS=true`; diese erlaubt zugleich HTTP und sollte nur
 in einem vertrauenswürdigen Netz aktiviert werden.
 
 Providerantworten besitzen ein konfigurierbares Timeout und Größenlimit. Die
 Standardwerte betragen 10 Sekunden und 10 MiB pro Tile. Sie lassen sich mit
-`MAPTOY_PROVIDER_TIMEOUT_MS` und `MAPTOY_MAX_TILE_BYTES` ändern.
+`MAPTOY_TILES_PROVIDER_TIMEOUT_MS` und `MAPTOY_TILES_MAX_BYTES` ändern.
 
 ## Fähigkeiten und aktueller Umfang
 

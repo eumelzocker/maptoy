@@ -1,0 +1,28 @@
+meta {
+  name: Photo Scan - Create Job (writes data)
+  type: http
+  seq: 17
+}
+post {
+  url: {{appUrl}}/api/layers/{{photoLayerId}}/photo-scan-jobs
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "relativeDirectory": "",
+    "recursive": true
+  }
+}
+
+docs {
+  Starts a persistent recursive scan for an existing Photo Layer and the configured read-only Photo directory.
+}
+
+tests {
+  test("queues a Photo scan", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.type).to.equal("photo-scan");
+  });
+}

@@ -19,7 +19,7 @@ anwendbar, in Exporte.
 
 Ein rechteckiger geografischer Bereich, meist durch westliche, südliche, östliche
 und nördliche Grenze angegeben. Bounds können in *maptoy* ein Downloadgebiet, einen
-Exportausschnitt oder die Position eines Bildlayers bestimmen.
+Exportausschnitt oder die Position eines Fotolayers bestimmen.
 
 ## Cache
 

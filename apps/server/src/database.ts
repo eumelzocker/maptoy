@@ -10,6 +10,7 @@ const migrationFiles = [
   { version: 6, filename: "0006-layer-plugins-and-jobs.sql" },
   { version: 7, filename: "0007-global-layer-instances.sql" },
   { version: 8, filename: "0008-layer-version-opacity.sql" },
+  { version: 9, filename: "0009-photo-domain.sql" },
 ] as const;
 
 async function loadMigrations(): Promise<

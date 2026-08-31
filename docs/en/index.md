@@ -14,7 +14,7 @@ serves its user interface and API from one HTTP port.
 
 The first usable release focuses on XYZ raster sources, a Leaflet-based interactive
 map, reproducible tile history, controlled downloads, and bitmap exports. Track and
-image layers use the same plugin boundary in the browser and during export.
+photo layers use the same plugin boundary in the browser and during export.
 
 ## Documentation languages
 

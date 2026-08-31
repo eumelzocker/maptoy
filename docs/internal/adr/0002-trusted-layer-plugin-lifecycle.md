@@ -5,7 +5,7 @@ Date: 2026-08-21
 
 ## Context
 
-Track and image layers must use the same data in the interactive map and bitmap
+Track and photo layers must use the same data in the interactive map and bitmap
 export, while plugins must not receive unrestricted access to application internals.
 v1 does not need runtime installation of arbitrary code.
 
@@ -37,7 +37,7 @@ silently migrate its data.
 
 SDK compatibility uses semantic versioning. Contract tests cover manifest checking,
 validation, migrations, lifecycle cleanup, interactive handles, and server rendering.
-The track and image plugins are the reference implementations for v1.
+The Track and Photo plugins are the reference implementations for v1.
 
 ## Historical spike evidence
 

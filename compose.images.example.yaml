@@ -1,9 +1,0 @@
-services:
-  maptoy:
-    environment:
-      MAPTOY_IMAGE_ROOTS_JSON: '{"photos":"/images/photos"}'
-    volumes:
-      - type: bind
-        source: ${MAPTOY_PHOTOS_DIR:?set MAPTOY_PHOTOS_DIR to an existing host directory}
-        target: /images/photos
-        read_only: true

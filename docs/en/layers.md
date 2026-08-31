@@ -16,12 +16,12 @@ Layer plugins build on reusable point, line, and area geometry. Geometry and fea
 properties are stored independently from colors, widths, marker styles, opacity, and
 other presentation options. A Layer may also be purely decorative and derive its
 visible content from the current map without storing Features or Assets. The Track plugin specializes lines and can retain
-timestamp and elevation data per vertex. The Image plugin specializes points; an
-image with geographic bounds uses the separate raster-overlay contract rather than a
+timestamp and elevation data per vertex. The Photo plugin specializes points; a
+photo with geographic bounds uses the separate raster-overlay contract rather than a
 vector polygon. This foundation can also support POIs, routes, and regions in future
 plugins.
 
-Use **Add layer** and its icon choices to create a Track, Images, or Decorations
+Use **Add layer** and its icon choices to create a Track, Photos, or Decorations
 layer. The name is optional; an empty field gets the next free numbered name, such
 as `Track 1`.
 After creation, the new Layer is selected in the tree dropdown, its single editor
@@ -35,7 +35,7 @@ incompatible build-time plugin disables its layer and reports a diagnostic witho
 deleting stored data. Plugins cannot be installed through the browser or API.
 
 The first hierarchy level comes from the plugin category, such as **Tracks** or
-**Images**, or **Decorations**. Use `/` in the Layer name for deeper folders:
+**Photos**, or **Decorations**. Use `/` in the Layer name for deeper folders:
 `Trips/2026/Alps` appears below `Tracks > Trips > 2026`. Renaming the Layer changes
 this path; no separate folder records are created. Categories and every generated
 folder level can be collapsed independently. Those display preferences are retained
@@ -78,39 +78,40 @@ Create a Track layer and choose the highlighted **Import track…** action. Afte
 successful import, the secondary action is named **Replace track…** because another
 file replaces the normalized Track geometry. Both actions accept GPX and GeoJSON.
 The upload is assigned a
-generated Asset ID and stored below `MAPTOY_DATA_DIR/layer-assets`; the original
+generated Asset ID and stored below `MAPTOY_STORAGE_DATA_DIR/layer-assets`; the original
 client filename is metadata only. GPX track segments and GeoJSON LineString or
 MultiLineString features are normalized into the shared line model. GPX DTD and
 entity declarations are rejected. The upload is limited by
-`MAPTOY_MAX_LAYER_ASSET_BYTES` and validated by the Track plugin before the layer is
+`MAPTOY_LAYERS_ASSET_MAX_BYTES` and validated by the Track plugin before the layer is
 updated.
 
-## External image roots
+## External photo directory
 
-*maptoy never imports image originals into its data directory.* An operator exposes
-one or more existing directories as named, read-only image roots. The server setting
-maps a safe ID to an absolute container path, for example:
+*maptoy never imports photo originals into its data directory.* Set the existing
+host directory in the repository `.env` file:
 
 ```dotenv
-MAPTOY_IMAGE_ROOTS_JSON={"photos":"/images/photos"}
+MAPTOY_PHOTOS_DIR=/srv/photos
 ```
 
-The matching host directory must be mounted read-only. With the repository's sample
-override this is:
+Start maptoy normally:
 
 ```sh
-MAPTOY_PHOTOS_DIR=/srv/photos docker compose \
-  -f compose.yaml -f compose.images.example.yaml up --build
+docker compose up --build
 ```
 
-Only the stable root ID is exposed to clients. Scan requests accept a normalized
-relative subdirectory; absolute paths, parent traversal, and symbolic-link escapes
-are rejected.
+The standard Compose file mounts the directory read-only at `/photos` inside the
+container and configures maptoy to use it. The photo limit variables already have
+defaults and do not need to be changed for a first test. After startup,
+`GET api/photos/directory` reports `available: true` when the mount is readable;
+neither absolute path is returned. Scan requests accept a normalized relative
+subdirectory; absolute paths, parent traversal, and symbolic-link escapes are
+rejected.
 
-## Scanning images
+## Scanning photos
 
-Create an Images layer, select an image root and optional subdirectory, choose
-whether the scan is recursive, and select **Scan directory**. The persistent job can
+Create a Photos layer, enter an optional subdirectory, choose whether the scan is
+recursive, and select **Scan directory**. The persistent job can
 be paused, resumed, or cancelled. An interrupted running scan returns to the queue
 after restart.
 
@@ -120,27 +121,27 @@ later scans before decoding. Changed files are reprocessed. Files no longer pres
 are marked `missing`; their metadata and existing preview remain available.
 
 EXIF GPS is immediately used as the effective point coordinate. There is no separate
-“detected” and “accepted” coordinate. Open **Manage images** to correct or remove the
+“detected” and “accepted” coordinate. Open **Manage photos** to correct or remove the
 point, or to enter west/south/east/north bounds for a raster overlay. A manual
 position—or a deliberate removal—is never overwritten by a later scan. Only a
 position whose source is still `exif` may be refreshed from a changed original.
 
 ## What is stored
 
-SQLite stores the layer instances, normalized Track data, Asset IDs, external image
-root IDs and relative paths, selected metadata, fingerprints, effective coordinates,
-bounds, statuses, and persistent jobs. `MAPTOY_DATA_DIR` stores managed non-image
-uploads and derived image previews. Image originals remain exclusively in the
-configured external roots and are not returned by the preview endpoint.
+SQLite stores the layer instances, normalized Track data, Asset IDs, relative photo
+paths, selected metadata, fingerprints, effective coordinates,
+bounds, statuses, and persistent jobs. `MAPTOY_STORAGE_DATA_DIR` stores managed non-image
+uploads and derived photo previews. Photo originals remain exclusively in the
+configured external directory and are not returned by the preview endpoint.
 
-Back up `MAPTOY_DATA_DIR` for the catalog and previews. Back up external image roots
-separately if their originals must be preserved.
+Back up `MAPTOY_STORAGE_DATA_DIR` for the catalog and previews. Back up the external
+photo directory separately if its originals must be preserved.
 
-## Image limits
+## Photo limits
 
-The defaults are 100 MiB per image, 100 million decoded pixels, a 640-pixel preview
+The defaults are 100 MiB per photo, 100 million decoded pixels, a 640-pixel preview
 edge, batches of 100, two concurrent decoders, and at most 100,000 files per scan.
-Configure these with `MAPTOY_MAX_IMAGE_BYTES`, `MAPTOY_MAX_IMAGE_PIXELS`,
-`MAPTOY_IMAGE_PREVIEW_MAX_EDGE`, `MAPTOY_IMAGE_SCAN_BATCH_SIZE`,
-`MAPTOY_IMAGE_DECODER_CONCURRENCY`, and `MAPTOY_MAX_IMAGE_SCAN_FILES`. The server
+Configure these with `MAPTOY_PHOTOS_MAX_FILE_BYTES`, `MAPTOY_PHOTOS_MAX_DECODED_PIXELS`,
+`MAPTOY_PHOTOS_PREVIEW_MAX_EDGE`, `MAPTOY_PHOTOS_SCAN_BATCH_SIZE`,
+`MAPTOY_PHOTOS_SCAN_CONCURRENCY`, and `MAPTOY_PHOTOS_SCAN_MAX_FILES`. The server
 also enforces hard ceilings to reject unsafe configuration values at startup.

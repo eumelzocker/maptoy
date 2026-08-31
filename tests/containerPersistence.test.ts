@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 describe("container persistence", () => {
   it("uses the configured host directory as a bind mount", async () => {
     const compose = await readFile("compose.yaml", "utf8");
-    const hostDataDirectory = "$" + "{MAPTOY_DATA_DIR:-./.data}";
+    const hostDataDirectory = "$" + "{MAPTOY_STORAGE_DATA_DIR:-./.data}";
 
     expect(compose).toContain("type: bind");
     expect(compose).toContain(`source: ${hostDataDirectory}`);
@@ -16,12 +16,12 @@ describe("container persistence", () => {
     const compose = await readFile("compose.yaml", "utf8");
     const apiLogDirectory =
       "$" +
-      "{MAPTOY_API_TRAFFIC_LOG_DIR:-$" +
-      "{MAPTOY_DATA_DIR:-./.data}/logs/api}";
+      "{MAPTOY_LOGGING_API_TRAFFIC_DIR:-$" +
+      "{MAPTOY_STORAGE_DATA_DIR:-./.data}/logs/api}";
     const providerLogDirectory =
       "$" +
-      "{MAPTOY_PROVIDER_TRAFFIC_LOG_DIR:-$" +
-      "{MAPTOY_DATA_DIR:-./.data}/logs/provider}";
+      "{MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR:-$" +
+      "{MAPTOY_STORAGE_DATA_DIR:-./.data}/logs/provider}";
 
     expect(compose).toContain(`source: ${apiLogDirectory}`);
     expect(compose).toContain("target: /logs/api");
@@ -33,5 +33,16 @@ describe("container persistence", () => {
     const dockerfile = await readFile("Dockerfile", "utf8");
 
     expect(dockerfile).not.toMatch(/^VOLUME\s/m);
+  });
+
+  it("mounts the configured Photos directory read-only", async () => {
+    const compose = await readFile("compose.yaml", "utf8");
+    const hostPhotoDirectory = "$" + "{MAPTOY_PHOTOS_DIR:-./.photos}";
+
+    expect(compose).toContain(`source: ${hostPhotoDirectory}`);
+    expect(compose).toContain("MAPTOY_PHOTOS_DIR: /photos");
+    expect(compose).toContain("target: /photos");
+    expect(compose).toContain("read_only: true");
+    expect(compose).toContain("create_host_path: true");
   });
 });

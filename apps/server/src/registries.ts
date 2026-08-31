@@ -1,4 +1,4 @@
-import { imageLayerPlugin } from "@maptoy/image-layer";
+import { photoLayerPlugin } from "@maptoy/photo-layer";
 import { createLayerPluginRegistry } from "@maptoy/layer-plugin-sdk";
 import { leafletXyzManifest } from "@maptoy/leaflet-xyz";
 import { createMapRendererManifestRegistry } from "@maptoy/map-adapter-sdk";
@@ -11,6 +11,6 @@ export const mapRendererRegistry = createMapRendererManifestRegistry([
 
 export const layerPluginRegistry = createLayerPluginRegistry([
   trackLayerPlugin,
-  imageLayerPlugin,
+  photoLayerPlugin,
   tileGridLayerPlugin,
 ]);

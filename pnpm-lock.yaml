@@ -55,9 +55,9 @@ importers:
       '@maptoy/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@maptoy/image-layer':
+      '@maptoy/photo-layer':
         specifier: workspace:*
-        version: link:../../plugins/image-layer
+        version: link:../../plugins/photo-layer
       '@maptoy/layer-plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/layer-plugin-sdk
@@ -95,9 +95,9 @@ importers:
       '@maptoy/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@maptoy/image-layer':
+      '@maptoy/photo-layer':
         specifier: workspace:*
-        version: link:../../plugins/image-layer
+        version: link:../../plugins/photo-layer
       '@maptoy/layer-plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/layer-plugin-sdk
@@ -181,7 +181,7 @@ importers:
 
   packages/map-core: {}
 
-  plugins/image-layer:
+  plugins/photo-layer:
     dependencies:
       '@maptoy/layer-plugin-sdk':
         specifier: workspace:*

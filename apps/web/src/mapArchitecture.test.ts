@@ -45,7 +45,7 @@ describe("Map view architecture", () => {
       layerEditorRegistry,
       schemaLayerEditor,
       trackLayerEditor,
-      imageLayerEditor,
+      photoLayerEditor,
       treeSelectDropdown,
       checkboxTree,
       layerStore,
@@ -85,7 +85,7 @@ describe("Map view architecture", () => {
       ),
       readFile(
         fileURLToPath(
-          new URL("./components/ImageLayerEditor.vue", import.meta.url),
+          new URL("./components/PhotoLayerEditor.vue", import.meta.url),
         ),
         "utf8",
       ),
@@ -133,7 +133,7 @@ describe("Map view architecture", () => {
     expect(layerEditor).toContain(':is="pluginEditor"');
     expect(layerEditor).not.toContain("layer.pluginId ===");
     expect(layerEditorRegistry).toContain("TrackLayerPluginEditor");
-    expect(layerEditorRegistry).toContain("ImageLayerPluginEditor");
+    expect(layerEditorRegistry).toContain("PhotoLayerPluginEditor");
     expect(layerEditorRegistry).toContain('"tile-grid-layer"');
     expect(schemaLayerEditor).toContain("configurationSchema.properties");
     expect(schemaLayerEditor).toContain('class="color-fields"');
@@ -149,8 +149,8 @@ describe("Map view architecture", () => {
     expect(trackLayerEditor).toContain("GPX or GeoJSON");
     expect(trackLayerEditor).not.toContain("lineOpacity");
     expect(trackLayerEditor).not.toContain("Line opacity");
-    expect(imageLayerEditor).toContain("Scan directory");
-    expect(imageLayerEditor).toContain("data-layer-primary-action");
+    expect(photoLayerEditor).toContain("Scan directory");
+    expect(photoLayerEditor).toContain("data-layer-primary-action");
     expect(treeSelectDropdown).toContain("CheckboxTree");
     expect(treeSelectDropdown).toContain("Search layers…");
     expect(checkboxTree).toContain("emit('check'");

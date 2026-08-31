@@ -15,11 +15,11 @@ bleibt ausschließlich auf das Tile-Archiv ausgerichtet.
 Layer-Plugins verwenden wiederverwendbare Punkt-, Linien- und Flächengeometrien.
 Fachliche Eigenschaften und Geometrie sind von Farbe, Breite, Markersymbol und
 Deckkraft getrennt. Das Track-Plugin spezialisiert Linien und kann Zeitstempel und
-Höhe je Stützpunkt bewahren. Das Bild-Plugin spezialisiert Punkte. Ein Bild mit
+Höhe je Stützpunkt bewahren. Das Foto-Plugin spezialisiert Punkte. Ein Foto mit
 geografischen Bounds verwendet einen eigenen Raster-Overlay-Vertrag und keine
 Vektorfläche. Dieselben Grundlagen können später POIs, Routen und Regionen tragen.
 
-Über **Add layer** und die dortige Symbolauswahl wird ein Track- oder Bildlayer
+Über **Add layer** und die dortige Symbolauswahl wird ein Track- oder Fotolayer
 erstellt. Der Name ist optional; ein leeres Feld erhält den nächsten freien,
 nummerierten Namen wie `Track 1`. Nach dem Anlegen wird der neue Layer im
 Baum-Dropdown ausgewählt, als einziger Layer-Editor geöffnet und der Import
@@ -33,7 +33,7 @@ oder inkompatible, beim Build registrierte Plugins werden diagnostiziert;
 Plugin-Code kann weder im Browser noch über die API installiert werden.
 
 Die erste Hierarchieebene stammt aus der Plugin-Kategorie, beispielsweise
-**Tracks** oder **Images**. `/` erzeugt im Namen weitere Ebenen:
+**Tracks** oder **Photos**. `/` erzeugt im Namen weitere Ebenen:
 `Reisen/2026/Alpen` erscheint unter `Tracks > Reisen > 2026`. Umbenennen ändert
 diesen Pfad; separate Ordnerdatensätze werden nicht angelegt. Kategorien und jede
 daraus erzeugte Ordnerebene lassen sich unabhängig einklappen. Diese
@@ -45,45 +45,48 @@ In einem leeren Track-Layer ist **Import track…** als Primäraktion hervorgeho
 Nach erfolgreichem Import heißt die normale Aktion **Replace track…**, weil eine
 weitere Datei die normalisierte Trackgeometrie ersetzt. Beide Aktionen akzeptieren
 GPX beziehungsweise GeoJSON LineString/MultiLineString. *maptoy* vergibt eine Asset-ID, validiert über das Plugin
-und speichert die Datei kontrolliert unter `MAPTOY_DATA_DIR/layer-assets`. Der
+und speichert die Datei kontrolliert unter `MAPTOY_STORAGE_DATA_DIR/layer-assets`. Der
 ursprüngliche Dateiname bleibt nur Metadatum. DTD- und Entity-Deklarationen in GPX
-werden abgewiesen. Es gilt `MAPTOY_MAX_LAYER_ASSET_BYTES`.
+werden abgewiesen. Es gilt `MAPTOY_LAYERS_ASSET_MAX_BYTES`.
 
-## Externe Bildwurzeln
+## Externes Fotoverzeichnis
 
-*maptoy* übernimmt keine Bildoriginale in sein Datenverzeichnis. Stattdessen ordnet
-der Betreiber einer stabilen ID einen absoluten, im Container nur lesbar
-eingebundenen Pfad zu:
+*maptoy* übernimmt keine Fotooriginale in sein Datenverzeichnis. Trage den
+vorhandenen absoluten Hostpfad in `.env` ein:
 
 ```dotenv
-MAPTOY_IMAGE_ROOTS_JSON={"photos":"/images/photos"}
+MAPTOY_PHOTOS_DIR=/srv/photos
 ```
 
-Mit der Beispiel-Compose-Erweiterung wird ein Hostverzeichnis so eingebunden:
+Danach wird maptoy ganz normal gestartet:
 
 ```sh
-MAPTOY_PHOTOS_DIR=/srv/photos docker compose \
-  -f compose.yaml -f compose.images.example.yaml up --build
+docker compose up --build
 ```
 
-An Clients gelangt nur die Wurzel-ID. Scans akzeptieren ausschließlich relative
-Unterverzeichnisse; absolute Pfade, `..` und Symlink-Ausbrüche werden verhindert.
+Die normale Compose-Datei mountet das Verzeichnis im Container read-only nach
+`/photos` und konfiguriert maptoy entsprechend. Die Variablen für Fotolimits besitzen
+Vorgabewerte und müssen für einen ersten Test nicht geändert werden. Nach dem Start
+meldet `GET api/photos/directory` den Wert `available: true`, wenn der Mount lesbar
+ist; keiner der absoluten Pfade wird ausgegeben. Scans akzeptieren ausschließlich
+relative Unterverzeichnisse; absolute Pfade, `..` und Symlink-Ausbrüche werden
+verhindert.
 
-## Bildverzeichnisse scannen
+## Fotoverzeichnisse scannen
 
-Im Bildlayer werden Wurzel, optionales Unterverzeichnis und rekursive Verarbeitung
+Im Fotolayer werden ein optionales Unterverzeichnis und rekursive Verarbeitung
 gewählt. **Scan directory** startet einen persistenten Job, der pausiert, fortgesetzt
 oder abgebrochen werden kann. Nach einem Neustart wird ein unterbrochener Scan erneut
 eingereiht.
 
 Neue und geänderte Dateien werden sicher dekodiert und als EXIF-orientierte,
-metadatenbereinigte WebP-Vorschau unter `MAPTOY_DATA_DIR/layer-previews` abgelegt.
+metadatenbereinigte WebP-Vorschau unter `MAPTOY_STORAGE_DATA_DIR/layer-previews` abgelegt.
 Unveränderte Dateien werden anhand Größe und Änderungszeit vor dem Dekodieren
 übersprungen. Nicht mehr vorhandene Dateien erhalten den Status `missing`; Katalog
 und Vorschau bleiben erhalten.
 
 EXIF-GPS wird beim ersten Scan unmittelbar zur wirksamen Punktposition. Es gibt keine
-getrennte erkannte und akzeptierte Koordinate. Unter **Manage images** kann die
+getrennte erkannte und akzeptierte Koordinate. Unter **Manage photos** kann die
 Position korrigiert, bewusst entfernt oder durch West-/Süd-/Ost-/Nord-Bounds für ein
 Raster-Overlay ersetzt werden. Manuelle Änderungen werden von späteren Scans nicht
 überschrieben. Nur eine weiterhin aus EXIF stammende Position darf bei geänderter
@@ -91,13 +94,13 @@ Quelldatei aktualisiert werden.
 
 ## Speicher und Grenzen
 
-SQLite enthält Layer, normalisierte Trackdaten, Asset-IDs, Bildwurzel-ID und
-relativen Pfad, ausgewählte Metadaten, Fingerprint, wirksame Position, Bounds,
+SQLite enthält Layer, normalisierte Trackdaten, Asset-IDs, relative Fotopfade,
+ausgewählte Metadaten, Fingerprint, wirksame Position, Bounds,
 Status und Jobs. Im Datenverzeichnis liegen verwaltete Nicht-Bild-Uploads und
-abgeleitete Vorschauen—keine Bildoriginale. Diese müssen getrennt gesichert werden.
+abgeleitete Vorschauen—keine Fotooriginale. Diese müssen getrennt gesichert werden.
 
-Die Standardgrenzen sind 100 MiB pro Bild, 100 Millionen dekodierte Pixel, 640 Pixel
+Die Standardgrenzen sind 100 MiB pro Foto, 100 Millionen dekodierte Pixel, 640 Pixel
 Vorschaukante, Batchgröße 100, zwei parallele Decoder und 100.000 Dateien pro Scan.
-Sie werden über `MAPTOY_MAX_IMAGE_BYTES`, `MAPTOY_MAX_IMAGE_PIXELS`,
-`MAPTOY_IMAGE_PREVIEW_MAX_EDGE`, `MAPTOY_IMAGE_SCAN_BATCH_SIZE`,
-`MAPTOY_IMAGE_DECODER_CONCURRENCY` und `MAPTOY_MAX_IMAGE_SCAN_FILES` konfiguriert.
+Sie werden über `MAPTOY_PHOTOS_MAX_FILE_BYTES`, `MAPTOY_PHOTOS_MAX_DECODED_PIXELS`,
+`MAPTOY_PHOTOS_PREVIEW_MAX_EDGE`, `MAPTOY_PHOTOS_SCAN_BATCH_SIZE`,
+`MAPTOY_PHOTOS_SCAN_CONCURRENCY` und `MAPTOY_PHOTOS_SCAN_MAX_FILES` konfiguriert.

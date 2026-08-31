@@ -5,27 +5,34 @@ services:
     env_file:
       - .env
     environment:
-      MAPTOY_DATA_DIR: /data
-      MAPTOY_HOST: 0.0.0.0
-      MAPTOY_LOG_LEVEL: ${MAPTOY_LOG_LEVEL:-info}
-      MAPTOY_API_TRAFFIC_LOG_DIR: /logs/api
-      MAPTOY_PROVIDER_TRAFFIC_LOG_DIR: /logs/provider
-      MAPTOY_TRAFFIC_LOG_MAX_BYTES: ${MAPTOY_TRAFFIC_LOG_MAX_BYTES:-10485760}
-      MAPTOY_TRAFFIC_LOG_MAX_FILES: ${MAPTOY_TRAFFIC_LOG_MAX_FILES:-5}
-      MAPTOY_PORT: ${MAPTOY_PORT:-4004}
+      MAPTOY_STORAGE_DATA_DIR: /data
+      MAPTOY_SERVER_HOST: 0.0.0.0
+      MAPTOY_LOGGING_LEVEL: ${MAPTOY_LOGGING_LEVEL:-info}
+      MAPTOY_LOGGING_API_TRAFFIC_DIR: /logs/api
+      MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR: /logs/provider
+      MAPTOY_LOGGING_TRAFFIC_MAX_BYTES: ${MAPTOY_LOGGING_TRAFFIC_MAX_BYTES:-10485760}
+      MAPTOY_LOGGING_TRAFFIC_MAX_FILES: ${MAPTOY_LOGGING_TRAFFIC_MAX_FILES:-5}
+      MAPTOY_SERVER_PORT: ${MAPTOY_SERVER_PORT:-4004}
+      MAPTOY_PHOTOS_DIR: /photos
     ports:
-      - "${MAPTOY_PORT:-4004}:${MAPTOY_PORT:-4004}"
+      - "${MAPTOY_SERVER_PORT:-4004}:${MAPTOY_SERVER_PORT:-4004}"
     read_only: true
     restart: unless-stopped
     tmpfs:
       - /tmp
     volumes:
       - type: bind
-        source: ${MAPTOY_DATA_DIR:-./.data}
+        source: ${MAPTOY_STORAGE_DATA_DIR:-./.data}
         target: /data
       - type: bind
-        source: ${MAPTOY_API_TRAFFIC_LOG_DIR:-${MAPTOY_DATA_DIR:-./.data}/logs/api}
+        source: ${MAPTOY_LOGGING_API_TRAFFIC_DIR:-${MAPTOY_STORAGE_DATA_DIR:-./.data}/logs/api}
         target: /logs/api
       - type: bind
-        source: ${MAPTOY_PROVIDER_TRAFFIC_LOG_DIR:-${MAPTOY_DATA_DIR:-./.data}/logs/provider}
+        source: ${MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR:-${MAPTOY_STORAGE_DATA_DIR:-./.data}/logs/provider}
         target: /logs/provider
+      - type: bind
+        source: ${MAPTOY_PHOTOS_DIR:-./.photos}
+        target: /photos
+        read_only: true
+        bind:
+          create_host_path: true

@@ -4,8 +4,20 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-31
+
 ### Changed
 
+- Standardized runtime configuration as `MAPTOY_<DOMAIN>_<PROPERTY>` across the
+  `SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, and `PHOTOS` domains without
+  compatibility aliases. Photo configuration consistently uses `PHOTOS`.
+- Renamed the external-photo feature across plugin IDs, API routes, contracts,
+  persistent Asset and Job types, server services, and Vue components. Schema
+  migration 9 converts existing catalog records once; no legacy runtime names or
+  API aliases remain. Photo setup now needs only `MAPTOY_PHOTOS_DIR`; the standard
+  Compose file mounts it read-only automatically, while the scan API and UI no
+  longer expose or require configurable root IDs. Generic raster decoding and
+  preview storage retain the technical `Image` terminology.
 - Replaced the Map view's Layers and Display Options popovers with draggable,
   non-modal dialogs and made focused dialogs move to the top. Escape now closes
   only the topmost dialog. Both tools are available at the bottom of the context

@@ -241,13 +241,12 @@ export const LayerAssetSchema = Type.Object(
   {
     id: Type.String(),
     layerId: Type.String(),
-    kind: Type.Union([Type.Literal("managed"), Type.Literal("external-image")]),
+    kind: Type.Union([Type.Literal("managed"), Type.Literal("external-photo")]),
     status: LayerAssetStatusSchema,
     fileName: Type.String(),
     contentType: Type.Union([Type.String(), Type.Null()]),
     byteLength: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
     contentHash: Type.Union([Type.String(), Type.Null()]),
-    sourceRootId: Type.Union([Type.String(), Type.Null()]),
     relativePath: Type.Union([Type.String(), Type.Null()]),
     sourceModifiedAt: Type.Union([Type.String(), Type.Null()]),
     width: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
@@ -328,29 +327,20 @@ export const LayerAssetListResponseSchema = Type.Object(
   { additionalProperties: false, $id: "LayerAssetListResponse" },
 );
 
-export const ImageRootSchema = Type.Object(
-  {
-    id: Type.String(),
-    available: Type.Boolean(),
-  },
-  { additionalProperties: false, $id: "ImageRoot" },
+export const PhotoDirectoryStatusSchema = Type.Object(
+  { configured: Type.Boolean(), available: Type.Boolean() },
+  { additionalProperties: false, $id: "PhotoDirectoryStatus" },
 );
 
-export const ImageRootListResponseSchema = Type.Object(
-  { items: Type.Array(ImageRootSchema) },
-  { additionalProperties: false, $id: "ImageRootListResponse" },
-);
-
-export const ImageScanJobInputSchema = Type.Object(
+export const PhotoScanJobInputSchema = Type.Object(
   {
-    rootId: Type.String({ minLength: 1, maxLength: 64 }),
     relativeDirectory: Type.String({ maxLength: 4096 }),
     recursive: Type.Boolean(),
   },
-  { additionalProperties: false, $id: "ImageScanJobInput" },
+  { additionalProperties: false, $id: "PhotoScanJobInput" },
 );
 
-export type ImageScanJobInput = Static<typeof ImageScanJobInputSchema>;
+export type PhotoScanJobInput = Static<typeof PhotoScanJobInputSchema>;
 
 export const JobStatusSchema = Type.Union([
   Type.Literal("queued"),
@@ -365,7 +355,7 @@ export const JobSchema = Type.Object(
   {
     id: Type.String(),
     type: Type.Union([
-      Type.Literal("image-scan"),
+      Type.Literal("photo-scan"),
       Type.Literal("tile-download"),
       Type.Literal("map-export"),
     ]),

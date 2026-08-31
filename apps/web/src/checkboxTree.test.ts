@@ -29,8 +29,8 @@ const nodes: CheckboxTreeNode[] = [
     ],
   },
   {
-    id: "images",
-    label: "Images",
+    id: "photos",
+    label: "Photos",
     checked: true,
     children: [],
   },

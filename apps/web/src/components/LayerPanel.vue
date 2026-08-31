@@ -66,7 +66,6 @@ const addDialogError = ref<string | null>(null);
 const newLayerName = ref("");
 const newLayerPluginId = ref("track-layer");
 const assetSearch = ref("");
-const rootSelections = reactive<Record<string, string>>({});
 const scanDirectories = reactive<Record<string, string>>({});
 const recursiveScans = reactive<Record<string, boolean>>({});
 const editingAsset = ref<LayerAsset | null>(null);
@@ -265,17 +264,17 @@ const suggestedLayerName = computed(() => {
 const activeJobs = computed(() =>
   store.jobs.filter(
     (job) =>
-      job.type === "image-scan" &&
+      job.type === "photo-scan" &&
       ["queued", "running", "paused"].includes(job.status),
   ),
 );
-const filteredImageAssets = computed(() => {
+const filteredPhotoAssets = computed(() => {
   const layerId = editingAsset.value?.layerId;
   if (layerId === undefined) {
     return [];
   }
   const query = assetSearch.value.trim().toLocaleLowerCase();
-  return imageAssets(layerId)
+  return photoAssets(layerId)
     .filter(
       (asset) =>
         query === "" ||
@@ -290,7 +289,7 @@ const filteredAssetCount = computed(() => {
     return 0;
   }
   const query = assetSearch.value.trim().toLocaleLowerCase();
-  return imageAssets(layerId).filter(
+  return photoAssets(layerId).filter(
     (asset) =>
       query === "" ||
       asset.fileName.toLocaleLowerCase().includes(query) ||
@@ -316,9 +315,9 @@ function selectLayer(layerId: string | null): void {
   saveSelectedLayerId(layerId, browserStorage);
 }
 
-function imageAssets(layerId: string): LayerAsset[] {
+function photoAssets(layerId: string): LayerAsset[] {
   return (store.assetsByLayer[layerId] ?? []).filter(
-    (asset) => asset.kind === "external-image",
+    (asset) => asset.kind === "external-photo",
   );
 }
 
@@ -330,7 +329,7 @@ function displayedScanJob(layerId: string) {
   return (
     scanJob(layerId) ??
     store.jobs.find(
-      (job) => job.type === "image-scan" && job.input.layerId === layerId,
+      (job) => job.type === "photo-scan" && job.input.layerId === layerId,
     )
   );
 }
@@ -375,9 +374,7 @@ function add(): void {
     .create(pluginId, name)
     .then(async (layer) => {
       addDialogOpen.value = false;
-      if (pluginId === "image-layer") {
-        rootSelections[layer.id] =
-          store.imageRoots.find((root) => root.available)?.id ?? "";
+      if (pluginId === "photo-layer") {
         scanDirectories[layer.id] = "";
         recursiveScans[layer.id] = true;
       }
@@ -542,14 +539,12 @@ function uploadTrack(layerId: string, file: File): void {
 }
 
 function startScan(layerId: string): void {
-  const rootId = rootSelections[layerId] ?? "";
-  if (rootId === "") {
-    localError.value = "Select an available image root.";
+  if (!store.photoDirectory.available) {
+    localError.value = "The configured photo directory is unavailable.";
     return;
   }
   void run(() =>
-    store.startImageScan(layerId, {
-      rootId,
+    store.startPhotoScan(layerId, {
       relativeDirectory: scanDirectories[layerId] ?? "",
       recursive: recursiveScans[layerId] ?? true,
     }),
@@ -566,8 +561,8 @@ function openAsset(asset: LayerAsset): void {
   editBounds.north = asset.bounds?.north.toString() ?? "";
 }
 
-function openFirstImage(layerId: string): void {
-  const asset = imageAssets(layerId)[0];
+function openFirstPhoto(layerId: string): void {
+  const asset = photoAssets(layerId)[0];
   if (asset !== undefined) {
     openAsset(asset);
   }
@@ -618,7 +613,7 @@ async function pollJobs(): Promise<void> {
   if (finished) {
     await Promise.all(
       store.items
-        .filter((layer) => layer.pluginId === "image-layer")
+        .filter((layer) => layer.pluginId === "photo-layer")
         .map((layer) => store.loadAssets(layer.id)),
     );
     emit("changed");
@@ -626,11 +621,9 @@ async function pollJobs(): Promise<void> {
 }
 
 onMounted(async () => {
-  await Promise.all([store.loadImageRoots(), store.loadJobs()]);
+  await Promise.all([store.loadPhotoDirectory(), store.loadJobs()]);
   for (const layer of store.items) {
-    if (layer.pluginId === "image-layer") {
-      rootSelections[layer.id] =
-        store.imageRoots.find((root) => root.available)?.id ?? "";
+    if (layer.pluginId === "photo-layer") {
       recursiveScans[layer.id] = true;
     }
   }
@@ -705,13 +698,12 @@ onBeforeUnmount(() => {
         :busy="busy"
         :can-move-up="canMove(selectedLayer, -1)"
         :can-move-down="canMove(selectedLayer, 1)"
-        :image-roots="store.imageRoots"
-        :image-root-id="rootSelections[selectedLayer.id] ?? ''"
+        :photo-directory="store.photoDirectory"
         :scan-directory="scanDirectories[selectedLayer.id] ?? ''"
         :recursive-scan="recursiveScans[selectedLayer.id] ?? true"
         :active-scan-job="scanJob(selectedLayer.id)"
         :displayed-scan-job="displayedScanJob(selectedLayer.id)"
-        :image-count="imageAssets(selectedLayer.id).length"
+        :photo-count="photoAssets(selectedLayer.id).length"
         @visibility-change="setSelectedVisibility"
         @opacity-change="setSelectedOpacity"
         @zoom-change="setSelectedZoom"
@@ -720,12 +712,11 @@ onBeforeUnmount(() => {
         @move="withSelectedLayer((layer) => move(layer, $event))"
         @remove="withSelectedLayer(removeLayer)"
         @upload-track="withSelectedLayer((layer) => uploadTrack(layer.id, $event))"
-        @update:image-root-id="withSelectedLayer((layer) => { rootSelections[layer.id] = $event; })"
         @update:scan-directory="withSelectedLayer((layer) => { scanDirectories[layer.id] = $event; })"
         @update:recursive-scan="withSelectedLayer((layer) => { recursiveScans[layer.id] = $event; })"
         @start-scan="withSelectedLayer((layer) => startScan(layer.id))"
         @scan-job-action="withSelectedLayer((layer) => { const job = scanJob(layer.id); if (job) controlJob(job.id, $event); })"
-        @manage-images="withSelectedLayer((layer) => openFirstImage(layer.id))"
+        @manage-photos="withSelectedLayer((layer) => openFirstPhoto(layer.id))"
       />
     </section>
   </CenteredDialog>
@@ -770,17 +761,17 @@ onBeforeUnmount(() => {
 
   <CenteredDialog
     :open="editingAsset !== null"
-    title="Image position"
+    title="Photo position"
     @close="editingAsset = null"
   >
     <div v-if="editingAsset" class="asset-editor">
       <aside class="asset-list">
-        <input v-model="assetSearch" type="search" placeholder="Filter images" />
-        <small v-if="filteredAssetCount > filteredImageAssets.length">
-          Showing {{ filteredImageAssets.length }} of {{ filteredAssetCount }} matches
+        <input v-model="assetSearch" type="search" placeholder="Filter photos" />
+        <small v-if="filteredAssetCount > filteredPhotoAssets.length">
+          Showing {{ filteredPhotoAssets.length }} of {{ filteredAssetCount }} matches
         </small>
         <button
-          v-for="asset in filteredImageAssets"
+          v-for="asset in filteredPhotoAssets"
           :key="asset.id"
           type="button"
           :class="{ selected: asset.id === editingAsset.id }"
