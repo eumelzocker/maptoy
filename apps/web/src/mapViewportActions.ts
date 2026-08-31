@@ -11,12 +11,12 @@ type ViewportController = Pick<
 export async function applyMapCenter(
   renderer: ViewportController,
   center: GeographicCoordinate,
+  zoom = renderer.getViewport().zoom,
 ): Promise<void> {
-  const currentViewport = renderer.getViewport();
   // Apply unconditionally: a non-modal dialog can retain its original values
   // while the map beneath it has since moved elsewhere.
   await renderer.setViewport({
     center: { ...center },
-    zoom: currentViewport.zoom,
+    zoom,
   });
 }

@@ -32,6 +32,7 @@ describe("Map view architecture", () => {
     expect(mapView).toContain("showCoordinates && pointer");
     expect(mapView).not.toContain("Math.round(zoom)");
     expect(tileUrl).not.toContain("https://");
+    expect(mapView).not.toContain("displayOptionsOpen.value = false");
   });
 
   it("keeps layer tools inside the standard Map view", async () => {
@@ -119,7 +120,16 @@ describe("Map view architecture", () => {
     expect(layerPanel).toContain('class="layer-type-option"');
     expect(layerPanel).toContain(':placeholder="suggestedLayerName"');
     expect(layerPanel).toContain("focusPrimaryLayerAction");
-    expect(layerPanel).toContain(":suspend-outside-close=");
+    expect(layerPanel).toContain('title="Layers"');
+    expect(layerPanel).toContain(':is-modal="false"');
+    expect(layerPanel).toContain('initial-position="map-controls"');
+    expect(layerPanel).toContain(':content-scrollable="false"');
+    expect(layerPanel).toContain("fit-content");
+    expect(layerPanel).toContain("<template #header-actions>");
+    expect(mapView).toContain('title="Display Options"');
+    expect(mapView).toContain(':open="displayOptionsOpen"');
+    expect(mapView).toContain('initial-position="map-controls"');
+    expect(mapView).not.toContain("<TogglePanel");
     expect(layerEditor).toContain(':is="pluginEditor"');
     expect(layerEditor).not.toContain("layer.pluginId ===");
     expect(layerEditorRegistry).toContain("TrackLayerPluginEditor");
@@ -130,6 +140,9 @@ describe("Map view architecture", () => {
     expect(schemaLayerEditor).toContain("colorAlphaPercent");
     expect(schemaLayerEditor).toContain("field.property.uiControl === 'range'");
     expect(layerEditor).toContain('class="layer-state-fields"');
+    expect(layerEditor).not.toContain('title="Move layer up"');
+    expect(layerEditor).not.toContain('title="Move layer down"');
+    expect(layerEditor).toContain("move: [direction: -1 | 1]");
     expect(trackLayerEditor).toContain("Import track…");
     expect(trackLayerEditor).toContain("Replace track…");
     expect(trackLayerEditor).toContain(':class="{ primary: !hasTrack }"');

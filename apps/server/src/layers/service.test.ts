@@ -43,7 +43,7 @@ describe("Layer service", () => {
         showGrid: true,
         showLabels: true,
         showScale: true,
-        scaleWidthPercent: 75,
+        scaleWidthPercent: 50,
       },
       data: {},
       status: "ready",

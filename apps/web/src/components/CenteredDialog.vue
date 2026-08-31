@@ -1,13 +1,28 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
+import {
+  activateDialog,
+  deactivateDialog,
+  isTopDialog,
+} from "../dialogStack.js";
 
 const props = withDefaults(
   defineProps<{
     open: boolean;
     title: string;
     isModal?: boolean;
+    initialPosition?: "center" | "map-controls";
+    contentScrollable?: boolean;
+    fitContent?: boolean;
+    allowViewportHeight?: boolean;
   }>(),
-  { isModal: true },
+  {
+    isModal: true,
+    initialPosition: "center",
+    contentScrollable: true,
+    fitContent: false,
+    allowViewportHeight: false,
+  },
 );
 
 const emit = defineEmits<{
@@ -16,9 +31,11 @@ const emit = defineEmits<{
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const titleId = `centered-dialog-title-${useId()}`;
+const dialogStackId = Symbol("centered-dialog");
 const panel = ref<HTMLElement | null>(null);
 const dragOffset = ref({ x: 0, y: 0 });
 const dragging = ref(false);
+const zIndex = ref(3000);
 let previouslyFocused: HTMLElement | null = null;
 let dragSession: {
   pointerId: number;
@@ -44,6 +61,17 @@ const focusableSelector = [
 function close(): void {
   emit("close");
 }
+
+function bringToFront(): void {
+  zIndex.value = activateDialog(dialogStackId);
+}
+
+function activate(): void {
+  bringToFront();
+  panel.value?.focus();
+}
+
+defineExpose({ activate });
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -120,8 +148,12 @@ function focusableElements(): HTMLElement[] {
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  if (!isTopDialog(dialogStackId)) {
+    return;
+  }
   if (event.key === "Escape") {
     event.preventDefault();
+    event.stopImmediatePropagation();
     close();
     return;
   }
@@ -152,6 +184,11 @@ function removeKeyListener(): void {
   document.removeEventListener("keydown", onKeydown);
 }
 
+function deactivate(): void {
+  removeKeyListener();
+  deactivateDialog(dialogStackId);
+}
+
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function onBackdropMouseDown(): void {
   if (props.isModal) {
@@ -163,7 +200,7 @@ watch(
   () => props.open,
   async (open) => {
     if (!open) {
-      removeKeyListener();
+      deactivate();
       dragSession = null;
       dragging.value = false;
       previouslyFocused?.focus();
@@ -174,6 +211,7 @@ watch(
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    bringToFront();
     dragOffset.value = { x: 0, y: 0 };
     document.addEventListener("keydown", onKeydown);
     await nextTick();
@@ -186,7 +224,7 @@ watch(
   { flush: "post" },
 );
 
-onBeforeUnmount(removeKeyListener);
+onBeforeUnmount(deactivate);
 </script>
 
 <template>
@@ -194,18 +232,28 @@ onBeforeUnmount(removeKeyListener);
     <div
       v-if="open"
       class="dialog-backdrop"
-      :class="{ 'non-modal': !isModal }"
+      :class="[
+        `initial-${initialPosition}`,
+        { 'non-modal': !isModal },
+      ]"
+      :style="{ zIndex }"
       @mousedown.self="onBackdropMouseDown"
     >
       <section
         ref="panel"
         class="centered-dialog"
-        :class="{ dragging }"
+        :class="{
+          dragging,
+          'fit-content': fitContent,
+          'allow-viewport-height': allowViewportHeight,
+        }"
         :style="{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }"
         role="dialog"
         :aria-modal="isModal ? 'true' : undefined"
         :aria-labelledby="titleId"
         tabindex="-1"
+        @pointerdown="bringToFront"
+        @focusin="bringToFront"
       >
         <header
           class="dialog-header"
@@ -215,16 +263,22 @@ onBeforeUnmount(removeKeyListener);
           @pointercancel="stopDrag"
         >
           <h2 :id="titleId">{{ title }}</h2>
-          <button
-            type="button"
-            class="dialog-close"
-            :aria-label="`Close ${title}`"
-            @click="close"
-          >
-            <i class="mdi mdi-close" aria-hidden="true"></i>
-          </button>
+          <div class="dialog-header-actions">
+            <slot name="header-actions"></slot>
+            <button
+              type="button"
+              class="dialog-close"
+              :aria-label="`Close ${title}`"
+              @click="close"
+            >
+              <i class="mdi mdi-close" aria-hidden="true"></i>
+            </button>
+          </div>
         </header>
-        <div class="dialog-content">
+        <div
+          class="dialog-content"
+          :class="{ contained: !contentScrollable }"
+        >
           <slot></slot>
         </div>
         <footer v-if="$slots.footer" class="dialog-footer">
@@ -239,7 +293,6 @@ onBeforeUnmount(removeKeyListener);
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 3000;
   display: grid;
   padding: 1rem;
   place-items: center;
@@ -248,6 +301,11 @@ onBeforeUnmount(removeKeyListener);
 
 .dialog-backdrop.non-modal {
   pointer-events: none;
+}
+
+.dialog-backdrop.initial-map-controls {
+  padding-left: 3.65rem;
+  place-items: center start;
 }
 
 .centered-dialog {
@@ -263,6 +321,15 @@ onBeforeUnmount(removeKeyListener);
   box-shadow: 0 1.5rem 4rem rgb(10 28 24 / 32%);
 }
 
+.centered-dialog.fit-content {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.centered-dialog.allow-viewport-height {
+  max-height: calc(100dvh - 2rem);
+}
+
 .non-modal .centered-dialog {
   pointer-events: auto;
 }
@@ -272,7 +339,8 @@ onBeforeUnmount(removeKeyListener);
 }
 
 .dialog-header,
-.dialog-footer {
+.dialog-footer,
+.dialog-header-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -296,6 +364,10 @@ onBeforeUnmount(removeKeyListener);
   margin: 0;
   color: #163832;
   font-size: 1.15rem;
+}
+
+.dialog-header-actions {
+  gap: 0.45rem;
 }
 
 .dialog-close {
@@ -324,6 +396,11 @@ onBeforeUnmount(removeKeyListener);
   overflow-y: auto;
 }
 
+.dialog-content.contained {
+  display: flex;
+  overflow: hidden;
+}
+
 .dialog-footer {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -331,5 +408,11 @@ onBeforeUnmount(removeKeyListener);
   padding: 0.9rem 1.1rem;
   border-top: 1px solid #d7e0db;
   background: #f6f8f7;
+}
+
+@media (max-width: 700px) {
+  .dialog-backdrop.initial-map-controls {
+    padding-left: 3.4rem;
+  }
 }
 </style>

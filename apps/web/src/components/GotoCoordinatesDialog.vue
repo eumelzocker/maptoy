@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { GeographicCoordinate } from "@maptoy/map-adapter-sdk";
 import { WEB_MERCATOR_MAX_LATITUDE } from "@maptoy/map-core";
-import { ref, useId, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import CenteredDialog from "./CenteredDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
@@ -10,33 +10,57 @@ import CoordinateDmsReadout from "./CoordinateDmsReadout.vue";
 const props = defineProps<{
   open: boolean;
   initialCoordinate: GeographicCoordinate;
+  initialZoom: number;
+  minimumZoom: number;
+  maximumZoom: number;
 }>();
 
 const emit = defineEmits<{
   close: [];
-  apply: [coordinate: GeographicCoordinate];
+  apply: [coordinate: GeographicCoordinate, zoom: number];
 }>();
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const formId = `goto-coordinates-form-${useId()}`;
+const zoom = ref(0);
 const longitude = ref(0);
 const latitude = ref(0);
+const coordinatePrecision = 8;
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const zoomLevels = computed(() =>
+  Array.from(
+    { length: props.maximumZoom - props.minimumZoom + 1 },
+    (_, index) => props.minimumZoom + index,
+  ),
+);
 
 watch(
   () => props.open,
   (open) => {
     if (open) {
-      longitude.value = props.initialCoordinate.longitude;
-      latitude.value = props.initialCoordinate.latitude;
+      zoom.value = Math.min(
+        props.maximumZoom,
+        Math.max(props.minimumZoom, Math.round(props.initialZoom)),
+      );
+      longitude.value = Number(
+        props.initialCoordinate.longitude.toFixed(coordinatePrecision),
+      );
+      latitude.value = Number(
+        props.initialCoordinate.latitude.toFixed(coordinatePrecision),
+      );
     }
   },
 );
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function apply(): void {
+  const nextZoom = Number(zoom.value);
   const nextLongitude = Number(longitude.value);
   const nextLatitude = Number(latitude.value);
   if (
+    !Number.isInteger(nextZoom) ||
+    nextZoom < props.minimumZoom ||
+    nextZoom > props.maximumZoom ||
     !Number.isFinite(nextLongitude) ||
     nextLongitude < -180 ||
     nextLongitude > 180 ||
@@ -45,7 +69,7 @@ function apply(): void {
   ) {
     return;
   }
-  emit("apply", { longitude: nextLongitude, latitude: nextLatitude });
+  emit("apply", { longitude: nextLongitude, latitude: nextLatitude }, nextZoom);
 }
 </script>
 
@@ -60,6 +84,14 @@ function apply(): void {
       <p>Center the map on a WGS84 longitude and latitude.</p>
       <div class="coordinate-fields">
         <label>
+          <span>Zoom level</span>
+          <select v-model.number="zoom" required>
+            <option v-for="level in zoomLevels" :key="level" :value="level">
+              z{{ level }}
+            </option>
+          </select>
+        </label>
+        <label>
           <span>Longitude</span>
           <input
             v-model.number="longitude"
@@ -70,7 +102,11 @@ function apply(): void {
             required
             autofocus
           />
-          <CoordinateDmsReadout axis="longitude" :value="longitude" />
+          <CoordinateDmsReadout
+            class="coordinate-readout"
+            axis="longitude"
+            :value="longitude"
+          />
         </label>
         <label>
           <span>Latitude</span>
@@ -82,7 +118,11 @@ function apply(): void {
             step="any"
             required
           />
-          <CoordinateDmsReadout axis="latitude" :value="latitude" />
+          <CoordinateDmsReadout
+            class="coordinate-readout"
+            axis="latitude"
+            :value="latitude"
+          />
         </label>
       </div>
       <small>Latitude is limited to the Web Mercator map extent.</small>
@@ -112,7 +152,7 @@ function apply(): void {
 
 .coordinate-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 6rem repeat(2, minmax(0, 1fr));
   gap: 0.8rem;
 }
 
@@ -120,12 +160,18 @@ function apply(): void {
   display: grid;
   min-width: 0;
   gap: 0.35rem;
+  align-content: start;
   color: #314f47;
   font-size: 0.84rem;
   font-weight: 700;
 }
 
+.coordinate-readout {
+  text-align: center;
+}
+
 .map-tool-form input,
+.map-tool-form select,
 .dialog-button {
   min-height: 2.5rem;
   padding: 0.55rem 0.65rem;
@@ -136,7 +182,8 @@ function apply(): void {
   font: inherit;
 }
 
-.map-tool-form input {
+.map-tool-form input,
+.map-tool-form select {
   width: 100%;
   min-width: 0;
 }

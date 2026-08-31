@@ -17,6 +17,7 @@ interface MapContextMenuState {
   documentationLanguage: string;
   documentationPages: readonly DocumentationMenuPage[];
   toolsEnabled: boolean;
+  layersEnabled: boolean;
   cachedTilesOnly: boolean;
   showTitleBar: boolean;
   showMapSelector: boolean;
@@ -35,6 +36,8 @@ export const mapContextMenuIds = {
   documentationPrefix: "goto-documentation:",
   gotoCoordinates: "tool-goto-coordinates",
   tileCalculator: "tool-tile-calculator",
+  layers: "tool-layers",
+  displayOptions: "tool-display-options",
   cachedTilesOnly: "option-cached-tiles-only",
   showTitleBar: "option-show-title-bar",
   showMapSelector: "option-show-map-selector",
@@ -90,20 +93,6 @@ export function createMapContextMenuItems(
 
   return [
     {
-      id: "map-set",
-      label: "Map Set",
-      icon: "mdi-layers-outline",
-      disabled: mapSetItems.length === 0,
-      children: mapSetItems,
-    },
-    {
-      id: "zoom",
-      label: "Zoom",
-      icon: "mdi-magnify",
-      disabled: zoomItems.length === 0 || state.currentZoom === null,
-      children: zoomItems,
-    },
-    {
       id: "goto",
       label: "Goto",
       icon: "mdi-arrow-right-bold-box-outline",
@@ -132,6 +121,20 @@ export function createMapContextMenuItems(
       ],
     },
     {
+      id: "map-set",
+      label: "Map Set",
+      icon: "mdi-layers-outline",
+      disabled: mapSetItems.length === 0,
+      children: mapSetItems,
+    },
+    {
+      id: "zoom",
+      label: "Zoom",
+      icon: "mdi-magnify",
+      disabled: zoomItems.length === 0 || state.currentZoom === null,
+      children: zoomItems,
+    },
+    {
       id: "tools",
       label: "Tools",
       icon: "mdi-tools",
@@ -147,6 +150,17 @@ export function createMapContextMenuItems(
           label: "Tile Calculator",
           icon: "mdi-grid",
           disabled: !state.toolsEnabled,
+        },
+        {
+          id: mapContextMenuIds.layers,
+          label: "Layers",
+          icon: "mdi-layers-triple-outline",
+          disabled: !state.layersEnabled,
+        },
+        {
+          id: mapContextMenuIds.displayOptions,
+          label: "Display Options",
+          icon: "mdi-tune",
         },
       ],
     },

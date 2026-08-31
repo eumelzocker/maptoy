@@ -4,6 +4,24 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the Map view's Layers and Display Options popovers with draggable,
+  non-modal dialogs and made focused dialogs move to the top. Escape now closes
+  only the topmost dialog. Both tools are available at the bottom of the context
+  menu's Tools submenu, while Goto precedes Map Set at the top level.
+- Hid the Layer editor's move-up and move-down controls while retaining Layer
+  reordering below the UI for later use.
+- Let the Layers dialog grow within the viewport while keeping overflow and
+  scrollbars inside its Layer editor or expanded hierarchy instead of the dialog
+  itself, and size its width to its content.
+- Extended Goto Coordinates with a Map Set-bounded whole-level Zoom selector. Zoom
+  and coordinate values now apply together on confirmation, with centered DMS
+  readouts below the coordinate fields.
+- Sized the Tile Calculator dialog and preview to the active Map Set's native Tile
+  dimensions, removing excess space around 256 px Tiles and only scaling larger
+  Tiles down when the browser viewport cannot show them at 1:1.
+
 ## [0.2.3] - 2026-08-30
 
 ### Added

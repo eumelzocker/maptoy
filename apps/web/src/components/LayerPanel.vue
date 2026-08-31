@@ -37,16 +37,15 @@ import { LAYER_PLUGIN_REGISTRY_KEY } from "../registries.js";
 import { useLayersStore } from "../stores/layers.js";
 import CenteredDialog from "./CenteredDialog.vue";
 import LayerEditor from "./LayerEditor.vue";
-import TogglePanel from "./TogglePanel.vue";
+import MapSideControlButton from "./MapSideControlButton.vue";
 import TreeSelectDropdown from "./TreeSelectDropdown.vue";
 
 const props = withDefaults(
   defineProps<{
     enabled: boolean;
-    placement?: "top" | "right";
     supportedLayerTypes?: readonly MapLayerType[];
   }>(),
-  { placement: "top", supportedLayerTypes: () => [] },
+  { supportedLayerTypes: () => [] },
 );
 
 const emit = defineEmits<{ changed: [] }>();
@@ -59,6 +58,9 @@ const layerPlugins = injectedLayerPlugins;
 const browserStorage = availableLocalStorage();
 const busy = ref(false);
 const localError = ref<string | null>(null);
+const panelOpen = ref(false);
+const selectorOpen = ref(false);
+const layerDialog = ref<{ activate(): void } | null>(null);
 const addDialogOpen = ref(false);
 const addDialogError = ref<string | null>(null);
 const newLayerName = ref("");
@@ -75,6 +77,29 @@ const selectedLayerId = ref<string | null>(loadSelectedLayerId(browserStorage));
 const collapsedHierarchyKeys = ref(loadCollapsedLayerHierarchy(browserStorage));
 let jobPoll: number | null = null;
 let previousRunningJobs = new Set<string>();
+
+function openPanel(): void {
+  if (panelOpen.value) {
+    layerDialog.value?.activate();
+    return;
+  }
+  panelOpen.value = true;
+}
+
+function closePanel(): void {
+  panelOpen.value = false;
+  selectorOpen.value = false;
+}
+
+function togglePanel(): void {
+  if (panelOpen.value) {
+    closePanel();
+  } else {
+    openPanel();
+  }
+}
+
+defineExpose({ open: openPanel });
 
 const categoryDefinitions: Array<
   LayerCategoryDefinition & { pluginIds: string[] }
@@ -621,23 +646,35 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <TogglePanel
+  <MapSideControlButton
     label="Layers"
-    align="start"
-    :placement="placement"
-    :suspend-outside-close="addDialogOpen || editingAsset !== null"
+    :expanded="panelOpen"
+    @click="togglePanel"
   >
-    <template #trigger>
-      <i class="mdi mdi-layers-triple-outline" aria-hidden="true"></i>
+    <i class="mdi mdi-layers-triple-outline" aria-hidden="true"></i>
+  </MapSideControlButton>
+
+  <CenteredDialog
+    ref="layerDialog"
+    :open="panelOpen"
+    title="Layers"
+    :is-modal="false"
+    :content-scrollable="false"
+    fit-content
+    initial-position="map-controls"
+    @close="closePanel"
+  >
+    <template #header-actions>
+      <button
+        type="button"
+        class="layer-add-button"
+        :disabled="!enabled || busy"
+        @click="openAddDialog"
+      >
+        <i class="mdi mdi-plus" aria-hidden="true"></i>Add layer
+      </button>
     </template>
     <section class="layer-panel" :aria-busy="busy">
-      <header>
-        <strong>Layers</strong>
-        <button type="button" :disabled="!enabled || busy" @click="openAddDialog">
-          <i class="mdi mdi-plus" aria-hidden="true"></i>Add layer
-        </button>
-      </header>
-
       <p v-if="!enabled" class="layer-note">Layer rendering is unavailable for this Map Set.</p>
       <p v-else-if="store.loading" class="layer-note">Loading layers…</p>
       <p v-else-if="store.items.length === 0" class="layer-note">No layers yet.</p>
@@ -656,10 +693,12 @@ onBeforeUnmount(() => {
         @update:model-value="selectLayer"
         @update:expanded-ids="expandedHierarchyIds = $event"
         @check="setTreeVisibility"
+        @open-change="selectorOpen = $event"
       />
 
       <LayerEditor
         v-if="selectedLayer"
+        v-show="!selectorOpen"
         :layer="selectedLayer"
         :configuration-schema="layerPlugins.get(selectedLayer.pluginId)?.manifest.configurationSchema ?? {}"
         :compatibility-diagnostic="compatibilityDiagnostic(selectedLayer)"
@@ -689,7 +728,7 @@ onBeforeUnmount(() => {
         @manage-images="withSelectedLayer((layer) => openFirstImage(layer.id))"
       />
     </section>
-  </TogglePanel>
+  </CenteredDialog>
 
   <CenteredDialog :open="addDialogOpen" title="Add layer" @close="addDialogOpen = false">
     <form class="add-dialog" @submit.prevent="add">
@@ -784,22 +823,19 @@ onBeforeUnmount(() => {
 .layer-panel {
   display: grid;
   gap: 0.7rem;
+  min-height: 0;
   width: min(25rem, 82vw);
-  max-height: min(38rem, 78vh);
+  max-height: min(38rem, calc(100dvh - 7.6rem));
+  overflow: hidden;
 }
 
-.layer-panel header,
 .coordinate-fields {
   display: flex;
   gap: 0.45rem;
   align-items: center;
 }
 
-.layer-panel header {
-  justify-content: space-between;
-}
-
-.layer-panel header button,
+.layer-add-button,
 .add-dialog > button {
   display: inline-flex;
   gap: 0.3rem;

@@ -16,6 +16,7 @@ interface TileCalculatorMapSet {
   id: string;
   minZoom: number;
   maxZoom: number;
+  tileSize: 256 | 512;
 }
 
 const props = defineProps<{
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 const zoom = ref(0);
 const longitude = ref(0);
 const latitude = ref(0);
+const coordinatePrecision = 8;
 const previewUrl = ref<string | null>(null);
 const previewStatus = ref<"idle" | "loading" | "loaded" | "error">("idle");
 let previewTimer: ReturnType<typeof setTimeout> | null = null;
@@ -62,13 +64,22 @@ const previewTargetUrl = computed(() => {
     : null;
 });
 
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const previewStyle = computed(() => ({
+  "--tile-preview-size": `${props.mapSet?.tileSize ?? 256}px`,
+}));
+
 watch(
   () => props.open,
   (open) => {
     if (open) {
       zoom.value = props.initialInput.zoom;
-      longitude.value = props.initialInput.longitude;
-      latitude.value = props.initialInput.latitude;
+      longitude.value = Number(
+        props.initialInput.longitude.toFixed(coordinatePrecision),
+      );
+      latitude.value = Number(
+        props.initialInput.latitude.toFixed(coordinatePrecision),
+      );
     }
   },
 );
@@ -100,9 +111,16 @@ onBeforeUnmount(() => {
     :open="open"
     title="Tile Calculator"
     :is-modal="false"
+    fit-content
+    allow-viewport-height
     @close="emit('close')"
   >
-    <form class="map-tool-form" @submit.prevent>
+    <form
+      class="map-tool-form"
+      :class="{ 'cached-only': cachedTilesOnly }"
+      :style="previewStyle"
+      @submit.prevent
+    >
       <p>Find the XYZ tile containing a WGS84 coordinate.</p>
       <p v-if="cachedTilesOnly" class="cached-only-note">
         The preview follows the Map view's <i>Cached Tiles only</i> option;
@@ -198,7 +216,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .map-tool-form {
   display: grid;
+  width: max(30rem, var(--tile-preview-size));
+  max-width: 100%;
   gap: 1rem;
+  --tile-preview-available-height: calc(100dvh - 25rem);
+}
+
+.map-tool-form.cached-only {
+  --tile-preview-available-height: calc(100dvh - 28rem);
 }
 
 .map-tool-form > p {
@@ -286,9 +311,14 @@ onBeforeUnmount(() => {
 .tile-preview-frame {
   position: relative;
   display: grid;
-  height: clamp(10rem, 50dvh, 25rem);
-  min-height: 10rem;
+  width: min(
+    var(--tile-preview-size),
+    100%,
+    max(10rem, var(--tile-preview-available-height))
+  );
+  aspect-ratio: 1;
   overflow: hidden;
+  justify-self: center;
   place-items: center;
   border: 1px solid #b6c6bc;
   border-radius: 0.55rem;
@@ -308,8 +338,9 @@ onBeforeUnmount(() => {
 
 .tile-preview img {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .tile-preview-frame > span + img {

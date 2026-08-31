@@ -67,22 +67,6 @@ function emitConfigurationChange(
         <button type="button" title="Rename layer" :disabled="busy" @click="emit('rename')">
           <i class="mdi mdi-pencil-outline" aria-hidden="true"></i>
         </button>
-        <button
-          type="button"
-          title="Move layer up"
-          :disabled="busy || !canMoveUp"
-          @click="emit('move', -1)"
-        >
-          <i class="mdi mdi-arrow-up" aria-hidden="true"></i>
-        </button>
-        <button
-          type="button"
-          title="Move layer down"
-          :disabled="busy || !canMoveDown"
-          @click="emit('move', 1)"
-        >
-          <i class="mdi mdi-arrow-down" aria-hidden="true"></i>
-        </button>
         <button type="button" title="Delete layer" :disabled="busy" @click="emit('remove')">
           <i class="mdi mdi-trash-can-outline" aria-hidden="true"></i>
         </button>

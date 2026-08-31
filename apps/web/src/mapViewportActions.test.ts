@@ -37,4 +37,25 @@ describe("Map viewport actions", () => {
 
     expect(setViewport).toHaveBeenCalledOnce();
   });
+
+  it("applies an explicitly selected zoom together with the dialog center", async () => {
+    const viewport: MapViewport = {
+      center: { longitude: 13.405, latitude: 52.52 },
+      zoom: 10.25,
+    };
+    const targetCenter = { longitude: 10.74, latitude: 54.22 };
+    const setViewport = vi.fn();
+
+    await applyMapCenter(
+      { getViewport: () => viewport, setViewport },
+      targetCenter,
+      7,
+    );
+
+    expect(setViewport).toHaveBeenCalledOnce();
+    expect(setViewport).toHaveBeenCalledWith({
+      center: targetCenter,
+      zoom: 7,
+    });
+  });
 });

@@ -38,7 +38,8 @@ describe("Tile Grid layer plugin", () => {
             showGrid: true,
             showLabels: true,
             showScale: true,
-            scaleWidthPercent: 75,
+            scaleWidthPercent:
+              defaultTileGridLayerConfiguration.scaleWidthPercent,
           },
         ],
       },

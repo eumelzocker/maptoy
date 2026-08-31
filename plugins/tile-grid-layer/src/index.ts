@@ -24,7 +24,7 @@ export const defaultTileGridLayerConfiguration: TileGridLayerConfiguration = {
   lineColor: "#20202080",
   textColor: "#202020ff",
   backgroundColor: "#ffffffd0",
-  scaleWidthPercent: 75,
+  scaleWidthPercent: 50,
 };
 
 function record(value: unknown, message: string): Record<string, unknown> {

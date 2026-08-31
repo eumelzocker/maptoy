@@ -25,6 +25,8 @@ import AppContextMenu from "../components/AppContextMenu.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import AppMenuSelect from "../components/AppMenuSelect.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import CenteredDialog from "../components/CenteredDialog.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import GotoCoordinatesDialog from "../components/GotoCoordinatesDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
@@ -35,9 +37,9 @@ import MapSetSelect from "../components/MapSetSelect.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapZoomControl from "../components/MapZoomControl.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
-import TileCalculatorDialog from "../components/TileCalculatorDialog.vue";
+import MapSideControlButton from "../components/MapSideControlButton.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
-import TogglePanel from "../components/TogglePanel.vue";
+import TileCalculatorDialog from "../components/TileCalculatorDialog.vue";
 import { loadDocumentationLanguage } from "../documentationLanguage.js";
 import {
   type CoordinateFormat,
@@ -132,12 +134,15 @@ const showTileGrid = computed(() =>
     ? layers.defaultGridLayer?.visible === true
     : storedShowTileGrid.value,
 );
-const displayOptionsPanel = ref<{ close: () => void } | null>(null);
+const layerPanel = ref<{ open(): void } | null>(null);
+const displayOptionsOpen = ref(false);
+const displayOptionsDialog = ref<{ activate(): void } | null>(null);
 const gotoCoordinatesOpen = ref(false);
 const gotoInitialCoordinate = ref<GeographicCoordinate>({
   longitude: 0,
   latitude: 0,
 });
+const gotoInitialZoom = ref(0);
 const tileCalculatorOpen = ref(false);
 const tileCalculatorInitialInput = ref({
   zoom: 0,
@@ -187,6 +192,7 @@ const mapContextMenuItems = computed(() =>
       ({ requestedLanguage }) => requestedLanguage === documentationLanguage,
     ),
     toolsEnabled: selected.value !== null && zoom.value !== null,
+    layersEnabled: selected.value !== null,
     cachedTilesOnly: cachedTilesOnly.value,
     showTitleBar: showTitleBar.value,
     showMapSelector: showMapSelector.value,
@@ -487,7 +493,6 @@ onBeforeUnmount(() => mapViewState.setSourceZoom(null));
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function openMapContextMenu(event: MouseEvent): void {
   event.preventDefault();
-  displayOptionsPanel.value?.close();
   mapContextMenu.value?.openAt(event.clientX, event.clientY);
 }
 
@@ -502,7 +507,6 @@ function onMapContextMenuKeydown(event: KeyboardEvent): void {
     return;
   }
   const box = target.getBoundingClientRect();
-  displayOptionsPanel.value?.close();
   mapContextMenu.value?.openAt(
     box.left + Math.min(box.width / 2, 160),
     box.top + Math.min(box.height / 2, 120),
@@ -535,6 +539,14 @@ function selectMapContextMenuItem(item: MenuItem): void {
     openGotoCoordinates();
   } else if (item.id === mapContextMenuIds.tileCalculator) {
     openTileCalculator();
+  } else if (item.id === mapContextMenuIds.layers) {
+    layerPanel.value?.open();
+  } else if (item.id === mapContextMenuIds.displayOptions) {
+    if (displayOptionsOpen.value) {
+      displayOptionsDialog.value?.activate();
+    } else {
+      displayOptionsOpen.value = true;
+    }
   } else if (item.id === mapContextMenuIds.cachedTilesOnly) {
     cachedTilesOnly.value = !cachedTilesOnly.value;
   } else if (item.id === mapContextMenuIds.showTileGrid) {
@@ -605,23 +617,45 @@ function resetToInitialViewport(): void {
 }
 
 function openGotoCoordinates(): void {
-  if (renderer === null) {
+  const mapSet = selected.value;
+  if (renderer === null || mapSet === null) {
     return;
   }
   const viewport = renderer.getViewport();
+  const zoomOptions = leafletXyzZoomOptions(mapSet);
   gotoInitialCoordinate.value = viewport.center;
-  displayOptionsPanel.value?.close();
+  gotoInitialZoom.value = Math.min(
+    mapSet.maxZoom,
+    Math.max(
+      mapSet.minZoom,
+      Math.round(viewport.zoom + zoomOptions.zoomOffset),
+    ),
+  );
   gotoCoordinatesOpen.value = true;
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function applyGotoCoordinates(
   coordinate: GeographicCoordinate,
+  sourceZoom: number,
 ): Promise<void> {
-  if (renderer === null) {
+  const mapSet = selected.value;
+  if (
+    renderer === null ||
+    mapSet === null ||
+    !Number.isInteger(sourceZoom) ||
+    sourceZoom < mapSet.minZoom ||
+    sourceZoom > mapSet.maxZoom
+  ) {
     return;
   }
-  await applyMapCenter(renderer, coordinate);
+  const zoomOptions = leafletXyzZoomOptions(mapSet);
+  await applyMapCenter(
+    renderer,
+    coordinate,
+    sourceZoom - zoomOptions.zoomOffset,
+  );
+  zoom.value = renderer.getViewport().zoom;
   saveMapViewport(browserStorage, renderer.getViewport());
   gotoCoordinatesOpen.value = false;
 }
@@ -644,7 +678,6 @@ function openTileCalculator(): void {
       ),
     ),
   };
-  displayOptionsPanel.value?.close();
   tileCalculatorOpen.value = true;
 }
 
@@ -712,23 +745,30 @@ function selectCoordinateFormat(value: string): void {
 
       <div class="map-side-controls">
         <LayerPanel
+          ref="layerPanel"
           v-if="selected"
           :enabled="selected.capabilities.layerRendering"
           :supported-layer-types="supportedLayerTypes"
-          placement="right"
           @changed="renderPluginLayers"
         />
-        <TogglePanel
-          ref="displayOptionsPanel"
+        <MapSideControlButton
           label="Display Options"
-          align="start"
-          placement="right"
+          :expanded="displayOptionsOpen"
+          @click="displayOptionsOpen = !displayOptionsOpen"
         >
-          <template #trigger>
-            <i class="mdi mdi-tune" aria-hidden="true"></i>
-          </template>
-          <strong class="options-heading">Display Options</strong>
-          <hr class="options-divider" />
+          <i class="mdi mdi-tune" aria-hidden="true"></i>
+        </MapSideControlButton>
+      </div>
+
+      <CenteredDialog
+        ref="displayOptionsDialog"
+        :open="displayOptionsOpen"
+        title="Display Options"
+        :is-modal="false"
+        initial-position="map-controls"
+        @close="displayOptionsOpen = false"
+      >
+        <div class="display-options">
           <div class="display-tool-actions">
             <button
               type="button"
@@ -780,8 +820,8 @@ function selectCoordinateFormat(value: string): void {
             />
             <span>Show Tile Grid</span>
           </label>
-        </TogglePanel>
-      </div>
+        </div>
+      </CenteredDialog>
 
       <div
         class="coordinate-format-toggle"
@@ -821,6 +861,9 @@ function selectCoordinateFormat(value: string): void {
     <GotoCoordinatesDialog
       :open="gotoCoordinatesOpen"
       :initial-coordinate="gotoInitialCoordinate"
+      :initial-zoom="gotoInitialZoom"
+      :minimum-zoom="selected?.minZoom ?? 0"
+      :maximum-zoom="selected?.maxZoom ?? 0"
       @close="gotoCoordinatesOpen = false"
       @apply="applyGotoCoordinates"
     />
@@ -950,15 +993,15 @@ function selectCoordinateFormat(value: string): void {
   white-space: nowrap;
 }
 
-.options-heading {
-  display: block;
-  font-size: 0.85rem;
-}
-
 .options-divider {
   margin: 0;
   border: 0;
   border-top: 1px solid #d7e0db;
+}
+
+.display-options {
+  display: grid;
+  gap: 0.5rem;
 }
 
 .display-tool-actions {

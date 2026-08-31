@@ -32,6 +32,7 @@ const emit = defineEmits<{
   "update:modelValue": [id: string];
   "update:expandedIds": [ids: string[]];
   check: [id: string, checked: boolean];
+  openChange: [open: boolean];
 }>();
 
 const open = ref(false);
@@ -55,12 +56,20 @@ const selectedLabel = computed(() =>
 );
 
 function close(): void {
-  open.value = false;
+  setOpen(false);
+}
+
+function setOpen(value: boolean): void {
+  if (open.value === value) {
+    return;
+  }
+  open.value = value;
+  emit("openChange", value);
 }
 
 function toggle(): void {
   if (!props.disabled) {
-    open.value = !open.value;
+    setOpen(!open.value);
   }
 }
 
@@ -155,6 +164,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .tree-select-dropdown {
   position: relative;
+  display: grid;
+  min-height: 0;
+  gap: 0.3rem;
 }
 
 .tree-select-trigger {
@@ -189,15 +201,15 @@ onBeforeUnmount(() => {
 }
 
 .tree-select-popover {
-  position: absolute;
-  top: calc(100% + 0.3rem);
-  right: 0;
-  left: 0;
+  position: static;
   z-index: 30;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0.45rem;
-  min-width: min(23rem, 78vw);
+  min-width: 0;
+  max-height: calc(100dvh - 10.5rem);
   padding: 0.55rem;
+  overflow: hidden;
   border: 1px solid #9aada6;
   border-radius: 0.45rem;
   background: #fff;
@@ -240,7 +252,7 @@ onBeforeUnmount(() => {
 }
 
 .tree-options {
-  max-height: min(22rem, 48vh);
+  max-height: min(22rem, 48vh, calc(100dvh - 14.5rem));
   overflow: auto;
   overscroll-behavior: contain;
 }
