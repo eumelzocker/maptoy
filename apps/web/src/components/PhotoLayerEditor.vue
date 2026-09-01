@@ -18,12 +18,15 @@ defineProps<{
 
 const emit = defineEmits<{
   configurationChange: [key: string, value: string | number | boolean];
-  "update:scanDirectory": [value: string];
   "update:recursive": [value: boolean];
-  startScan: [];
+  browseDirectory: [];
   jobAction: [action: "pause" | "resume" | "cancel"];
   managePhotos: [];
 }>();
+
+function processedItems(job: Job): number {
+  return job.completed + job.skipped + job.failed;
+}
 </script>
 
 <template>
@@ -67,16 +70,12 @@ const emit = defineEmits<{
       <p v-else-if="!photoDirectory.available" class="scan-status">
         The configured photo directory is unavailable.
       </p>
-      <label>
+      <div class="selected-directory">
         <span>Subdirectory</span>
-        <input
-          :value="scanDirectory"
-          type="text"
-          placeholder="optional/relative"
-          :disabled="busy"
-          @input="emit('update:scanDirectory', ($event.target as HTMLInputElement).value)"
-        />
-      </label>
+        <strong :title="scanDirectory || 'No subdirectory selected'">
+          {{ scanDirectory || "No subdirectory selected" }}
+        </strong>
+      </div>
       <label class="recursive-field">
         <input
           type="checkbox"
@@ -90,14 +89,15 @@ const emit = defineEmits<{
         type="button"
         data-layer-primary-action
         :disabled="busy || activeJob !== undefined || !photoDirectory.available"
-        @click="emit('startScan')"
+        @click="emit('browseDirectory')"
       >
-        <i class="mdi mdi-folder-search-outline" aria-hidden="true"></i>Scan directory
+        <i class="mdi mdi-folder-search-outline" aria-hidden="true"></i>Scan directory…
       </button>
       <p v-if="displayedJob" class="scan-status">
-        {{ displayedJob.status }} · {{ displayedJob.completed }}/{{ displayedJob.total }} ·
+        {{ displayedJob.status }} · {{ processedItems(displayedJob) }}/{{ displayedJob.total }} ·
         new {{ displayedJob.summary.created ?? 0 }} · changed
-        {{ displayedJob.summary.changed ?? 0 }} · missing
+        {{ displayedJob.summary.changed ?? 0 }} · skipped (no location)
+        {{ displayedJob.summary.withoutLocation ?? 0 }} · missing
         {{ displayedJob.summary.missing ?? 0 }} · failed
         {{ displayedJob.summary.failed ?? 0 }}
       </p>
@@ -141,6 +141,21 @@ const emit = defineEmits<{
   gap: 0.2rem;
   min-width: 0;
   font-size: 0.82rem;
+}
+
+.selected-directory {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.82rem;
+}
+
+.selected-directory strong {
+  overflow: hidden;
+  color: #536b64;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .plugin-fields input[type="number"] {

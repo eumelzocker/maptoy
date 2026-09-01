@@ -83,12 +83,16 @@ hierarchy below the plugin category.
 path accepts one plugin-validated `multipart/form-data` non-image file. Its maximum
 size is `MAPTOY_LAYERS_ASSET_MAX_BYTES`. `GET api/layers/:id/assets/:assetId` returns
 the controlled managed file or an external photo's derived WebP preview. It never
-returns an external photo original. `PATCH` updates a photo's complete point or
-geographic bounds; the two forms are mutually exclusive.
+returns an external photo original. `PATCH` updates or clears a photo's complete
+point coordinate. External Photo Assets optionally include typed `photoMetadata`
+with capture, camera, exposure, and IPTC caption values collected during scanning.
 
 `GET api/photos/directory` reports whether `MAPTOY_PHOTOS_DIR` is configured and
-available without returning its path. `POST api/layers/:id/photo-scan-jobs` accepts
-a relative `relativeDirectory` and `recursive`. It creates a persistent scan Job.
+available without returning its path. `GET api/photos/directories?parent=...` lists
+the direct subdirectories of a safe relative parent for the directory browser. It
+returns relative navigation paths only, skips symbolic links, and rejects traversal
+outside the configured root. `POST api/layers/:id/photo-scan-jobs` accepts a relative
+`relativeDirectory` and `recursive`. It creates a persistent scan Job.
 
 ## Jobs
 

@@ -141,7 +141,6 @@ export class ManagedAssetService {
         managedPath: relativePath,
         previewPath: null,
         sourceFingerprint: null,
-        bounds: null,
         metadata: {},
       };
       this.repository.upsertAsset(stored);

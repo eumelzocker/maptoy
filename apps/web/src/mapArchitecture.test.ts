@@ -151,6 +151,13 @@ describe("Map view architecture", () => {
     expect(trackLayerEditor).not.toContain("Line opacity");
     expect(photoLayerEditor).toContain("Scan directory");
     expect(photoLayerEditor).toContain("data-layer-primary-action");
+    expect(photoLayerEditor).toContain("browseDirectory");
+    expect(photoLayerEditor).toContain("skipped (no location)");
+    expect(photoLayerEditor).not.toContain("update:scanDirectory");
+    expect(layerPanel).toContain("PhotoDirectoryBrowser");
+    expect(layerPanel).toContain(
+      "Choose a photo subdirectory before starting a scan.",
+    );
     expect(treeSelectDropdown).toContain("CheckboxTree");
     expect(treeSelectDropdown).toContain("Search layers…");
     expect(checkboxTree).toContain("emit('check'");

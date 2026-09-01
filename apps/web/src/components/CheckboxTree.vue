@@ -97,6 +97,12 @@ function onLabelKeydown(event: KeyboardEvent, node: CheckboxTreeNode): void {
           @click="activate(node)"
           @keydown="onLabelKeydown($event, node)"
         >
+          <i
+            v-if="node.icon"
+            class="mdi tree-node-icon"
+            :class="node.icon"
+            aria-hidden="true"
+          ></i>
           <span>{{ node.label }}</span>
           <small v-if="node.secondaryText">{{ node.secondaryText }}</small>
         </button>
@@ -170,11 +176,17 @@ function onLabelKeydown(event: KeyboardEvent, node: CheckboxTreeNode): void {
 .tree-label {
   display: flex;
   gap: 0.35rem;
-  align-items: baseline;
+  align-items: center;
   width: 100%;
   overflow: hidden;
   text-align: left;
   cursor: pointer;
+}
+
+.tree-node-icon {
+  flex: none;
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .tree-label span {

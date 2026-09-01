@@ -49,6 +49,118 @@ function validateConfiguration(value: unknown): PhotoLayerConfiguration {
 interface PhotoPointProperties {
   fileName: string;
   previewUrl?: string;
+  metadata?: Readonly<Record<string, unknown>>;
+}
+
+interface PhotoPopupFieldVisibility {
+  name: boolean;
+  coordinates: boolean;
+  capturedAt: boolean;
+  manufacturer: boolean;
+  cameraModel: boolean;
+  iso: boolean;
+  fStop: boolean;
+  shutterSpeed: boolean;
+  caption: boolean;
+}
+
+const popupFieldVisibility: PhotoPopupFieldVisibility = {
+  name: true,
+  coordinates: true,
+  capturedAt: true,
+  manufacturer: false,
+  cameraModel: false,
+  iso: false,
+  fStop: false,
+  shutterSpeed: false,
+  caption: false,
+};
+
+function coordinateToDms(
+  value: number,
+  positiveLetter: string,
+  negativeLetter: string,
+): string {
+  const totalSeconds = Math.round(Math.abs(value) * 36_000) / 10;
+  const degrees = Math.floor(totalSeconds / 3_600);
+  const remainingSeconds = totalSeconds - degrees * 3_600;
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds - minutes * 60;
+  return `${degrees}°${minutes}'${seconds.toFixed(1)}"${value >= 0 ? positiveLetter : negativeLetter}`;
+}
+
+function photoCoordinateLine(coordinate: {
+  longitude: number;
+  latitude: number;
+}): string {
+  return `${coordinateToDms(coordinate.latitude, "N", "S")}, ${coordinateToDms(coordinate.longitude, "E", "W")}`;
+}
+
+function metadataText(
+  metadata: Readonly<Record<string, unknown>> | undefined,
+  key: string,
+): string | undefined {
+  const value = metadata?.[key];
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+function metadataNumber(
+  metadata: Readonly<Record<string, unknown>> | undefined,
+  key: string,
+): number | undefined {
+  const value = metadata?.[key];
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function shutterSpeedLabel(seconds: number): string {
+  return seconds < 1
+    ? `1/${Math.round(1 / seconds)} s`
+    : `${seconds.toLocaleString("en-US", { maximumFractionDigits: 3 })} s`;
+}
+
+function photoPopupLines(
+  fileName: string,
+  coordinate: { longitude: number; latitude: number },
+  metadata: Readonly<Record<string, unknown>> | undefined,
+): string[] {
+  const lines: string[] = [];
+  const capturedAt = metadataText(metadata, "capturedAt");
+  const manufacturer = metadataText(metadata, "manufacturer");
+  const cameraModel = metadataText(metadata, "cameraModel");
+  const iso = metadataNumber(metadata, "iso");
+  const fStop = metadataNumber(metadata, "fStop");
+  const shutterSpeed = metadataNumber(metadata, "shutterSpeed");
+  const iptc = metadata?.iptc;
+  const caption =
+    typeof iptc === "object" && iptc !== null && "caption" in iptc
+      ? metadataText(iptc as Readonly<Record<string, unknown>>, "caption")
+      : undefined;
+  if (popupFieldVisibility.name) lines.push(fileName);
+  if (popupFieldVisibility.coordinates) {
+    lines.push(photoCoordinateLine(coordinate));
+  }
+  if (popupFieldVisibility.capturedAt && capturedAt !== undefined) {
+    lines.push(`Captured: ${capturedAt}`);
+  }
+  if (popupFieldVisibility.manufacturer && manufacturer !== undefined) {
+    lines.push(`Manufacturer: ${manufacturer}`);
+  }
+  if (popupFieldVisibility.cameraModel && cameraModel !== undefined) {
+    lines.push(`Camera model: ${cameraModel}`);
+  }
+  if (popupFieldVisibility.iso && iso !== undefined) lines.push(`ISO: ${iso}`);
+  if (popupFieldVisibility.fStop && fStop !== undefined) {
+    lines.push(`F-stop: f/${fStop}`);
+  }
+  if (popupFieldVisibility.shutterSpeed && shutterSpeed !== undefined) {
+    lines.push(`Shutter speed: ${shutterSpeedLabel(shutterSpeed)}`);
+  }
+  if (popupFieldVisibility.caption && caption !== undefined) {
+    lines.push(`Caption: ${caption}`);
+  }
+  return lines;
 }
 
 function photoPointFeatures(
@@ -59,8 +171,7 @@ function photoPointFeatures(
       (asset) =>
         asset.status === "ready" &&
         asset.longitude !== null &&
-        asset.latitude !== null &&
-        asset.bounds === undefined,
+        asset.latitude !== null,
     )
     .map((asset) => {
       const geometry = {
@@ -79,6 +190,7 @@ function photoPointFeatures(
           ...(asset.previewUrl === undefined
             ? {}
             : { previewUrl: asset.previewUrl }),
+          ...(asset.metadata === undefined ? {} : { metadata: asset.metadata }),
         },
       };
     });
@@ -86,7 +198,6 @@ function photoPointFeatures(
 
 function descriptor(input: InteractiveLayerInput) {
   const configuration = validateConfiguration(input.configuration);
-  const ready = input.assets.filter((asset) => asset.status === "ready");
   const points = photoPointFeatures(input);
   return {
     type: "composite" as const,
@@ -103,6 +214,11 @@ function descriptor(input: InteractiveLayerInput) {
             feature.properties.previewUrl !== undefined
               ? { previewUrl: feature.properties.previewUrl }
               : {}),
+            popupLines: photoPopupLines(
+              feature.properties.fileName,
+              feature.geometry.coordinate,
+              feature.properties.metadata,
+            ),
             symbolizer: {
               radius: configuration.pointRadius,
               fillColor: configuration.pointColor,
@@ -111,20 +227,6 @@ function descriptor(input: InteractiveLayerInput) {
               fillOpacity: 0.9,
             },
           })),
-        },
-        {
-          kind: "raster-overlay" as const,
-          features: ready
-            .filter(
-              (asset) =>
-                asset.bounds !== undefined && asset.previewUrl !== undefined,
-            )
-            .map((asset) => ({
-              id: asset.id,
-              imageUrl: asset.previewUrl as string,
-              bounds: asset.bounds as NonNullable<typeof asset.bounds>,
-              title: asset.fileName,
-            })),
         },
       ],
     },
@@ -158,11 +260,7 @@ export const photoLayerPlugin = {
       serverPreview: false,
       serverRender: true,
     },
-    requiredRendererLayerTypes: [
-      "point-collection",
-      "raster-overlay",
-      "composite",
-    ],
+    requiredRendererLayerTypes: ["point-collection", "composite"],
   },
   shared: {
     validateConfiguration,
@@ -184,13 +282,7 @@ export const photoLayerPlugin = {
     render: (context) => {
       const configuration = validateConfiguration(context.configuration);
       for (const asset of context.assets) {
-        if (asset.bounds !== undefined) {
-          context.surface.drawManagedImage(
-            asset.assetId,
-            asset.bounds,
-            context.opacity,
-          );
-        } else if (asset.longitude !== null && asset.latitude !== null) {
+        if (asset.longitude !== null && asset.latitude !== null) {
           context.surface.drawPoint(
             {
               longitude: asset.longitude,

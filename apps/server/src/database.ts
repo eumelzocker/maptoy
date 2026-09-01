@@ -12,6 +12,7 @@ const migrationFiles = [
   { version: 8, filename: "0008-layer-version-opacity.sql" },
   { version: 9, filename: "0009-photo-domain.sql" },
   { version: 10, filename: "0010-job-progress-cursor.sql" },
+  { version: 11, filename: "0011-photo-point-coordinates.sql" },
 ] as const;
 
 async function loadMigrations(): Promise<

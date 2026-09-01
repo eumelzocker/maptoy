@@ -25,7 +25,7 @@ import AppContextMenu from "../components/AppContextMenu.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import AppMenuSelect from "../components/AppMenuSelect.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
-import CenteredDialog from "../components/CenteredDialog.vue";
+import DialogWindow from "../components/DialogWindow.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import GotoCoordinatesDialog from "../components/GotoCoordinatesDialog.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
@@ -292,7 +292,9 @@ async function renderPluginLayers(): Promise<void> {
         : {}),
       longitude: asset.longitude,
       latitude: asset.latitude,
-      ...(asset.bounds === null ? {} : { bounds: asset.bounds }),
+      ...(asset.photoMetadata === undefined
+        ? {}
+        : { metadata: asset.photoMetadata }),
     }));
     const handle = await plugin.frontend.mount(
       {
@@ -766,7 +768,7 @@ function selectCoordinateFormat(value: string): void {
         </MapSideControlButton>
       </div>
 
-      <CenteredDialog
+      <DialogWindow
         ref="displayOptionsDialog"
         :open="displayOptionsOpen"
         title="Display Options"
@@ -827,7 +829,7 @@ function selectCoordinateFormat(value: string): void {
             <span>Show Tile Grid</span>
           </label>
         </div>
-      </CenteredDialog>
+      </DialogWindow>
 
       <div
         class="coordinate-format-toggle"

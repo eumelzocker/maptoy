@@ -52,8 +52,6 @@ errors visible in the output.
   points whose expected output pixels can be calculated independently.
 - A synthetic image contains non-sensitive EXIF GPS coordinates within the test
   area. Its orientation tag is not `1`, so EXIF orientation handling is exercised.
-- A second image fixture has explicit geographic bounds and no GPS metadata. It is
-  rendered as a partially transparent overlay.
 
 All fixture data is generated locally and may be committed to the repository.
 

@@ -29,7 +29,15 @@ import HtmlTooltip from "../components/HtmlTooltip.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
 import { useDisclosure } from "../composables/useDisclosure.js";
+import { formatDurationMinutes } from "../durationFormat.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
+import {
+  nextTableSort,
+  type SortDirection,
+  type SortValue,
+  stableSortBy,
+  type TableSortState,
+} from "../tableSort.js";
 
 const mapSets = useMapSetsStore();
 const route = useRoute();
@@ -55,6 +63,34 @@ const message = ref<string | null>(null);
 let routeReady = false;
 let loadGeneration = 0;
 
+type OverviewSortColumn =
+  | "mapSet"
+  | "logical"
+  | "current"
+  | "historical"
+  | "snapshots"
+  | "files"
+  | "storage"
+  | "cacheAge"
+  | "consistency";
+type CoverageSortColumn =
+  | "zoom"
+  | "mapSets"
+  | "cachedTiles"
+  | "possibleTiles"
+  | "coverage"
+  | "current"
+  | "historical"
+  | "storage";
+const overviewSort = ref<TableSortState<OverviewSortColumn>>({
+  column: null,
+  direction: null,
+});
+const coverageSort = ref<TableSortState<CoverageSortColumn>>({
+  column: null,
+  direction: null,
+});
+
 const isOverview = computed(() => selectedId.value === "");
 const selectedMapSet = computed(
   () => mapSets.items.find(({ id }) => id === selectedId.value) ?? null,
@@ -67,26 +103,119 @@ const auditByMapSet = computed(
     ),
 );
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const overviewRows = computed(() =>
-  (overview.value?.mapSets ?? []).flatMap((summary) => {
+const overviewRows = computed(() => {
+  const rows = (overview.value?.mapSets ?? []).flatMap((summary) => {
     const mapSet = mapSets.items.find(({ id }) => id === summary.mapSetId);
     return mapSet === undefined
       ? []
       : [{ mapSet, summary, audit: auditByMapSet.value.get(summary.mapSetId) }];
-  }),
-);
+  });
+  const { column, direction } = overviewSort.value;
+  if (column === null || direction === null) return rows;
+
+  return stableSortBy(
+    rows,
+    (row): SortValue => {
+      switch (column) {
+        case "mapSet":
+          return row.mapSet.name;
+        case "logical":
+          return row.summary.logicalTileCount;
+        case "current":
+          return row.summary.currentRevisionCount;
+        case "historical":
+          return row.summary.historicalRevisionCount;
+        case "snapshots":
+          return row.summary.snapshotCount;
+        case "files":
+          return row.summary.uniqueContentCount;
+        case "storage":
+          return row.summary.totalStorageBytes;
+        case "cacheAge": {
+          if (row.summary.oldestCurrentValidatedAt === null) return null;
+          const timestamp = Date.parse(row.summary.oldestCurrentValidatedAt);
+          return Number.isNaN(timestamp) ? null : -timestamp;
+        }
+        case "consistency":
+          return row.audit === undefined
+            ? "Not checked"
+            : mapSetAuditNeedsAttention(row.audit)
+              ? "Needs attention"
+              : "OK";
+      }
+    },
+    direction,
+  );
+});
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const coverageRows = computed(() =>
-  cacheCoverageByZoom(
+const coverageRows = computed(() => {
+  const rows = cacheCoverageByZoom(
     stats.value?.zoomLevels ?? [],
     isOverview.value
       ? mapSets.items
       : selectedMapSet.value === null
         ? []
         : [selectedMapSet.value],
-  ),
-);
+  );
+  const { column, direction } = coverageSort.value;
+  if (column === null || direction === null) return rows;
+
+  return stableSortBy(
+    rows,
+    (level): SortValue => {
+      switch (column) {
+        case "zoom":
+          return level.zoom;
+        case "mapSets":
+          return level.supportedMapSetCount;
+        case "cachedTiles":
+          return level.logicalTileCount;
+        case "possibleTiles":
+          return level.possibleTileCount;
+        case "coverage":
+          return level.coveragePercent;
+        case "current":
+          return level.currentRevisionCount;
+        case "historical":
+          return level.historicalRevisionCount;
+        case "storage":
+          return level.indexedStorageBytes;
+      }
+    },
+    direction,
+  );
+});
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function toggleOverviewSort(column: OverviewSortColumn): void {
+  overviewSort.value = nextTableSort(overviewSort.value, column);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function toggleCoverageSort(column: CoverageSortColumn): void {
+  coverageSort.value = nextTableSort(coverageSort.value, column);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function sortAria<Column extends string>(
+  sort: TableSortState<Column>,
+  column: Column,
+): SortDirection | "none" {
+  return sort.column === column && sort.direction !== null
+    ? sort.direction
+    : "none";
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function sortIcon<Column extends string>(
+  sort: TableSortState<Column>,
+  column: Column,
+): string {
+  if (sort.column !== column || sort.direction === null)
+    return "mdi-swap-vertical";
+  return sort.direction === "ascending" ? "mdi-arrow-up" : "mdi-arrow-down";
+}
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const sortedRevisions = computed(() =>
@@ -195,7 +324,6 @@ watch(
   },
 );
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function mapSetAuditNeedsAttention(
   result: TileCacheMapSetAuditResult | undefined,
 ): boolean {
@@ -463,27 +591,6 @@ function formatTileCount(count: bigint): string {
   return new Intl.NumberFormat().format(count);
 }
 
-function pluralize(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function formatDurationMinutes(totalMinutes: number): string {
-  // Clamp negative durations (e.g. clock skew between server and browser) to zero
-  // instead of relying on negative floor/modulo results happening to fail every `> 0` check below.
-  const clampedMinutes = Math.max(0, totalMinutes);
-  const weeks = Math.floor(clampedMinutes / (7 * 24 * 60));
-  const days = Math.floor((clampedMinutes % (7 * 24 * 60)) / (24 * 60));
-  const hours = Math.floor((clampedMinutes % (24 * 60)) / 60);
-  const minutes = clampedMinutes % 60;
-  const parts = [
-    weeks > 0 ? pluralize(weeks, "wk", "wks") : null,
-    days > 0 ? pluralize(days, "day", "days") : null,
-    hours > 0 ? pluralize(hours, "hour", "hours") : null,
-    minutes > 0 ? pluralize(minutes, "min", "mins") : null,
-  ].filter((part): part is string => part !== null);
-  return parts.length > 0 ? parts.join(", ") : "0 mins";
-}
-
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function formatCacheAge(value: string | null): string {
   if (value === null) return "–";
@@ -611,8 +718,51 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
         <table>
           <thead>
             <tr>
-              <th>Map Set</th><th class="numeric">Logical</th><th class="numeric">Current</th><th class="numeric">Historical</th>
-              <th class="numeric">Snapshots</th><th class="numeric">Files</th><th class="numeric">Storage</th><th class="numeric">Max. cache age</th><th>Consistency</th>
+              <th class="sortable" :aria-sort="sortAria(overviewSort, 'mapSet')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('mapSet')">
+                  <span>Map Set</span><i class="mdi" :class="sortIcon(overviewSort, 'mapSet')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(overviewSort, 'logical')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('logical')">
+                  <span>Logical</span><i class="mdi" :class="sortIcon(overviewSort, 'logical')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(overviewSort, 'current')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('current')">
+                  <span>Current</span><i class="mdi" :class="sortIcon(overviewSort, 'current')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(overviewSort, 'historical')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('historical')">
+                  <span>Historical</span><i class="mdi" :class="sortIcon(overviewSort, 'historical')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(overviewSort, 'snapshots')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('snapshots')">
+                  <span>Snapshots</span><i class="mdi" :class="sortIcon(overviewSort, 'snapshots')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(overviewSort, 'files')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('files')">
+                  <span>Files</span><i class="mdi" :class="sortIcon(overviewSort, 'files')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(overviewSort, 'storage')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('storage')">
+                  <span>Storage</span><i class="mdi" :class="sortIcon(overviewSort, 'storage')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(overviewSort, 'cacheAge')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('cacheAge')">
+                  <span>Max. cache age</span><i class="mdi" :class="sortIcon(overviewSort, 'cacheAge')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="sortable" :aria-sort="sortAria(overviewSort, 'consistency')">
+                <button class="sort-button" type="button" @click="toggleOverviewSort('consistency')">
+                  <span>Consistency</span><i class="mdi" :class="sortIcon(overviewSort, 'consistency')" aria-hidden="true"></i>
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -731,7 +881,50 @@ function revisionPreviewUrl(revision: TileRevisionSummary): string {
         class="table-scroll"
       >
         <table>
-          <thead><tr><th class="numeric">Zoom</th><th v-if="isOverview" class="numeric">Map Sets</th><th class="numeric">Cached tiles</th><th class="numeric">Possible tiles</th><th class="numeric">Coverage</th><th class="numeric">Current</th><th class="numeric">Historical</th><th class="numeric">Storage</th></tr></thead>
+          <thead>
+            <tr>
+              <th class="numeric sortable" :aria-sort="sortAria(coverageSort, 'zoom')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('zoom')">
+                  <span>Zoom</span><i class="mdi" :class="sortIcon(coverageSort, 'zoom')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th v-if="isOverview" class="numeric sortable" :aria-sort="sortAria(coverageSort, 'mapSets')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('mapSets')">
+                  <span>Map Sets</span><i class="mdi" :class="sortIcon(coverageSort, 'mapSets')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(coverageSort, 'cachedTiles')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('cachedTiles')">
+                  <span>Cached tiles</span><i class="mdi" :class="sortIcon(coverageSort, 'cachedTiles')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(coverageSort, 'possibleTiles')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('possibleTiles')">
+                  <span>Possible tiles</span><i class="mdi" :class="sortIcon(coverageSort, 'possibleTiles')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(coverageSort, 'coverage')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('coverage')">
+                  <span>Coverage</span><i class="mdi" :class="sortIcon(coverageSort, 'coverage')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(coverageSort, 'current')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('current')">
+                  <span>Current</span><i class="mdi" :class="sortIcon(coverageSort, 'current')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(coverageSort, 'historical')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('historical')">
+                  <span>Historical</span><i class="mdi" :class="sortIcon(coverageSort, 'historical')" aria-hidden="true"></i>
+                </button>
+              </th>
+              <th class="numeric sortable" :aria-sort="sortAria(coverageSort, 'storage')">
+                <button class="sort-button" type="button" @click="toggleCoverageSort('storage')">
+                  <span>Storage</span><i class="mdi" :class="sortIcon(coverageSort, 'storage')" aria-hidden="true"></i>
+                </button>
+              </th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="level in coverageRows" :key="level.zoom">
               <td class="numeric">{{ level.zoom }}</td>
@@ -977,11 +1170,18 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 0.65rem; border-bottom: 1px solid #d7e0db; text-align: left; white-space: nowrap; }
 th.numeric, td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+th.sortable { padding: 0; }
+.sort-button { display: flex; align-items: center; gap: 0.3rem; width: 100%; min-height: 0; padding: 0.65rem; border: 0; border-radius: 0.25rem; color: inherit; background: transparent; font: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
+th.numeric .sort-button { justify-content: flex-end; }
+.sort-button:hover { color: #17453c; background: rgba(23, 69, 60, 0.06); }
+.sort-button:focus-visible { outline: 2px solid #163832; outline-offset: -2px; }
+.sort-button i { flex: none; width: 1em; color: #71877f; font-size: 1rem; }
+th[aria-sort="ascending"] .sort-button i, th[aria-sort="descending"] .sort-button i { color: #17453c; }
 .theoretical-count { color: #617870; }
 .cache-age-cell { padding-block: 0.35rem; line-height: 1.15; }
 .cache-age-actual { font-size: 0.82rem; }
 .cache-age-limit { margin-top: 0.1rem; color: #617870; font-size: 0.68rem; font-weight: 600; }
-.coverage-value { color: #17453c; font-weight: 800; }
+.coverage-value { color: #17453c; }
 th { color: #536b64; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .state { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 999px; background: #e8ded6; }
 .state.current { color: #fff; background: #17453c; }

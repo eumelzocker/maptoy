@@ -35,9 +35,8 @@ const emit = defineEmits<{
   move: [direction: -1 | 1];
   remove: [];
   uploadTrack: [file: File];
-  "update:scanDirectory": [value: string];
   "update:recursiveScan": [value: boolean];
-  startScan: [];
+  browseScanDirectory: [];
   scanJobAction: [action: "pause" | "resume" | "cancel"];
   managePhotos: [];
 }>();
@@ -139,9 +138,8 @@ function emitConfigurationChange(
       :has-more-photos="hasMorePhotos"
       @configuration-change="emitConfigurationChange"
       @upload-track="emit('uploadTrack', $event)"
-      @update:scan-directory="emit('update:scanDirectory', $event)"
       @update:recursive-scan="emit('update:recursiveScan', $event)"
-      @start-scan="emit('startScan')"
+      @browse-scan-directory="emit('browseScanDirectory')"
       @scan-job-action="emit('scanJobAction', $event)"
       @manage-photos="emit('managePhotos')"
     />

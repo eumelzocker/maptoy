@@ -47,7 +47,6 @@ interface AssetRow {
   longitude: number | null;
   latitude: number | null;
   coordinate_source: CoordinateSource;
-  bounds_json: string | null;
   metadata_json: string;
   error_code: string | null;
   error_message: string | null;
@@ -130,10 +129,6 @@ function assetFromRow(row: AssetRow): StoredLayerAsset {
     longitude: row.longitude,
     latitude: row.latitude,
     coordinateSource: row.coordinate_source,
-    bounds:
-      row.bounds_json === null
-        ? null
-        : (JSON.parse(row.bounds_json) as LayerAsset["bounds"]),
     previewAvailable: row.preview_path !== null,
     errorCode: row.error_code,
     errorMessage: row.error_message,
@@ -175,7 +170,7 @@ const assetColumns = `
   id, layer_id, kind, status, file_name, content_type, byte_length,
   content_hash, managed_path, preview_path, source_root_id, relative_path,
   source_modified_at, source_fingerprint, width, height, longitude, latitude,
-  coordinate_source, bounds_json, metadata_json, error_code, error_message,
+  coordinate_source, metadata_json, error_code, error_message,
   created_at, updated_at
 `;
 
@@ -368,7 +363,7 @@ export class LayerRepository {
           ${assetColumns}
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-          ?, ?, ?
+          ?, ?
         )
         ON CONFLICT(id) DO UPDATE SET
           status = excluded.status,
@@ -385,7 +380,6 @@ export class LayerRepository {
           longitude = excluded.longitude,
           latitude = excluded.latitude,
           coordinate_source = excluded.coordinate_source,
-          bounds_json = excluded.bounds_json,
           metadata_json = excluded.metadata_json,
           error_code = excluded.error_code,
           error_message = excluded.error_message,
@@ -411,7 +405,6 @@ export class LayerRepository {
         asset.longitude,
         asset.latitude,
         asset.coordinateSource,
-        asset.bounds === null ? null : JSON.stringify(asset.bounds),
         JSON.stringify(asset.metadata),
         asset.errorCode,
         asset.errorMessage,

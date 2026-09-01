@@ -33,7 +33,6 @@ describe("Photo layer plugin", () => {
           surface: {
             drawPolyline: vi.fn(),
             drawPoint,
-            drawManagedImage: vi.fn(),
           },
         },
       }),
@@ -41,6 +40,63 @@ describe("Photo layer plugin", () => {
     expect(drawPoint).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ opacity: 0.6 }),
+    );
+  });
+
+  it("publishes only the code-configured preview details", () => {
+    const publishLayer = vi.fn();
+    photoLayerPlugin.frontend.mount(
+      {
+        instanceId: "photos",
+        publishLayer,
+        clearLayer: vi.fn(),
+        resolveAssetUrl: (assetId) => `api/assets/${assetId}`,
+      },
+      {
+        configuration: { showPreviews: true },
+        data: {},
+        assets: [
+          {
+            id: "photo",
+            status: "ready",
+            fileName: "ship.jpg",
+            previewUrl: "api/assets/photo",
+            longitude: 13.405,
+            latitude: 52.52,
+            metadata: {
+              capturedAt: "2026:09:01 12:34:56",
+              manufacturer: "Fujifilm",
+              cameraModel: "X-T5",
+              iso: 125,
+              fStop: 5.6,
+              shutterSpeed: 0.004,
+              iptc: { caption: "Historic sailing ship" },
+            },
+          },
+        ],
+        opacity: 1,
+        visible: true,
+      },
+    );
+
+    expect(publishLayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          layers: [
+            expect.objectContaining({
+              features: [
+                expect.objectContaining({
+                  popupLines: [
+                    "ship.jpg",
+                    `52°31'12.0"N, 13°24'18.0"E`,
+                    "Captured: 2026:09:01 12:34:56",
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
     );
   });
 });

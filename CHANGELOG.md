@@ -4,6 +4,50 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-01
+
+### Added
+
+- Added stable three-state column sorting to the Cache Map Sets and Zoom Overview
+  tables, cycling through original, descending, and ascending order with accessible
+  state indicators and unchanged bounded Revision Explorer ordering.
+- Added a safe Photo subdirectory-browsing API and picker that exposes only relative
+  folders below `MAPTOY_PHOTOS_DIR`, blocks root selection in the UI, skips symbolic
+  links, and restores each Photo Layer's latest scan folder and recursion setting.
+- Added extensible Photo marker preview details with code-configured field
+  visibility, initially showing only filename, DMS point coordinate, and available
+  capture time below the image while retaining further metadata for later UI
+  configuration.
+- Added capture of optional Photo manufacturer, camera model, ISO, f-stop, shutter
+  speed, and `IPTC.caption` in persisted scan metadata, exposed through the typed
+  Asset contract.
+
+### Changed
+
+- Show Layer category icons for Tracks, Photos, and Decorations in the hierarchy
+  picker, and replace the category name with its icon in the collapsed selection.
+- Show the active stale-age limit below the Coverage legend using the Cache table's
+  compact duration format, and render Coverage percentages at normal weight.
+- Open the Photo position dialog at a more useful content-sized width and allow it
+  to be resized in both directions within the viewport.
+- Admit newly scanned Photos to the catalog only when they have a complete, valid
+  EXIF GPS point, avoid creating previews or database records for unlocated Photos,
+  and show their separate skipped count in the scan result.
+- Open Photo preview popups on marker hover without auto-panning the Map, replacing
+  the filename-only tooltip while retaining click behavior for touch interaction.
+
+### Removed
+
+- Removed geographic bounds and raster-overlay handling from Photo Layers across
+  the editor, API, persistence, rendering contracts, documentation, and plan. Photo
+  positions now use point coordinates exclusively; schema migration 11 discards
+  previously stored Photo bounds.
+
+### Fixed
+
+- Recalculate Leaflet Photo popup dimensions after an asynchronously loaded preview
+  so its frame fits correctly on the first marker click.
+
 ## [0.3.1] - 2026-08-31
 
 ### Added

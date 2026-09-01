@@ -3,7 +3,7 @@ import type { GeographicCoordinate } from "@maptoy/map-adapter-sdk";
 import { WEB_MERCATOR_MAX_LATITUDE } from "@maptoy/map-core";
 import { computed, ref, useId, watch } from "vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
-import CenteredDialog from "./CenteredDialog.vue";
+import DialogWindow from "./DialogWindow.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import CoordinateDmsReadout from "./CoordinateDmsReadout.vue";
 
@@ -74,7 +74,7 @@ function apply(): void {
 </script>
 
 <template>
-  <CenteredDialog
+  <DialogWindow
     :open="open"
     title="Goto Coordinates"
     :is-modal="false"
@@ -135,7 +135,7 @@ function apply(): void {
         Apply
       </button>
     </template>
-  </CenteredDialog>
+  </DialogWindow>
 </template>
 
 <style scoped>

@@ -1,4 +1,4 @@
-export const LAYER_PLUGIN_SDK_VERSION = "1.2.0";
+export const LAYER_PLUGIN_SDK_VERSION = "2.0.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 export type JsonObject = Readonly<Record<string, unknown>>;
@@ -200,19 +200,13 @@ export interface LayerPluginAssetReference {
   originalUrl?: string;
   longitude: number | null;
   latitude: number | null;
-  bounds?: Readonly<{
-    west: number;
-    south: number;
-    east: number;
-    north: number;
-  }>;
+  metadata?: JsonObject;
 }
 
 export type InteractiveLayerType =
   | "point-collection"
   | "line-collection"
   | "area-collection"
-  | "raster-overlay"
   | "xyz-tile-grid"
   | "composite";
 
@@ -268,11 +262,6 @@ export interface LayerDrawingSurface {
     style: JsonObject,
   ) => void;
   drawPoint: (coordinate: GeographicCoordinate, style: JsonObject) => void;
-  drawManagedImage: (
-    assetId: string,
-    bounds: readonly [GeographicCoordinate, GeographicCoordinate],
-    opacity: number,
-  ) => void;
 }
 
 export interface LayerPluginServerRenderContext {
@@ -288,7 +277,6 @@ export interface LayerPluginServerAssetReference {
   assetId: string;
   longitude: number | null;
   latitude: number | null;
-  bounds?: readonly [GeographicCoordinate, GeographicCoordinate];
 }
 
 export interface LayerPluginServerHooks {

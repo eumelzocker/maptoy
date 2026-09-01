@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import {
   ErrorResponseSchema,
+  PhotoDirectoryListingSchema,
   PhotoDirectoryStatusSchema,
   type PhotoScanJobInput,
   PhotoScanJobInputSchema,
@@ -247,6 +248,27 @@ export function registerLayerRoutes(
     "/api/photos/directory",
     { schema: { response: { 200: PhotoDirectoryStatusSchema } } },
     async () => photoScans.directory.status(),
+  );
+
+  server.get<{ Querystring: { parent?: string } }>(
+    "/api/photos/directories",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            parent: { type: "string", maxLength: 4096, default: "" },
+          },
+        },
+        response: {
+          200: PhotoDirectoryListingSchema,
+          400: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) =>
+      photoScans.directory.directories(request.query.parent ?? ""),
   );
 
   server.post<{

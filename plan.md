@@ -135,7 +135,7 @@ maptoy/
 │   └── leaflet-xyz/         # einziger in v1 implementierter Kartenadapter
 ├── plugins/
 │   ├── track-layer/         # GPX-/GeoJSON-Referenz-Plugin
-│   └── photo-layer/         # GPS-/Bounds-Bild-Referenz-Plugin
+│   └── photo-layer/         # GPS-Foto-Referenz-Plugin
 ├── extensions/
 │   └── firefox/             # generische, separat versionierte Response-Weiterleitung
 ├── docs/
@@ -185,12 +185,9 @@ Innenringe.
 Die Frontend-Hooks erzeugen ausschließlich adapterneutrale, typisierte
 Darstellungsdeskriptoren für Punkte, Linien und Flächen. Stil beziehungsweise
 Symbolisierung bleiben von der Geometrie getrennt und werden erst vom aktiven
-Renderer-Adapter in dessen konkrete Darstellung übersetzt. Ein georeferenziertes
-Bild mit Bounds ist kein gewöhnlicher Flächenstil, sondern ein eigener
-Raster-Overlay-Deskriptor mit verwalteter Asset-ID und geografischer Ausdehnung; sein
-Footprint kann bei Bedarf als Fläche abgeleitet werden.
+Renderer-Adapter in dessen konkrete Darstellung übersetzt.
 
-Neben Deskriptoren für persistierte Geometrie und Rasterdaten unterstützt das SDK
+Neben Deskriptoren für persistierte Geometrie unterstützt das SDK
 zustandsabgeleitete Dekorationsdeskriptoren. Deren sichtbarer Inhalt wird aus
 Viewport, Projektion und aktiver Tile-Matrix berechnet und nicht als Feature- oder
 Assetdaten persistiert. Initial steht `xyz-tile-grid` für ein weltbezogenes Raster
@@ -212,7 +209,10 @@ Die Registry wird beim Build aus explizit zugelassenen Paketen erzeugt. Ein Plug
 Die Referenz-Plugins definieren die Mindestqualität der Schnittstelle:
 
 - `track-layer`: Import von GPX und GeoJSON, normalisierte Geometrie, Linien-/Punktstil, interaktive Anzeige und Export
-- `photo-layer`: sichere Bilddekodierung, EXIF-Ausrichtung, optionale GPS-Extraktion, explizite Punktkoordinate oder geografische Bounds, Vorschaubild, Marker-/Popup-Anzeige und Export
+- `photo-layer`: sichere Bilddekodierung, EXIF-Ausrichtung, optionale GPS-Extraktion,
+  explizite Punktkoordinate, Vorschaubild, Marker-/Hover-Popup-Anzeige mit einer
+  zunächst im Code vorkonfigurierten, später per UI wählbaren Auswahl erweiterbarer
+  Bilddetails und Export
 - `tile-grid-layer`: assetfreie, zustandsabgeleitete Darstellung sichtbarer
   XYZ-Tile-Grenzen und `z/x/y`-Koordinaten sowie einer metrischen Maßstabsleiste
 
@@ -342,9 +342,10 @@ Originalfotos werden von maptoy weder dauerhaft hochgeladen noch in das
 Anwendungsdatenverzeichnis kopiert. Der Betreiber konfiguriert stattdessen ein
 Fotoverzeichnis, das im Container ausschließlich lesbar eingebunden wird. Persistiert
 werden ein normalisierter relativer Pfad, Dateiname, tatsächlicher
-Medientyp, Größe, Bildabmessungen, relevante EXIF-Metadaten, Änderungsfingerprint,
-optionaler Content-Hash, Scanstatus und die fachliche Punktposition beziehungsweise
-geografischen Bounds. Absolute Host- oder Containerpfade werden weder an Plugins
+Medientyp, Größe, Bildabmessungen, Aufnahmezeit, Hersteller, Kameramodell, ISO,
+Blende, Belichtungszeit, optionale IPTC-Bildunterschrift, Änderungsfingerprint,
+optionaler Content-Hash, Scanstatus und die fachliche Punktposition. Absolute Host-
+oder Containerpfade werden weder an Plugins
 noch an das Frontend ausgegeben. Plugin-Hooks greifen nur über kontrollierte
 Asset-Resolver auf Original oder Vorschau zu.
 
@@ -360,16 +361,18 @@ verständlich als `missing` beziehungsweise `changed` diagnostiziert.
 Ein Fotoverzeichnisscan arbeitet wahlweise rekursiv, inkrementell und als
 persistenter Job. Er verarbeitet nur unterstützte Dateien innerhalb einer
 konfigurierten Fotoverzeichnisses, vergleicht zunächst relativen Pfad, Größe und
-Änderungszeit und dekodiert neue oder geänderte Fotos. Neu gefundene Inhalte werden
-angelegt, geänderte Inhalte neu ausgewertet und nicht mehr auffindbare Dateien nur
-als `missing` markiert; ein Scan löscht weder Metadaten noch Vorschauen oder
-Nutzerkorrekturen automatisch. Ein Content-Hash darf verzögert für neue oder
-geänderte Dateien berechnet werden, damit große unveränderte Bestände nicht bei
-jedem Scan vollständig gelesen werden.
+Änderungszeit und dekodiert neue oder geänderte Fotos. Neu gefundene Fotos werden
+nur mit einer vollständigen, gültigen EXIF-GPS-Punktposition in den Katalog
+aufgenommen; übersprungene Fotos ohne Position werden separat in der
+Jobzusammenfassung gezählt. Geänderte Inhalte werden neu ausgewertet und nicht mehr
+auffindbare Dateien nur als `missing` markiert; ein Scan löscht weder Metadaten noch
+Vorschauen oder Nutzerkorrekturen automatisch. Ein Content-Hash darf verzögert für
+neue oder geänderte Dateien berechnet werden, damit große unveränderte Bestände
+nicht bei jedem Scan vollständig gelesen werden.
 
 Der Server führt vor dem Speichern und nach Plugin-Upgrades die zum Manifest passende Validierung aus. Plugin-Migrationen sind schrittweise, deterministisch und vorab sicherbar. Layerdaten werden nicht gelöscht, wenn das zugehörige Plugin temporär fehlt oder inkompatibel ist.
 
-Das Track-Plugin importiert GPX und GeoJSON, bewahrt sinnvolle Quellmetadaten auf und speichert eine normalisierte Geometrie für Darstellung und Export. Das Bild-Plugin unterstützt GPS-getaggte Bilder als Punktlayer mit Vorschaubild sowie Bilder mit expliziten geografischen Bounds als flächige Overlays. Eine vorhandene EXIF-GPS-Position wird beim ersten Scan ohne einzelnen Bestätigungsschritt als wirksame Punktposition übernommen und kann anschließend korrigiert oder entfernt werden. Gespeichert werden nur die wirksame Koordinate und ihre Herkunft `exif`, `manual` oder `none`; es gibt keine getrennten Felder für erkannte und akzeptierte Koordinaten. Ein erneuter Scan darf eine manuell korrigierte oder bewusst entfernte Position nicht überschreiben. Nur eine weiterhin aus EXIF stammende Position darf bei einer nachweislich geänderten Quelldatei aus deren aktuellen EXIF-Daten aktualisiert werden.
+Das Track-Plugin importiert GPX und GeoJSON, bewahrt sinnvolle Quellmetadaten auf und speichert eine normalisierte Geometrie für Darstellung und Export. Das Bild-Plugin unterstützt GPS-getaggte Bilder als Punktlayer mit Vorschaubild. Eine vorhandene EXIF-GPS-Position wird beim ersten Scan ohne einzelnen Bestätigungsschritt als wirksame Punktposition übernommen und kann anschließend korrigiert oder entfernt werden. Gespeichert werden nur die wirksame Koordinate und ihre Herkunft `exif`, `manual` oder `none`; es gibt keine getrennten Felder für erkannte und akzeptierte Koordinaten. Ein erneuter Scan darf eine manuell korrigierte oder bewusst entfernte Position nicht überschreiben. Nur eine weiterhin aus EXIF stammende Position darf bei einer nachweislich geänderten Quelldatei aus deren aktuellen EXIF-Daten aktualisiert werden.
 
 Die normalisierten Layerdaten verwenden die gemeinsamen Geometriegrundlagen des
 SDK. Ein Feature besitzt eine stabile ID, genau eine Geometrie und typisierte
@@ -384,9 +387,7 @@ Pluginabhängige Darstellungseigenschaften wie Farbe, Linienbreite, Punktmarkier
 Füllung oder Deckkraft verändern die normalisierte Geometrie nicht. Das Track-Plugin
 spezialisiert Linie mit Track- und Stützpunktmetadaten. Das Bild-Plugin spezialisiert
 Punkt mit extern referenzierten Originalen, verwalteten Vorschau-Assets und
-Bildmetadaten. Bilder mit
-geografischen Bounds verwenden den gesonderten Raster-Overlay-Vertrag und nicht die
-allgemeine Vektorfläche.
+Bildmetadaten.
 
 ### 5.5 Kartenexporte
 
@@ -772,8 +773,7 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Map-Adapter-Vertrag, Capability-Auswertung und adapterneutrale Viewport-Ereignisse
 - gemeinsame Geometrie- und Laufzeitschemata für Punkt, Linie und Fläche einschließlich
   Feature-/Stützpunkteigenschaften, Ringvalidierung und Trennung von Geometrie und Stil
-- adapterneutrale Darstellungsdeskriptoren und Symbolisierung für Punkt, Linie, Fläche
-  sowie den gesonderten Raster-Overlay-Typ
+- adapterneutrale Darstellungsdeskriptoren und Symbolisierung für Punkt, Linie und Fläche
 - den zustandsabgeleiteten Deskriptor für XYZ-Tile-Raster, Beschriftung und lokale
   Maßstabsleiste je Tile,
   Capability-Abgleich sowie kanonische Source-Tile-Auswahl bei Viertel-Zoom,
@@ -1023,8 +1023,6 @@ Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten
 - typisierte, adapterneutrale Darstellungsdeskriptoren und Symbolisierung für Punkte,
   Linien und Flächen im Map-Adapter-SDK ergänzen und im Leaflet-/XYZ- sowie
   Fake-Adapter implementieren
-- einen gesonderten Raster-Overlay-Deskriptor für Bilder mit geografischen Bounds
-  vorsehen, ohne ihn als gewöhnliche Vektorfläche zu modellieren
 - generische Layer-Persistenz, Assetkatalog, kontrollierten Speicher für verwaltete
   Nicht-Bild-Assets und Bildvorschauen sowie die CRUD-API bauen
 - ein optional einblendbares Layer-Panel mit durchsuchbarem Dropdown-Baum,
@@ -1055,8 +1053,7 @@ Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten
   GPX/GeoJSON, Track- und Stützpunktmetadaten einschließlich optionaler Zeitstempel,
   Stil, interaktive Karte und normalisierte Geometrie implementieren
 - Bild-Referenz-Plugin als Spezialisierung der gemeinsamen Punktbasis für EXIF/GPS,
-  manuelle Koordinaten, Bildmetadaten, Vorschaubilder und Kartenanzeige sowie mit dem
-  gesonderten Raster-Overlay-Typ für geografische Bounds implementieren
+  manuelle Koordinaten, Bildmetadaten, Vorschaubilder und Kartenanzeige implementieren
 - EXIF-GPS beim ersten Scan automatisch als wirksame Position mit Herkunft
   `exif` übernehmen; Korrektur und Entfernung ohne getrennte
   Erkannt-/Akzeptiert-Koordinaten ermöglichen und vor Überschreiben bei erneutem
@@ -1090,7 +1087,8 @@ Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten
   persistenter Job gescannt werden. Originalbilder verbleiben außerhalb des
   Anwendungsdatenverzeichnisses; SQLite enthält den Katalog und
   `MAPTOY_STORAGE_DATA_DIR` ausschließlich abgeleitete Vorschauen und temporäre
-  Verarbeitungsartefakte.
+  Verarbeitungsartefakte. Neu gefundene Fotos ohne gültige EXIF-GPS-Position werden
+  nicht katalogisiert und im Scan-Ergebnis als übersprungen ausgewiesen.
 - EXIF-GPS-Positionen sind ohne Einzelbestätigung unmittelbar nutzbar. Manuelle
   Korrekturen und bewusst entfernte Positionen überleben erneute Scans; fehlende oder
   geänderte Originale führen zu nachvollziehbaren Zuständen statt Datenverlust.
@@ -1100,8 +1098,7 @@ Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten
   ein eigenes Flächen-Referenz-Plugin ist für v1 nicht erforderlich.
 - Das Track-Plugin verwendet ausschließlich die allgemeine Linienbasis einschließlich
   optionaler Stützpunktmetadaten. Das Bild-Plugin verwendet für GPS- und manuell
-  positionierte Bilder ausschließlich die allgemeine Punktbasis; Bilder mit Bounds
-  verwenden den gesonderten Raster-Overlay-Vertrag.
+  positionierte Bilder ausschließlich die allgemeine Punktbasis.
 - Track- und Bild-Referenz-Plugin verwenden ausschließlich die veröffentlichten Plugin-Schnittstellen und bestehen dieselbe Contract-Test-Suite.
 - Ein deaktiviertes oder fehlendes Plugin verursacht keinen Datenverlust; ungültige beziehungsweise inkompatible Zustände werden verständlich angezeigt.
 - Es kann kein ausführbarer Plugin-Code über API oder Weboberfläche installiert werden.
@@ -1228,17 +1225,13 @@ von Phase 7
 - den Deskriptor `xyz-tile-grid` serverseitig rendern; das XYZ-Raster bezeichnet
   weiterhin die Source-Tiles und wird mit `z/x/y`-Beschriftung sowie der lokal je
   Tile berechneten Maßstabsleiste in die Zielprojektion abgebildet
-- externe Bildoriginale für hochauflösende Raster-Overlays nur über den
-  kontrollierten Asset-Resolver und bei passendem gespeicherten Fingerprint lesen;
-  für fehlende oder geänderte Quellen eine konfigurierbare, verständliche
-  Fehler-/Vorschau-Fallbackstrategie umsetzen
 - Layer-Reihenfolge, Deckkraft, Attribution und Fehlerstrategie konfigurierbar machen
 - Export-UI mit Vorschau, Fortschritt, Ergebnisdownload und Aufräumregeln bauen
 
 **Ergebnis/Akzeptanz**
 
 - Ein Kartenausschnitt wird in jeder unterstützten Ausgabeart und Projektion korrekt erzeugt.
-- Testtrack, GPS-Bild und Bounds-Bild liegen nach Projektion visuell und numerisch an den erwarteten Koordinaten.
+- Testtrack und GPS-Bild liegen nach Projektion visuell und numerisch an den erwarteten Koordinaten.
 - Tile-Grenzen und `z/x/y`-Beschriftungen entsprechen in allen unterstützten
   Zielprojektionen denselben Source-Tiles; die Maßstabsleisten der einzelnen Tiles
   zeigen für definierte Ausschnitte und Breitengrade numerisch korrekte, gut lesbar
@@ -1321,6 +1314,7 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.2.3` | Dekorativer Tile-Grid-Layer mit lokalen Maßstabsleisten, schnellem Display-Schalter und Mapping-Ressourcen |
 | `0.3.0` | Konsistentes Environment-Schema, vereinfachter Fotokatalog und überarbeitete Dialog- und Kartenwerkzeuge |
 | `0.3.1` | Abschluss von Phase 5 mit belastbarer Scan-Wiederaufnahme, Job-Aufbewahrung, skalierbarem Fotokatalog und gemessenen Fotolimits |
+| `0.3.2` | Cache- und Coverage-Verbesserungen sowie fokussierte Fotoverzeichnis-, Positions- und Metadatenabläufe |
 
 ### 13.2 Weitere Releases
 
@@ -1411,8 +1405,7 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
   und nachträgliche Korrektur beziehungsweise Entfernung bei erneutem Scan erhalten
   bleibt;
 - Track- und Bild-Referenz-Plugins die gemeinsame Linien- beziehungsweise Punktbasis
-  verwenden, Bilder mit geografischen Bounds den gesonderten Raster-Overlay-Vertrag
-  nutzen und alle Varianten interaktiv sowie im Export funktionieren;
+  verwenden und interaktiv sowie im Export funktionieren;
 - Kartenbilder mit den dokumentierten Projektionen und Plugin-Layern einschließlich
   projiziertem XYZ-Tile-Grid und koordinatenabhängiger Maßstabsleiste je Tile korrekt
   exportiert werden;
@@ -1452,9 +1445,9 @@ geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
   Differenzbilder bleiben eine optionale spätere Erweiterung.
 - Englisch ist vollständig. Für Deutsch und Thai gilt seitenweiser, sichtbarer
   Englisch-Fallback; ein zusätzlicher Mindestübersetzungsgrad ist kein v1-Gate.
-- Das Bild-Plugin unterstützt in v1 EXIF-GPS, explizite Punktkoordinaten und
-  geografische Bounds. Worldfiles und GeoTIFF-Metadaten sind nicht Bestandteil des
-  v1-Umfangs.
+- Das Bild-Plugin unterstützt in v1 EXIF-GPS und explizite Punktkoordinaten.
+  Worldfiles, GeoTIFF-Metadaten und flächige Bildgeoreferenzierung sind nicht
+  Bestandteil des v1-Umfangs.
 - Bildoriginale verbleiben in konfigurierten, nur lesbar eingebundenen externen
   Fotoverzeichnis. maptoy persistiert Katalogmetadaten und abgeleitete Vorschauen,
   übernimmt EXIF-GPS automatisch als korrigierbare wirksame Position und scannt

@@ -35,9 +35,10 @@ import { availableLocalStorage } from "../localStorage.js";
 import { layerTypePresentation } from "../layerEditorRegistry.js";
 import { LAYER_PLUGIN_REGISTRY_KEY } from "../registries.js";
 import { useLayersStore } from "../stores/layers.js";
-import CenteredDialog from "./CenteredDialog.vue";
+import DialogWindow from "./DialogWindow.vue";
 import LayerEditor from "./LayerEditor.vue";
 import MapSideControlButton from "./MapSideControlButton.vue";
+import PhotoDirectoryBrowser from "./PhotoDirectoryBrowser.vue";
 import TreeSelectDropdown from "./TreeSelectDropdown.vue";
 
 const props = withDefaults(
@@ -69,9 +70,9 @@ const assetSearch = ref("");
 const scanDirectories = reactive<Record<string, string>>({});
 const recursiveScans = reactive<Record<string, boolean>>({});
 const editingAsset = ref<LayerAsset | null>(null);
+const photoDirectoryBrowserLayerId = ref<string | null>(null);
 const editLongitude = ref("");
 const editLatitude = ref("");
-const editBounds = reactive({ west: "", south: "", east: "", north: "" });
 const selectedLayerId = ref<string | null>(loadSelectedLayerId(browserStorage));
 const collapsedHierarchyKeys = ref(loadCollapsedLayerHierarchy(browserStorage));
 let jobPoll: number | null = null;
@@ -101,7 +102,7 @@ function togglePanel(): void {
 defineExpose({ open: openPanel });
 
 const categoryDefinitions: Array<
-  LayerCategoryDefinition & { pluginIds: string[] }
+  LayerCategoryDefinition & { pluginIds: string[]; icon: string }
 > = [];
 for (const plugin of layerPlugins.list()) {
   let category = categoryDefinitions.find(
@@ -112,6 +113,7 @@ for (const plugin of layerPlugins.list()) {
       id: plugin.manifest.category.id,
       label: plugin.manifest.category.displayName,
       pluginIds: [],
+      icon: layerTypePresentation(plugin.manifest.id).icon,
     };
     categoryDefinitions.push(category);
   }
@@ -121,6 +123,9 @@ const categoryIdByPlugin = new Map(
   categoryDefinitions.flatMap((category) =>
     category.pluginIds.map((pluginId) => [pluginId, category.id] as const),
   ),
+);
+const categoryIconById = new Map(
+  categoryDefinitions.map(({ id, icon }) => [id, icon]),
 );
 
 interface LayerSelectorModel {
@@ -160,6 +165,13 @@ const selectorModel = computed<LayerSelectorModel>(() => {
         : {
             id: row.key,
             label: row.label,
+            ...(row.kind === "category"
+              ? {
+                  icon:
+                    categoryIconById.get(row.categoryId) ??
+                    "mdi-layers-outline",
+                }
+              : {}),
             checked: false,
             selectable: false,
             children: [],
@@ -553,27 +565,44 @@ function uploadTrack(layerId: string, file: File): void {
   void run(() => store.uploadTrack(layerId, file));
 }
 
-function startScan(layerId: string): void {
+function startPhotoScan(layerId: string): void {
   if (!store.photoDirectory.available) {
     localError.value = "The configured photo directory is unavailable.";
     return;
   }
+  const relativeDirectory = (scanDirectories[layerId] ?? "").trim();
+  if (relativeDirectory === "") {
+    localError.value = "Choose a photo subdirectory before starting a scan.";
+    return;
+  }
   void run(() =>
     store.startPhotoScan(layerId, {
-      relativeDirectory: scanDirectories[layerId] ?? "",
+      relativeDirectory,
       recursive: recursiveScans[layerId] ?? true,
     }),
   );
+}
+
+function openPhotoDirectoryBrowser(layer: Layer): void {
+  if (!store.photoDirectory.available) {
+    localError.value = "The configured photo directory is unavailable.";
+    return;
+  }
+  photoDirectoryBrowserLayerId.value = layer.id;
+}
+
+function scanPhotoDirectory(relativeDirectory: string): void {
+  const layerId = photoDirectoryBrowserLayerId.value;
+  if (layerId === null) return;
+  scanDirectories[layerId] = relativeDirectory;
+  photoDirectoryBrowserLayerId.value = null;
+  startPhotoScan(layerId);
 }
 
 function openAsset(asset: LayerAsset): void {
   editingAsset.value = asset;
   editLongitude.value = asset.longitude?.toString() ?? "";
   editLatitude.value = asset.latitude?.toString() ?? "";
-  editBounds.west = asset.bounds?.west.toString() ?? "";
-  editBounds.south = asset.bounds?.south.toString() ?? "";
-  editBounds.east = asset.bounds?.east.toString() ?? "";
-  editBounds.north = asset.bounds?.north.toString() ?? "";
 }
 
 function openFirstPhoto(layerId: string): void {
@@ -629,25 +658,10 @@ function saveAsset(): void {
   if (asset === null) {
     return;
   }
-  const values = [
-    editBounds.west,
-    editBounds.south,
-    editBounds.east,
-    editBounds.north,
-  ];
-  const bounds = values.some((value) => value.trim() !== "")
-    ? {
-        west: Number(editBounds.west),
-        south: Number(editBounds.south),
-        east: Number(editBounds.east),
-        north: Number(editBounds.north),
-      }
-    : null;
   void run(async () => {
     await store.updateAsset(asset.layerId, asset.id, {
       longitude: numberOrNull(editLongitude.value),
       latitude: numberOrNull(editLatitude.value),
-      bounds,
     });
     editingAsset.value = null;
   });
@@ -675,7 +689,15 @@ onMounted(async () => {
   await Promise.all([store.loadPhotoDirectory(), store.loadJobs()]);
   for (const layer of store.items) {
     if (layer.pluginId === "photo-layer") {
-      recursiveScans[layer.id] = true;
+      const previousJob = displayedScanJob(layer.id);
+      scanDirectories[layer.id] =
+        typeof previousJob?.input.relativeDirectory === "string"
+          ? previousJob.input.relativeDirectory
+          : "";
+      recursiveScans[layer.id] =
+        typeof previousJob?.input.recursive === "boolean"
+          ? previousJob.input.recursive
+          : true;
     }
   }
   previousRunningJobs = new Set(activeJobs.value.map(({ id }) => id));
@@ -698,7 +720,7 @@ onBeforeUnmount(() => {
     <i class="mdi mdi-layers-triple-outline" aria-hidden="true"></i>
   </MapSideControlButton>
 
-  <CenteredDialog
+  <DialogWindow
     ref="layerDialog"
     :open="panelOpen"
     title="Layers"
@@ -733,6 +755,7 @@ onBeforeUnmount(() => {
         :expanded-ids="expandedHierarchyIds"
         label="Layer"
         placeholder="Select a layer"
+        root-icon-only
         :disabled="!enabled || busy"
         @update:model-value="selectLayer"
         @update:expanded-ids="expandedHierarchyIds = $event"
@@ -765,16 +788,15 @@ onBeforeUnmount(() => {
         @move="withSelectedLayer((layer) => move(layer, $event))"
         @remove="withSelectedLayer(removeLayer)"
         @upload-track="withSelectedLayer((layer) => uploadTrack(layer.id, $event))"
-        @update:scan-directory="withSelectedLayer((layer) => { scanDirectories[layer.id] = $event; })"
         @update:recursive-scan="withSelectedLayer((layer) => { recursiveScans[layer.id] = $event; })"
-        @start-scan="withSelectedLayer((layer) => startScan(layer.id))"
+        @browse-scan-directory="withSelectedLayer(openPhotoDirectoryBrowser)"
         @scan-job-action="withSelectedLayer((layer) => { const job = scanJob(layer.id); if (job) controlJob(job.id, $event); })"
         @manage-photos="withSelectedLayer((layer) => openFirstPhoto(layer.id))"
       />
     </section>
-  </CenteredDialog>
+  </DialogWindow>
 
-  <CenteredDialog :open="addDialogOpen" title="Add layer" @close="addDialogOpen = false">
+  <DialogWindow :open="addDialogOpen" title="Add layer" @close="addDialogOpen = false">
     <form class="add-dialog" @submit.prevent="add">
       <fieldset class="layer-type-picker">
         <legend>Category</legend>
@@ -810,11 +832,21 @@ onBeforeUnmount(() => {
         <i class="mdi mdi-plus" aria-hidden="true"></i>Add layer
       </button>
     </form>
-  </CenteredDialog>
+  </DialogWindow>
 
-  <CenteredDialog
+  <PhotoDirectoryBrowser
+    :open="photoDirectoryBrowserLayerId !== null"
+    :initial-directory="photoDirectoryBrowserLayerId === null ? '' : (scanDirectories[photoDirectoryBrowserLayerId] ?? '')"
+    @close="photoDirectoryBrowserLayerId = null"
+    @select="scanPhotoDirectory"
+  />
+
+  <DialogWindow
     :open="editingAsset !== null"
     title="Photo position"
+    fit-content
+    allow-viewport-height
+    resizable
     @close="editingAsset = null"
   >
     <div v-if="editingAsset" class="asset-editor">
@@ -853,20 +885,13 @@ onBeforeUnmount(() => {
           <label><span>Longitude</span><input v-model="editLongitude" type="number" step="any" /></label>
           <label><span>Latitude</span><input v-model="editLatitude" type="number" step="any" /></label>
         </div>
-        <fieldset>
-          <legend>Geographic bounds (alternative to point)</legend>
-          <label><span>West</span><input v-model="editBounds.west" type="number" step="any" /></label>
-          <label><span>South</span><input v-model="editBounds.south" type="number" step="any" /></label>
-          <label><span>East</span><input v-model="editBounds.east" type="number" step="any" /></label>
-          <label><span>North</span><input v-model="editBounds.north" type="number" step="any" /></label>
-        </fieldset>
       </section>
     </div>
     <template #footer>
       <button type="button" @click="editingAsset = null">Cancel</button>
       <button type="button" :disabled="busy" @click="saveAsset">Save position</button>
     </template>
-  </CenteredDialog>
+  </DialogWindow>
 </template>
 
 <style scoped>

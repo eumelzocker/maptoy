@@ -16,10 +16,8 @@ Layer plugins build on reusable point, line, and area geometry. Geometry and fea
 properties are stored independently from colors, widths, marker styles, opacity, and
 other presentation options. A Layer may also be purely decorative and derive its
 visible content from the current map without storing Features or Assets. The Track plugin specializes lines and can retain
-timestamp and elevation data per vertex. The Photo plugin specializes points; a
-photo with geographic bounds uses the separate raster-overlay contract rather than a
-vector polygon. This foundation can also support POIs, routes, and regions in future
-plugins.
+timestamp and elevation data per vertex. The Photo plugin specializes points. This
+foundation can also support POIs, routes, and regions in future plugins.
 
 Use **Add layer** and its icon choices to create a Track, Photos, or Decorations
 layer. The name is optional; an empty field gets the next free numbered name, such
@@ -110,15 +108,22 @@ rejected.
 
 ## Scanning photos
 
-Create a Photos layer, enter an optional subdirectory, choose whether the scan is
-recursive, and select **Scan directory**. The persistent job can
-be paused, resumed, or cancelled. An interrupted running scan returns to the queue
-after restart.
+Create a Photos layer, choose whether the scan is recursive, and select
+**Scan directory…**. The directory browser exposes only folders below the configured
+photo directory and never discloses its absolute path. Navigate into a subdirectory
+and select **Scan this directory**. Selecting the configured root itself is disabled
+in the browser, which makes it practical to assign a separate source folder to each
+Photos layer. The persistent job can be paused, resumed, or cancelled. An interrupted
+running scan returns to the queue after restart. The most recently scanned folder and
+recursive setting are restored from that Layer's latest Job when the UI reloads.
 
-The first scan extracts selected metadata, creates an EXIF-oriented, metadata-free
-WebP preview, and records a size/mtime fingerprint. Unchanged files are skipped on
-later scans before decoding. Changed files are reprocessed. Files no longer present
-are marked `missing`; their metadata and existing preview remain available.
+The first scan admits only photos with a complete, valid EXIF GPS point into the
+catalog. It creates an EXIF-oriented, metadata-free WebP preview and records a
+size/mtime fingerprint for each admitted photo. Photos without a valid location are
+not stored, and the scan result reports their separate skipped count. Unchanged
+cataloged files are skipped on later scans before decoding. Changed files are
+reprocessed. Files no longer present are marked `missing`; their metadata and
+existing preview remain available.
 
 The browser does not preload every Asset page for every Layer. Selecting a Photo
 Layer loads its first catalog page, and **Load more photos** follows the server's
@@ -127,15 +132,22 @@ hidden catalogs do not delay initial Layer loading.
 
 EXIF GPS is immediately used as the effective point coordinate. There is no separate
 “detected” and “accepted” coordinate. Open **Manage photos** to correct or remove the
-point, or to enter west/south/east/north bounds for a raster overlay. A manual
-position—or a deliberate removal—is never overwritten by a later scan. Only a
-position whose source is still `exif` may be refreshed from a changed original.
+point. A manual position—or a deliberate removal—is never overwritten by a later
+scan. Only a position whose source is still `exif` may be refreshed from a changed
+original. Hovering a marker opens its preview popup instead of a filename tooltip;
+click remains available for touch and pointer interaction. The popup shows the
+filename, point coordinate in DMS notation, and available capture time below the
+image. This field selection is currently configured in code. Manufacturer, camera
+model, ISO, f-stop, shutter speed, and IPTC caption remain stored for a later
+user-configurable popup selection but are initially hidden.
 
 ## What is stored
 
 SQLite stores the layer instances, normalized Track data, Asset IDs, relative photo
-paths, selected metadata, fingerprints, effective coordinates,
-bounds, statuses, and persistent jobs. `MAPTOY_STORAGE_DATA_DIR` stores managed non-image
+paths, selected metadata, fingerprints, effective coordinates, statuses, and
+persistent jobs. Selected Photo metadata includes capture time, manufacturer, camera
+model, ISO, f-stop, shutter speed in seconds, and `IPTC.caption` when present.
+`MAPTOY_STORAGE_DATA_DIR` stores managed non-image
 uploads and derived photo previews. Photo originals remain exclusively in the
 configured external directory and are not returned by the preview endpoint.
 

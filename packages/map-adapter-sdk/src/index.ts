@@ -1,4 +1,4 @@
-export const MAP_ADAPTER_SDK_VERSION = "1.1.0";
+export const MAP_ADAPTER_SDK_VERSION = "2.0.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -45,7 +45,6 @@ export type MapLayerType =
   | "point-collection"
   | "line-collection"
   | "area-collection"
-  | "raster-overlay"
   | "xyz-tile-grid"
   | "composite";
 
@@ -91,6 +90,7 @@ export interface MapPointFeature {
   coordinate: GeographicCoordinate;
   title?: string;
   previewUrl?: string;
+  popupLines?: readonly string[];
   symbolizer: MapPointSymbolizer;
 }
 
@@ -138,18 +138,6 @@ export interface MapAreaLayerData {
   features: readonly MapAreaFeature[];
 }
 
-export interface MapRasterOverlayFeature {
-  id: string;
-  imageUrl: string;
-  bounds: MapGeographicBounds;
-  title?: string;
-}
-
-export interface MapRasterOverlayLayerData {
-  kind: "raster-overlay";
-  features: readonly MapRasterOverlayFeature[];
-}
-
 export interface MapXyzTileGridLayerData {
   kind: "xyz-tile-grid";
   lineColor: string;
@@ -166,7 +154,6 @@ export type MapPrimitiveLayerData =
   | MapPointLayerData
   | MapLineLayerData
   | MapAreaLayerData
-  | MapRasterOverlayLayerData
   | MapXyzTileGridLayerData;
 
 export interface MapCompositeLayerData {
@@ -207,12 +194,6 @@ export function isMapLineLayerData(value: unknown): value is MapLineLayerData {
 
 export function isMapAreaLayerData(value: unknown): value is MapAreaLayerData {
   return hasKind(value, "area-collection");
-}
-
-export function isMapRasterOverlayLayerData(
-  value: unknown,
-): value is MapRasterOverlayLayerData {
-  return hasKind(value, "raster-overlay");
 }
 
 export function isMapXyzTileGridLayerData(
@@ -335,7 +316,6 @@ export function createFakeMapRendererFactory(): MapRendererFactory {
         "point-collection",
         "line-collection",
         "area-collection",
-        "raster-overlay",
         "xyz-tile-grid",
         "composite",
       ],
@@ -494,7 +474,6 @@ export async function exerciseMapRendererContract(
     { kind: "point-collection", features: [] },
     { kind: "line-collection", features: [] },
     { kind: "area-collection", features: [] },
-    { kind: "raster-overlay", features: [] },
     {
       kind: "xyz-tile-grid",
       lineColor: "#000000",
@@ -509,7 +488,7 @@ export async function exerciseMapRendererContract(
       kind: "composite",
       layers: [
         { kind: "point-collection", features: [] },
-        { kind: "raster-overlay", features: [] },
+        { kind: "area-collection", features: [] },
       ],
     },
   ];

@@ -1,0 +1,24 @@
+meta {
+  name: Photo Directory - Browse Subdirectories
+  type: http
+  seq: 15
+}
+get {
+  url: {{appUrl}}/api/photos/directories?parent=
+  body: none
+  auth: none
+}
+
+docs {
+  Lists direct subdirectories below MAPTOY_PHOTOS_DIR without disclosing its absolute path.
+}
+
+tests {
+  test("returns safe relative Photo directories", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.relativeDirectory).to.equal("");
+    expect(res.body.parentDirectory).to.equal(null);
+    expect(res.body.items).to.be.an("array");
+    expect(JSON.stringify(res.body)).not.to.include("/photos");
+  });
+}

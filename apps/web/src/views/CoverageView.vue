@@ -48,6 +48,8 @@ import {
   hasCoveragePreviewZoomRange,
   visibleCoverageBounds,
 } from "../coverageModel.js";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import { formatDurationMinutes } from "../durationFormat.js";
 import { mapTileUrl } from "../mapTileUrl.js";
 import { availableLocalStorage } from "../localStorage.js";
 import { MAP_RENDERER_FACTORY_REGISTRY_KEY } from "../registries.js";
@@ -750,6 +752,10 @@ onBeforeUnmount(destroyRenderer);
             ></i>
           </span>
         </div>
+        <p v-if="selected" class="stale-limit">
+          Stale limit:
+          {{ formatDurationMinutes(Math.round(selected.cachePolicy.maximumAgeSeconds / 60)) }}
+        </p>
       </section>
 
       <section v-if="response" class="summary" aria-label="Coverage summary">
@@ -848,6 +854,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .legend .status-scale { display: grid; grid-column: 1 / -1; grid-template-columns: 4.5rem 1fr; gap: 0.55rem; align-items: center; }
 .legend .status-scale-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; width: min(100%, 10rem); height: 0.75rem; overflow: hidden; border: 1px solid #9db0a6; border-radius: 0.2rem; }
 .legend .status-scale-bar i { width: auto; height: 100%; border-radius: 0; cursor: help; }
+.legend .stale-limit { grid-column: 1 / -1; margin: 0.1rem 0 0; color: #617870; font-size: 0.72rem; }
 .summary, .cell-detail { margin-top: 1rem; padding: 0.85rem; border: 1px solid #c8d4cd; border-radius: 0.55rem; background: white; }
 .cell-detail { scroll-margin-block: 1rem; }
 .summary header span, .cell-detail header span { color: #617870; font-size: 0.78rem; }

@@ -1,6 +1,7 @@
 export interface CheckboxTreeNode {
   id: string;
   label: string;
+  icon?: string;
   checked: boolean;
   indeterminate?: boolean;
   disabled?: boolean;

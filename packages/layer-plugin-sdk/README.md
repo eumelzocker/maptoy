@@ -20,7 +20,7 @@ an exact `LAYER_PLUGIN_SDK_VERSION` match. Persisted schema migrations advance b
 version, are ordered, and must be deterministic.
 
 Interactive manifests declare the renderer descriptor types they require. In
-addition to stored geometry and raster overlays, a plugin may publish a state-derived
+addition to stored geometry, a plugin may publish a state-derived
 `xyz-tile-grid` descriptor. It persists only configuration for boundaries, labels,
 and the percentage width of the per-Tile metric scale; the active renderer derives
 the visible content from its viewport, projection, and Tile matrix.
@@ -29,9 +29,10 @@ SDK 1.1 adds the general Layer opacity to the server-render context. SDK 1.2 add
 renderer descriptor requirements and state-derived decorations. A schema step
 that must preserve appearance while changing configuration can use `migrateLayer`
 to migrate configuration, data, and opacity atomically; data-only migrations keep
-using `migrate`.
+using `migrate`. SDK 2.0 removes Photo bounds and raster-overlay drawing from the
+shared Asset and rendering contracts.
 
 The reference packages `plugins/track-layer`, `plugins/photo-layer`, and
-`plugins/tile-grid-layer` demonstrate line, point/raster-overlay, and asset-free
+`plugins/tile-grid-layer` demonstrate line, point, and asset-free
 state-derived specializations. Executable plugin upload or runtime installation is
 outside the v1 trust model.

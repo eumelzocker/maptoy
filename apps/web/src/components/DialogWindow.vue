@@ -15,6 +15,7 @@ const props = withDefaults(
     contentScrollable?: boolean;
     fitContent?: boolean;
     allowViewportHeight?: boolean;
+    resizable?: boolean;
   }>(),
   {
     isModal: true,
@@ -22,6 +23,7 @@ const props = withDefaults(
     contentScrollable: true,
     fitContent: false,
     allowViewportHeight: false,
+    resizable: false,
   },
 );
 
@@ -30,8 +32,8 @@ const emit = defineEmits<{
 }>();
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const titleId = `centered-dialog-title-${useId()}`;
-const dialogStackId = Symbol("centered-dialog");
+const titleId = `dialog-window-title-${useId()}`;
+const dialogStackId = Symbol("dialog-window");
 const panel = ref<HTMLElement | null>(null);
 const dragOffset = ref({ x: 0, y: 0 });
 const dragging = ref(false);
@@ -241,11 +243,12 @@ onBeforeUnmount(deactivate);
     >
       <section
         ref="panel"
-        class="centered-dialog"
+        class="dialog-window"
         :class="{
           dragging,
           'fit-content': fitContent,
           'allow-viewport-height': allowViewportHeight,
+          resizable,
         }"
         :style="{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }"
         role="dialog"
@@ -308,7 +311,7 @@ onBeforeUnmount(deactivate);
   place-items: center start;
 }
 
-.centered-dialog {
+.dialog-window {
   display: flex;
   width: min(32rem, 100%);
   max-height: min(44rem, calc(100dvh - 2rem));
@@ -321,20 +324,28 @@ onBeforeUnmount(deactivate);
   box-shadow: 0 1.5rem 4rem rgb(10 28 24 / 32%);
 }
 
-.centered-dialog.fit-content {
+.dialog-window.fit-content {
   width: fit-content;
   max-width: 100%;
 }
 
-.centered-dialog.allow-viewport-height {
+.dialog-window.allow-viewport-height {
   max-height: calc(100dvh - 2rem);
 }
 
-.non-modal .centered-dialog {
+.dialog-window.resizable {
+  min-width: min(20rem, 100%);
+  min-height: min(14rem, calc(100dvh - 2rem));
+  max-width: 100%;
+  max-height: calc(100dvh - 2rem);
+  resize: both;
+}
+
+.non-modal .dialog-window {
   pointer-events: auto;
 }
 
-.centered-dialog:focus {
+.dialog-window:focus {
   outline: none;
 }
 
@@ -356,7 +367,7 @@ onBeforeUnmount(deactivate);
   user-select: none;
 }
 
-.centered-dialog.dragging .dialog-header {
+.dialog-window.dragging .dialog-header {
   cursor: grabbing;
 }
 
@@ -391,6 +402,7 @@ onBeforeUnmount(deactivate);
 }
 
 .dialog-content {
+  flex: 1 1 auto;
   min-height: 0;
   padding: 1.1rem;
   overflow-y: auto;

@@ -51,12 +51,48 @@ interface ExifToolResult {
   GPSLatitude?: number;
   GPSLongitude?: number;
   DateTimeOriginal?: string;
+  Make?: string;
+  Model?: string;
+  ISO?: number;
+  FNumber?: number;
+  ExposureTime?: number;
+  "Caption-Abstract"?: string;
+}
+
+function optionalMetadataText(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized === "" ? undefined : normalized;
+}
+
+function optionalPositiveNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
+function validPhotoCoordinate(
+  longitude: unknown,
+  latitude: unknown,
+): longitude is number {
+  return (
+    typeof longitude === "number" &&
+    Number.isFinite(longitude) &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    typeof latitude === "number" &&
+    Number.isFinite(latitude) &&
+    latitude >= -90 &&
+    latitude <= 90
+  );
 }
 
 async function readExif(filePath: string): Promise<{
   longitude: number | null;
   latitude: number | null;
-  capturedAt: string | null;
+  metadata: Readonly<Record<string, unknown>>;
 }> {
   const { stdout } = await executeFile(
     "exiftool",
@@ -66,22 +102,39 @@ async function readExif(filePath: string): Promise<{
       "-GPSLatitude",
       "-GPSLongitude",
       "-DateTimeOriginal",
+      "-Make",
+      "-Model",
+      "-ISO",
+      "-FNumber",
+      "-ExposureTime",
+      "-IPTC:Caption-Abstract",
       filePath,
     ],
     { maxBuffer: 1024 * 1024 },
   );
   const first = (JSON.parse(stdout) as ExifToolResult[])[0];
-  const longitude =
-    typeof first?.GPSLongitude === "number" ? first.GPSLongitude : null;
-  const latitude =
-    typeof first?.GPSLatitude === "number" ? first.GPSLatitude : null;
+  const longitude = first?.GPSLongitude;
+  const latitude = first?.GPSLatitude;
+  const hasCoordinate = validPhotoCoordinate(longitude, latitude);
+  const capturedAt = optionalMetadataText(first?.DateTimeOriginal);
+  const manufacturer = optionalMetadataText(first?.Make);
+  const cameraModel = optionalMetadataText(first?.Model);
+  const iso = optionalPositiveNumber(first?.ISO);
+  const fStop = optionalPositiveNumber(first?.FNumber);
+  const shutterSpeed = optionalPositiveNumber(first?.ExposureTime);
+  const caption = optionalMetadataText(first?.["Caption-Abstract"]);
   return {
-    longitude,
-    latitude,
-    capturedAt:
-      typeof first?.DateTimeOriginal === "string"
-        ? first.DateTimeOriginal
-        : null,
+    longitude: hasCoordinate ? longitude : null,
+    latitude: hasCoordinate ? (latitude as number) : null,
+    metadata: {
+      capturedAt: capturedAt ?? null,
+      ...(manufacturer === undefined ? {} : { manufacturer }),
+      ...(cameraModel === undefined ? {} : { cameraModel }),
+      ...(iso === undefined ? {} : { iso }),
+      ...(fStop === undefined ? {} : { fStop }),
+      ...(shutterSpeed === undefined ? {} : { shutterSpeed }),
+      ...(caption === undefined ? {} : { iptc: { caption } }),
+    },
   };
 }
 
@@ -114,7 +167,18 @@ function publicAsset(asset: StoredLayerAsset): LayerAsset {
     metadata: _metadata,
     ...result
   } = asset;
-  return result;
+  const photoMetadata = Object.fromEntries(
+    Object.entries(asset.metadata).filter(
+      ([key, value]) =>
+        key !== "orientation" && key !== "pages" && value !== null,
+    ),
+  );
+  return {
+    ...result,
+    ...(asset.kind === "external-photo" && Object.keys(photoMetadata).length > 0
+      ? { photoMetadata }
+      : {}),
+  } as LayerAsset;
 }
 
 export class PhotoScanService {
@@ -220,15 +284,9 @@ export class PhotoScanService {
   ): LayerAsset {
     const asset = this.getAsset(layerId, assetId);
     const hasCoordinate = patch.longitude !== null && patch.latitude !== null;
-    if (
-      (patch.longitude === null) !== (patch.latitude === null) ||
-      (patch.bounds !== null &&
-        (patch.bounds.west >= patch.bounds.east ||
-          patch.bounds.south >= patch.bounds.north)) ||
-      (hasCoordinate && patch.bounds !== null)
-    ) {
+    if ((patch.longitude === null) !== (patch.latitude === null)) {
       throw new JobStateError(
-        "Use either a complete point coordinate or valid photo bounds.",
+        "Use a complete point coordinate or leave it empty.",
       );
     }
     const updated: StoredLayerAsset = {
@@ -236,7 +294,6 @@ export class PhotoScanService {
       longitude: patch.longitude,
       latitude: patch.latitude,
       coordinateSource: hasCoordinate ? "manual" : "none",
-      bounds: patch.bounds,
       updatedAt: new Date().toISOString(),
     };
     this.layerRepository.upsertAsset(updated);
@@ -284,6 +341,7 @@ export class PhotoScanService {
         created: 0,
         changed: 0,
         unchanged: 0,
+        withoutLocation: 0,
         missing: 0,
         failed: 0,
       },
@@ -448,9 +506,18 @@ export class PhotoScanService {
               created: counts.created + (result === "created" ? 1 : 0),
               changed: counts.changed + (result === "changed" ? 1 : 0),
               unchanged: counts.unchanged + (result === "unchanged" ? 1 : 0),
+              withoutLocation:
+                counts.withoutLocation +
+                (result === "without-location" ? 1 : 0),
               failed: counts.failed + (result === "failed" ? 1 : 0),
             }),
-            { created: 0, changed: 0, unchanged: 0, failed: 0 },
+            {
+              created: 0,
+              changed: 0,
+              unchanged: 0,
+              withoutLocation: 0,
+              failed: 0,
+            },
           );
           const latest = this.getJob(job.id);
           const nextProcessedFiles =
@@ -460,6 +527,7 @@ export class PhotoScanService {
             progress.created +
             progress.changed +
             progress.unchanged +
+            progress.withoutLocation +
             progress.failed;
           if (nextProcessedFiles > latest.total) {
             throw new Error(
@@ -469,13 +537,17 @@ export class PhotoScanService {
           job = {
             ...latest,
             completed: latest.completed + progress.created + progress.changed,
-            skipped: latest.skipped + progress.unchanged,
+            skipped:
+              latest.skipped + progress.unchanged + progress.withoutLocation,
             failed: latest.failed + progress.failed,
             summary: {
               ...latest.summary,
               created: (latest.summary.created ?? 0) + progress.created,
               changed: (latest.summary.changed ?? 0) + progress.changed,
               unchanged: (latest.summary.unchanged ?? 0) + progress.unchanged,
+              withoutLocation:
+                (latest.summary.withoutLocation ?? 0) +
+                progress.withoutLocation,
               failed: (latest.summary.failed ?? 0) + progress.failed,
             },
             updatedAt: new Date().toISOString(),
@@ -569,9 +641,15 @@ export class PhotoScanService {
     layerId: string,
     file: ResolvedPhotoFile,
     previous: StoredLayerAsset | undefined,
-  ): Promise<"created" | "changed" | "unchanged" | "failed"> {
+  ): Promise<
+    "created" | "changed" | "unchanged" | "without-location" | "failed"
+  > {
     const timestamp = new Date().toISOString();
     const assetId = previous?.id ?? randomUUID();
+    let persistFailure = previous !== undefined;
+    let effectiveLongitude = previous?.longitude ?? null;
+    let effectiveLatitude = previous?.latitude ?? null;
+    let effectiveCoordinateSource = previous?.coordinateSource ?? "none";
     try {
       const fingerprint = await this.previews.fingerprint(file.absolutePath);
       if (previous?.sourceFingerprint === fingerprint.sourceFingerprint) {
@@ -591,12 +669,27 @@ export class PhotoScanService {
           return "changed";
         }
       }
-      const processed = await this.previews.process(assetId, file.absolutePath);
       const exif = await readExif(file.absolutePath);
       const preserveCoordinate =
         previous !== undefined && previous.coordinateSource !== "exif";
       const hasExifCoordinate =
         exif.longitude !== null && exif.latitude !== null;
+      persistFailure ||= hasExifCoordinate;
+      if (previous === undefined && !hasExifCoordinate) {
+        return "without-location";
+      }
+      effectiveLongitude = preserveCoordinate
+        ? (previous?.longitude ?? null)
+        : exif.longitude;
+      effectiveLatitude = preserveCoordinate
+        ? (previous?.latitude ?? null)
+        : exif.latitude;
+      effectiveCoordinateSource = preserveCoordinate
+        ? (previous?.coordinateSource ?? "none")
+        : hasExifCoordinate
+          ? "exif"
+          : "none";
+      const processed = await this.previews.process(assetId, file.absolutePath);
       const asset: StoredLayerAsset = {
         id: assetId,
         layerId,
@@ -611,17 +704,9 @@ export class PhotoScanService {
         sourceModifiedAt: processed.sourceModifiedAt,
         width: processed.width,
         height: processed.height,
-        longitude: preserveCoordinate
-          ? (previous.longitude ?? null)
-          : exif.longitude,
-        latitude: preserveCoordinate
-          ? (previous.latitude ?? null)
-          : exif.latitude,
-        coordinateSource: preserveCoordinate
-          ? previous.coordinateSource
-          : hasExifCoordinate
-            ? "exif"
-            : "none",
+        longitude: effectiveLongitude,
+        latitude: effectiveLatitude,
+        coordinateSource: effectiveCoordinateSource,
         previewAvailable: true,
         errorCode: null,
         errorMessage: null,
@@ -630,10 +715,9 @@ export class PhotoScanService {
         managedPath: null,
         previewPath: processed.previewPath,
         sourceFingerprint: processed.sourceFingerprint,
-        bounds: previous?.bounds ?? null,
         metadata: {
           ...processed.metadata,
-          capturedAt: exif.capturedAt,
+          ...exif.metadata,
         },
       };
       this.layerRepository.upsertAsset(asset);
@@ -649,34 +733,35 @@ export class PhotoScanService {
       const message = (
         error instanceof Error ? error.message : "Photo processing failed."
       ).replaceAll(file.absolutePath, file.relativePath);
-      this.layerRepository.upsertAsset({
-        id: assetId,
-        layerId,
-        kind: "external-photo",
-        status: "failed",
-        fileName: path.basename(file.relativePath),
-        contentType: previous?.contentType ?? null,
-        byteLength: previous?.byteLength ?? null,
-        contentHash: previous?.contentHash ?? null,
-        sourceRootId: "photos",
-        relativePath: file.relativePath,
-        sourceModifiedAt: previous?.sourceModifiedAt ?? null,
-        width: previous?.width ?? null,
-        height: previous?.height ?? null,
-        longitude: previous?.longitude ?? null,
-        latitude: previous?.latitude ?? null,
-        coordinateSource: previous?.coordinateSource ?? "none",
-        previewAvailable: previous?.previewAvailable ?? false,
-        errorCode: "PHOTO_PROCESSING_FAILED",
-        errorMessage: message,
-        createdAt: previous?.createdAt ?? timestamp,
-        updatedAt: timestamp,
-        managedPath: null,
-        previewPath: previous?.previewPath ?? null,
-        sourceFingerprint: previous?.sourceFingerprint ?? null,
-        bounds: previous?.bounds ?? null,
-        metadata: previous?.metadata ?? {},
-      });
+      if (persistFailure) {
+        this.layerRepository.upsertAsset({
+          id: assetId,
+          layerId,
+          kind: "external-photo",
+          status: "failed",
+          fileName: path.basename(file.relativePath),
+          contentType: previous?.contentType ?? null,
+          byteLength: previous?.byteLength ?? null,
+          contentHash: previous?.contentHash ?? null,
+          sourceRootId: "photos",
+          relativePath: file.relativePath,
+          sourceModifiedAt: previous?.sourceModifiedAt ?? null,
+          width: previous?.width ?? null,
+          height: previous?.height ?? null,
+          longitude: effectiveLongitude,
+          latitude: effectiveLatitude,
+          coordinateSource: effectiveCoordinateSource,
+          previewAvailable: previous?.previewAvailable ?? false,
+          errorCode: "PHOTO_PROCESSING_FAILED",
+          errorMessage: message,
+          createdAt: previous?.createdAt ?? timestamp,
+          updatedAt: timestamp,
+          managedPath: null,
+          previewPath: previous?.previewPath ?? null,
+          sourceFingerprint: previous?.sourceFingerprint ?? null,
+          metadata: previous?.metadata ?? {},
+        });
+      }
       this.jobs.addError(
         jobId,
         {

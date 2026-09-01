@@ -171,7 +171,6 @@ describe("layer plugin contract", () => {
           surface: {
             drawPolyline,
             drawPoint,
-            drawManagedImage: vi.fn(),
           },
         },
       }),

@@ -5,7 +5,6 @@ import {
   isMapCompositeLayerData,
   isMapLineLayerData,
   isMapPointLayerData,
-  isMapRasterOverlayLayerData,
   isMapRectangleLayerData,
   isMapXyzTileGridLayerData,
   type MapLayerDescriptor,
@@ -46,7 +45,6 @@ export const leafletXyzManifest = {
     "point-collection",
     "line-collection",
     "area-collection",
-    "raster-overlay",
     "xyz-tile-grid",
     "composite",
   ],
@@ -316,17 +314,36 @@ async function createLeafletInstance(
           bubblingMouseEvents: false,
         },
       );
-      if (feature.title !== undefined) {
-        point.bindTooltip(feature.title, { sticky: true });
-      }
       if (feature.previewUrl !== undefined) {
+        const popupContent = document.createElement("div");
+        popupContent.className = "maptoy-point-popup";
         const preview = document.createElement("img");
-        preview.src = feature.previewUrl;
+        preview.className = "maptoy-point-popup__preview";
         preview.alt = feature.title ?? "";
         preview.loading = "lazy";
-        preview.style.maxWidth = "18rem";
-        preview.style.maxHeight = "14rem";
-        point.bindPopup(preview);
+        preview.addEventListener("load", () => {
+          point.getPopup()?.update();
+        });
+        preview.src = feature.previewUrl;
+        popupContent.append(preview);
+        if (feature.popupLines !== undefined) {
+          const details = document.createElement("small");
+          details.className = "maptoy-point-popup__details";
+          for (const line of feature.popupLines) {
+            const detail = document.createElement("span");
+            detail.textContent = line;
+            details.append(detail);
+          }
+          popupContent.append(details);
+        }
+        point.bindPopup(popupContent, {
+          autoPan: false,
+          closeButton: false,
+        });
+        point.on("mouseover", () => point.openPopup());
+        point.on("mouseout", () => point.closePopup());
+      } else if (feature.title !== undefined) {
+        point.bindTooltip(feature.title, { sticky: true });
       }
       bindFeatureSelection(point, descriptor, feature.id);
       point.addTo(group);
@@ -399,37 +416,6 @@ async function createLeafletInstance(
       }
       bindFeatureSelection(area, descriptor, feature.id);
       area.addTo(group);
-    }
-    return group;
-  };
-
-  const createRasterOverlayLayer = (
-    descriptor: MapLayerDescriptor,
-  ): Leaflet.LayerGroup | null => {
-    if (
-      descriptor.type !== "raster-overlay" ||
-      !isMapRasterOverlayLayerData(descriptor.data)
-    ) {
-      return null;
-    }
-    const group = L.layerGroup();
-    for (const feature of descriptor.data.features) {
-      const overlay = L.imageOverlay(
-        feature.imageUrl,
-        [
-          [feature.bounds.south, feature.bounds.west],
-          [feature.bounds.north, feature.bounds.east],
-        ],
-        {
-          opacity: descriptor.opacity,
-          interactive: true,
-        },
-      );
-      if (feature.title !== undefined) {
-        overlay.bindTooltip(feature.title, { sticky: true });
-      }
-      bindFeatureSelection(overlay, descriptor, feature.id);
-      overlay.addTo(group);
     }
     return group;
   };
@@ -617,7 +603,6 @@ async function createLeafletInstance(
       createPointLayer(descriptor) ??
       createLineLayer(descriptor) ??
       createAreaLayer(descriptor) ??
-      createRasterOverlayLayer(descriptor) ??
       createXyzTileGridLayer(descriptor)
     );
   };

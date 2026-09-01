@@ -18,6 +18,7 @@ const props = withDefaults(
     label?: string;
     placeholder?: string;
     disabled?: boolean;
+    rootIconOnly?: boolean;
   }>(),
   {
     modelValue: null,
@@ -25,6 +26,7 @@ const props = withDefaults(
     label: "Select item",
     placeholder: "Select…",
     disabled: false,
+    rootIconOnly: false,
   },
 );
 
@@ -40,6 +42,7 @@ const query = ref("");
 const root = ref<HTMLElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
 const contentId = `tree-select-${useId()}`;
+const triggerId = `tree-select-trigger-${useId()}`;
 const filteredNodes = computed(() =>
   filterCheckboxTree(props.nodes, query.value),
 );
@@ -54,6 +57,17 @@ const selectedLabel = computed(() =>
     ? selectedPath.value.map(({ label }) => label).join(" / ")
     : props.placeholder,
 );
+const selectedCategoryIcon = computed(() =>
+  props.rootIconOnly ? (selectedPath.value[0]?.icon ?? null) : null,
+);
+const selectedTriggerLabel = computed(() => {
+  if (selectedPath.value.length === 0) return props.placeholder;
+  const visiblePath =
+    selectedCategoryIcon.value === null
+      ? selectedPath.value
+      : selectedPath.value.slice(1);
+  return visiblePath.map(({ label }) => label).join(" / ");
+});
 
 function close(): void {
   setOpen(false);
@@ -117,16 +131,25 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="root" class="tree-select-dropdown" @keydown.esc.stop="close">
+    <label class="trigger-label" :for="triggerId">{{ label }}</label>
     <button
+      :id="triggerId"
       type="button"
       class="tree-select-trigger"
+      :class="{ 'has-category-icon': selectedCategoryIcon !== null }"
       :disabled="disabled"
       :aria-expanded="open"
       :aria-controls="contentId"
+      :aria-label="`${label}: ${selectedLabel}`"
       @click="toggle"
     >
-      <span class="trigger-label">{{ label }}</span>
-      <span class="trigger-value" :title="selectedLabel">{{ selectedLabel }}</span>
+      <i
+        v-if="selectedCategoryIcon"
+        class="mdi trigger-category-icon"
+        :class="selectedCategoryIcon"
+        aria-hidden="true"
+      ></i>
+      <span class="trigger-value" :title="selectedLabel">{{ selectedTriggerLabel }}</span>
       <i class="mdi mdi-chevron-down" aria-hidden="true"></i>
     </button>
     <div v-if="open" :id="contentId" class="tree-select-popover">
@@ -165,13 +188,15 @@ onBeforeUnmount(() => {
 .tree-select-dropdown {
   position: relative;
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   min-height: 0;
-  gap: 0.3rem;
+  gap: 0.3rem 0.5rem;
 }
 
 .tree-select-trigger {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.5rem;
   align-items: center;
   width: 100%;
@@ -186,11 +211,20 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.tree-select-trigger.has-category-icon {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
 .trigger-label {
   color: #617870;
   font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.trigger-category-icon {
+  color: #286b5d;
+  font-size: 1.15rem;
 }
 
 .trigger-value {
@@ -204,6 +238,7 @@ onBeforeUnmount(() => {
   position: static;
   z-index: 30;
   display: grid;
+  grid-column: 1 / -1;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0.45rem;
   min-width: 0;

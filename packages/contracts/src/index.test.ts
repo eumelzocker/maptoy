@@ -4,6 +4,7 @@ import {
   CoverageQuerySchema,
   CoverageResponseSchema,
   createDefaultMapSetInput,
+  LayerAssetPatchSchema,
   LayerInputSchema,
   MapSetInputSchema,
   TileRevisionSummarySchema,
@@ -126,6 +127,22 @@ describe("Map Set contracts", () => {
     expect(Value.Check(LayerInputSchema, layer)).toBe(true);
     expect(
       Value.Check(LayerInputSchema, { ...layer, mapSetId: "map-set" }),
+    ).toBe(false);
+  });
+
+  it("exposes only point fields for Photo Asset updates", () => {
+    expect(
+      Value.Check(LayerAssetPatchSchema, {
+        longitude: 13.405,
+        latitude: 52.52,
+      }),
+    ).toBe(true);
+    expect(
+      Value.Check(LayerAssetPatchSchema, {
+        longitude: 13.405,
+        latitude: 52.52,
+        bounds: { west: 13, south: 52, east: 14, north: 53 },
+      }),
     ).toBe(false);
   });
 });

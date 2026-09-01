@@ -21,9 +21,8 @@ defineProps<{
 
 const emit = defineEmits<{
   configurationChange: [key: string, value: string | number | boolean];
-  "update:scanDirectory": [value: string];
   "update:recursiveScan": [value: boolean];
-  startScan: [];
+  browseScanDirectory: [];
   scanJobAction: [action: "pause" | "resume" | "cancel"];
   managePhotos: [];
 }>();
@@ -42,9 +41,8 @@ const emit = defineEmits<{
     :photos-loaded="photosLoaded"
     :has-more-photos="hasMorePhotos"
     @configuration-change="(key, value) => emit('configurationChange', key, value)"
-    @update:scan-directory="emit('update:scanDirectory', $event)"
     @update:recursive="emit('update:recursiveScan', $event)"
-    @start-scan="emit('startScan')"
+    @browse-directory="emit('browseScanDirectory')"
     @job-action="emit('scanJobAction', $event)"
     @manage-photos="emit('managePhotos')"
   />

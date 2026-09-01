@@ -8,7 +8,7 @@ import {
   tileCoordinateForLocation,
 } from "../mapTileCalculator.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
-import CenteredDialog from "./CenteredDialog.vue";
+import DialogWindow from "./DialogWindow.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import CoordinateDmsReadout from "./CoordinateDmsReadout.vue";
 
@@ -107,7 +107,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <CenteredDialog
+  <DialogWindow
     :open="open"
     title="Tile Calculator"
     :is-modal="false"
@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
         Close
       </button>
     </template>
-  </CenteredDialog>
+  </DialogWindow>
 </template>
 
 <style scoped>

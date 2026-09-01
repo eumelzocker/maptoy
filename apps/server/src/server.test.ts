@@ -358,23 +358,23 @@ describe("maptoy server", () => {
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toEqual({ status: "ready" });
     expect(mapRenderers.json()).toMatchObject({
-      items: [{ id: "leaflet-xyz", sdkVersion: "1.1.0" }],
+      items: [{ id: "leaflet-xyz", sdkVersion: "2.0.0" }],
     });
     expect(layerPlugins.json()).toMatchObject({
       items: [
         {
           id: "track-layer",
-          sdkVersion: "1.2.0",
+          sdkVersion: "2.0.0",
           category: { id: "tracks", displayName: "Tracks" },
         },
         {
           id: "photo-layer",
-          sdkVersion: "1.2.0",
+          sdkVersion: "2.0.0",
           category: { id: "photos", displayName: "Photos" },
         },
         {
           id: "tile-grid-layer",
-          sdkVersion: "1.2.0",
+          sdkVersion: "2.0.0",
           category: { id: "decorations", displayName: "Decorations" },
         },
       ],
@@ -386,6 +386,10 @@ describe("maptoy server", () => {
     const config = await testConfig();
     const photoRoot = `${config.storage.dataDirectory}-external-photos`;
     await mkdir(photoRoot, { recursive: true });
+    await Promise.all([
+      mkdir(path.join(photoRoot, "Archive")),
+      mkdir(path.join(photoRoot, "Trips", "Day 1"), { recursive: true }),
+    ]);
     temporaryDirectories.push(photoRoot);
     await sharp({
       create: {
@@ -397,12 +401,28 @@ describe("maptoy server", () => {
     })
       .jpeg()
       .toFile(path.join(photoRoot, "photo.jpg"));
+    await sharp({
+      create: {
+        width: 24,
+        height: 16,
+        channels: 3,
+        background: "#999999",
+      },
+    })
+      .jpeg()
+      .toFile(path.join(photoRoot, "without-location.jpg"));
     await executeFile("exiftool", [
       "-overwrite_original",
       "-GPSLatitude=52.52",
       "-GPSLatitudeRef=N",
       "-GPSLongitude=13.405",
       "-GPSLongitudeRef=E",
+      "-Make=Fujifilm",
+      "-Model=X-T5",
+      "-ISO=125",
+      "-FNumber=5.6",
+      "-ExposureTime=1/250",
+      "-IPTC:Caption-Abstract=Historic sailing ship",
       path.join(photoRoot, "photo.jpg"),
     ]);
     const server = await buildServer({
@@ -443,6 +463,33 @@ describe("maptoy server", () => {
         })
       ).json(),
     ).toEqual({ configured: true, available: true });
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: "/api/photos/directories",
+        })
+      ).json(),
+    ).toEqual({
+      relativeDirectory: "",
+      parentDirectory: null,
+      items: [
+        { name: "Archive", relativePath: "Archive" },
+        { name: "Trips", relativePath: "Trips" },
+      ],
+    });
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: "/api/photos/directories?parent=Trips",
+        })
+      ).json(),
+    ).toEqual({
+      relativeDirectory: "Trips",
+      parentDirectory: "",
+      items: [{ name: "Day 1", relativePath: path.join("Trips", "Day 1") }],
+    });
 
     const scanResponse = await server.inject({
       method: "POST",
@@ -462,7 +509,10 @@ describe("maptoy server", () => {
         });
         expect(response.json()).toMatchObject({
           status: "completed",
-          summary: { created: 1 },
+          total: 2,
+          completed: 1,
+          skipped: 1,
+          summary: { created: 1, withoutLocation: 1 },
         });
       },
       { timeout: 5000 },
@@ -472,6 +522,10 @@ describe("maptoy server", () => {
       url: `/api/layers/${photoLayerId}/assets`,
     });
     expect(assetsResponse.statusCode, assetsResponse.body).toBe(200);
+    expect(assetsResponse.json().items).toHaveLength(1);
+    expect(
+      await readdir(path.join(config.storage.dataDirectory, "layer-previews")),
+    ).toHaveLength(1);
     expect(assetsResponse.json()).toMatchObject({
       items: [
         {
@@ -482,10 +536,31 @@ describe("maptoy server", () => {
           longitude: 13.405,
           latitude: 52.52,
           previewAvailable: true,
+          photoMetadata: {
+            manufacturer: "Fujifilm",
+            cameraModel: "X-T5",
+            iso: 125,
+            fStop: 5.6,
+            shutterSpeed: 0.004,
+            iptc: { caption: "Historic sailing ship" },
+          },
         },
       ],
     });
     const photoAssetId = assetsResponse.json().items[0].id as string;
+    const metadataDatabase = new DatabaseSync(config.storage.databasePath);
+    const metadataRow = metadataDatabase
+      .prepare("SELECT metadata_json FROM layer_assets WHERE id = ?")
+      .get(photoAssetId) as { metadata_json: string };
+    metadataDatabase.close();
+    expect(JSON.parse(metadataRow.metadata_json)).toMatchObject({
+      manufacturer: "Fujifilm",
+      cameraModel: "X-T5",
+      iso: 125,
+      fStop: 5.6,
+      shutterSpeed: 0.004,
+      iptc: { caption: "Historic sailing ship" },
+    });
     const preview = await server.inject({
       method: "GET",
       url: `/api/layers/${photoLayerId}/assets/${photoAssetId}`,
@@ -501,7 +576,6 @@ describe("maptoy server", () => {
       payload: {
         longitude: 13.405,
         latitude: 52.52,
-        bounds: null,
       },
     });
     expect(manualPosition.json()).toMatchObject({
@@ -525,8 +599,8 @@ describe("maptoy server", () => {
       });
       expect(response.json()).toMatchObject({
         status: "completed",
-        skipped: 1,
-        summary: { unchanged: 1 },
+        skipped: 2,
+        summary: { unchanged: 1, withoutLocation: 1 },
       });
     });
     expect(
@@ -541,7 +615,7 @@ describe("maptoy server", () => {
     const removedPosition = await server.inject({
       method: "PATCH",
       url: `/api/layers/${photoLayerId}/assets/${photoAssetId}`,
-      payload: { longitude: null, latitude: null, bounds: null },
+      payload: { longitude: null, latitude: null },
     });
     expect(removedPosition.json()).toMatchObject({
       coordinateSource: "none",
@@ -575,7 +649,8 @@ describe("maptoy server", () => {
       expect(response.json()).toMatchObject({
         status: "completed",
         completed: 1,
-        summary: { changed: 1 },
+        skipped: 1,
+        summary: { changed: 1, withoutLocation: 1 },
       });
     });
     expect(
@@ -609,7 +684,8 @@ describe("maptoy server", () => {
       });
       expect(response.json()).toMatchObject({
         status: "completed",
-        summary: { missing: 1 },
+        skipped: 1,
+        summary: { withoutLocation: 1, missing: 1 },
       });
     });
     expect(
@@ -748,8 +824,26 @@ describe("maptoy server", () => {
       path.join(tmpdir(), "maptoy-broken-photos-"),
     );
     temporaryDirectories.push(photoRoot);
-    await writeFile(path.join(photoRoot, "broken.jpg"), "not an image");
+    await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 3,
+        background: "#333333",
+      },
+    })
+      .jpeg()
+      .toFile(path.join(photoRoot, "broken.jpg"));
+    await executeFile("exiftool", [
+      "-overwrite_original",
+      "-GPSLatitude=52.52",
+      "-GPSLatitudeRef=N",
+      "-GPSLongitude=13.405",
+      "-GPSLongitudeRef=E",
+      path.join(photoRoot, "broken.jpg"),
+    ]);
     config.photos.directory = photoRoot;
+    config.photos.maximumDecodedPixels = 50;
     config.jobs.errorHistoryLimit = 1;
     const server = await buildServer({
       config,

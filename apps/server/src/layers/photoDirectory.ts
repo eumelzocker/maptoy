@@ -39,6 +39,12 @@ export interface ResolvedPhotoFile {
   relativePath: string;
 }
 
+export interface PhotoDirectoryListing {
+  relativeDirectory: string;
+  parentDirectory: string | null;
+  items: Array<{ name: string; relativePath: string }>;
+}
+
 export class PhotoDirectory {
   constructor(private readonly configuredPath: string | null) {}
 
@@ -85,6 +91,39 @@ export class PhotoDirectory {
       rootPath,
       directoryPath,
       relativeDirectory: normalized === "." ? "" : normalized,
+    };
+  }
+
+  async directories(relativeDirectory: string): Promise<PhotoDirectoryListing> {
+    const resolved = await this.resolveDirectory(relativeDirectory);
+    const items: PhotoDirectoryListing["items"] = [];
+    let directory: Awaited<ReturnType<typeof opendir>>;
+    try {
+      directory = await opendir(resolved.directoryPath);
+    } catch {
+      throw new PhotoDirectoryError(
+        "The requested photo directory is not available.",
+      );
+    }
+    for await (const entry of directory) {
+      if (!entry.isSymbolicLink() && entry.isDirectory()) {
+        items.push({
+          name: entry.name,
+          relativePath: path.relative(
+            resolved.rootPath,
+            path.join(resolved.directoryPath, entry.name),
+          ),
+        });
+      }
+    }
+    items.sort((left, right) => left.name.localeCompare(right.name));
+
+    const parent = path.dirname(resolved.relativeDirectory);
+    return {
+      relativeDirectory: resolved.relativeDirectory,
+      parentDirectory:
+        resolved.relativeDirectory === "" ? null : parent === "." ? "" : parent,
+      items,
     };
   }
 

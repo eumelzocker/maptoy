@@ -68,7 +68,6 @@ describe("track layer plugin", () => {
           surface: {
             drawPolyline: vi.fn(),
             drawPoint: vi.fn(),
-            drawManagedImage: vi.fn(),
           },
         },
       }),
@@ -151,7 +150,6 @@ describe("track layer plugin", () => {
       surface: {
         drawPolyline,
         drawPoint: vi.fn(),
-        drawManagedImage: vi.fn(),
       },
     });
     expect(drawPolyline).toHaveBeenCalledWith(

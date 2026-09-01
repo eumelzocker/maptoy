@@ -15,9 +15,8 @@ bleibt ausschließlich auf das Tile-Archiv ausgerichtet.
 Layer-Plugins verwenden wiederverwendbare Punkt-, Linien- und Flächengeometrien.
 Fachliche Eigenschaften und Geometrie sind von Farbe, Breite, Markersymbol und
 Deckkraft getrennt. Das Track-Plugin spezialisiert Linien und kann Zeitstempel und
-Höhe je Stützpunkt bewahren. Das Foto-Plugin spezialisiert Punkte. Ein Foto mit
-geografischen Bounds verwendet einen eigenen Raster-Overlay-Vertrag und keine
-Vektorfläche. Dieselben Grundlagen können später POIs, Routen und Regionen tragen.
+Höhe je Stützpunkt bewahren. Das Foto-Plugin spezialisiert Punkte. Dieselben
+Grundlagen können später POIs, Routen und Regionen tragen.
 
 Über **Add layer** und die dortige Symbolauswahl wird ein Track- oder Fotolayer
 erstellt. Der Name ist optional; ein leeres Feld erhält den nächsten freien,
@@ -74,16 +73,24 @@ verhindert.
 
 ## Fotoverzeichnisse scannen
 
-Im Fotolayer werden ein optionales Unterverzeichnis und rekursive Verarbeitung
-gewählt. **Scan directory** startet einen persistenten Job, der pausiert, fortgesetzt
-oder abgebrochen werden kann. Nach einem Neustart wird ein unterbrochener Scan erneut
-eingereiht.
+Im Fotolayer wird zunächst festgelegt, ob rekursiv verarbeitet werden soll.
+**Scan directory…** öffnet einen Verzeichnis-Browser, der ausschließlich Ordner unter
+dem konfigurierten Fotoverzeichnis zeigt und dessen absoluten Pfad nicht preisgibt.
+Nach der Navigation in ein Unterverzeichnis startet **Scan this directory** den
+persistenten Job. Das konfigurierte Wurzelverzeichnis selbst kann im Browser nicht
+ausgewählt werden. Dadurch kann jedem Fotolayer ein eigener Quellordner zugeordnet
+werden. Der Job kann pausiert, fortgesetzt oder abgebrochen werden. Nach einem Neustart
+wird ein unterbrochener Scan erneut eingereiht. Zuletzt verwendeter Unterordner und
+Rekursiv-Einstellung werden aus dem neuesten Job des jeweiligen Layers wiederhergestellt.
 
-Neue und geänderte Dateien werden sicher dekodiert und als EXIF-orientierte,
-metadatenbereinigte WebP-Vorschau unter `MAPTOY_STORAGE_DATA_DIR/layer-previews` abgelegt.
-Unveränderte Dateien werden anhand Größe und Änderungszeit vor dem Dekodieren
-übersprungen. Nicht mehr vorhandene Dateien erhalten den Status `missing`; Katalog
-und Vorschau bleiben erhalten.
+Nur neu gefundene Fotos mit einer vollständigen, gültigen EXIF-GPS-Punktposition
+werden in den Katalog aufgenommen. Für sie wird eine EXIF-orientierte,
+metadatenbereinigte WebP-Vorschau unter
+`MAPTOY_STORAGE_DATA_DIR/layer-previews` abgelegt. Fotos ohne gültige Position
+werden nicht gespeichert und im Scan-Ergebnis separat als übersprungen gezählt.
+Unveränderte katalogisierte Dateien werden anhand Größe und Änderungszeit vor dem
+Dekodieren übersprungen. Nicht mehr vorhandene Dateien erhalten den Status
+`missing`; Katalog und Vorschau bleiben erhalten.
 
 Der Browser lädt nicht mehr sämtliche Assetseiten aller Layer vorab. Beim Auswählen
 eines Fotolayers wird die erste Katalogseite geladen; **Load more photos** folgt bei
@@ -93,16 +100,23 @@ Layer-Aufbau nicht verzögern.
 
 EXIF-GPS wird beim ersten Scan unmittelbar zur wirksamen Punktposition. Es gibt keine
 getrennte erkannte und akzeptierte Koordinate. Unter **Manage photos** kann die
-Position korrigiert, bewusst entfernt oder durch West-/Süd-/Ost-/Nord-Bounds für ein
-Raster-Overlay ersetzt werden. Manuelle Änderungen werden von späteren Scans nicht
-überschrieben. Nur eine weiterhin aus EXIF stammende Position darf bei geänderter
-Quelldatei aktualisiert werden.
+Position korrigiert oder bewusst entfernt werden. Manuelle Änderungen werden von
+späteren Scans nicht überschrieben. Nur eine weiterhin aus EXIF stammende Position
+darf bei geänderter Quelldatei aktualisiert werden. Beim Überfahren eines Markers
+erscheint statt des Dateinamen-Tooltips direkt die Vorschau; für Touch- und
+Zeigerbedienung bleibt auch der Klick verfügbar. Unter dem Bild stehen Dateiname und
+Punktkoordinate in DMS-Notation sowie die verfügbare Aufnahmezeit. Diese Feldauswahl
+ist zunächst im Code vorkonfiguriert. Hersteller, Kameramodell, ISO, Blende,
+Belichtungszeit und IPTC-Bildunterschrift bleiben für eine spätere konfigurierbare
+Popup-Auswahl gespeichert, sind anfangs aber ausgeblendet.
 
 ## Speicher und Grenzen
 
 SQLite enthält Layer, normalisierte Trackdaten, Asset-IDs, relative Fotopfade,
-ausgewählte Metadaten, Fingerprint, wirksame Position, Bounds,
-Status und Jobs. Im Datenverzeichnis liegen verwaltete Nicht-Bild-Uploads und
+ausgewählte Metadaten, Fingerprint, wirksame Position, Status und Jobs. Zu den
+ausgewählten Fotometadaten gehören, sofern vorhanden, Aufnahmezeit, Hersteller,
+Kameramodell, ISO, Blende, Belichtungszeit in Sekunden und `IPTC.caption`. Im
+Datenverzeichnis liegen verwaltete Nicht-Bild-Uploads und
 abgeleitete Vorschauen—keine Fotooriginale. Diese müssen getrennt gesichert werden.
 
 Die Standardgrenzen sind 100 MiB pro Foto, 100 Millionen dekodierte Pixel, 640 Pixel

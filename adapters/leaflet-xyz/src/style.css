@@ -1,1 +1,25 @@
 @import "leaflet/dist/leaflet.css";
+
+.maptoy-point-popup {
+  display: grid;
+  gap: 0.35rem;
+  width: max-content;
+  max-width: 18rem;
+}
+
+.maptoy-point-popup__preview {
+  display: block;
+  max-width: 18rem;
+  max-height: 14rem;
+  width: auto;
+  height: auto;
+}
+
+.maptoy-point-popup__details {
+  display: grid;
+  gap: 0.1rem;
+  color: #536b64;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}

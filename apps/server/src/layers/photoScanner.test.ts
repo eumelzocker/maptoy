@@ -66,7 +66,6 @@ function existingPhoto(relativePath: string): StoredLayerAsset {
     longitude: null,
     latitude: null,
     coordinateSource: "none",
-    bounds: null,
     previewAvailable: true,
     errorCode: null,
     errorMessage: null,

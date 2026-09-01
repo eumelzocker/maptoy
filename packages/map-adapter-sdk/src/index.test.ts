@@ -7,7 +7,6 @@ import {
   isMapAreaLayerData,
   isMapLineLayerData,
   isMapPointLayerData,
-  isMapRasterOverlayLayerData,
   isMapRectangleLayerData,
   isMapXyzTileGridLayerData,
 } from "./index.js";
@@ -56,7 +55,7 @@ describe("map renderer contract", () => {
     );
   });
 
-  it("recognizes the shared point, line, area, and raster descriptors", () => {
+  it("recognizes the shared point, line, and area descriptors", () => {
     expect(
       isMapPointLayerData({ kind: "point-collection", features: [] }),
     ).toBe(true);
@@ -66,9 +65,6 @@ describe("map renderer contract", () => {
     expect(isMapAreaLayerData({ kind: "area-collection", features: [] })).toBe(
       true,
     );
-    expect(
-      isMapRasterOverlayLayerData({ kind: "raster-overlay", features: [] }),
-    ).toBe(true);
   });
 
   it("recognizes the derived Tile Grid decoration descriptor", () => {

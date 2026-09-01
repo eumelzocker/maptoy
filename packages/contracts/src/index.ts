@@ -237,6 +237,23 @@ export const LayerAssetStatusSchema = Type.Union([
   Type.Literal("failed"),
 ]);
 
+export const PhotoMetadataSchema = Type.Object(
+  {
+    capturedAt: Type.Optional(Type.String()),
+    manufacturer: Type.Optional(Type.String()),
+    cameraModel: Type.Optional(Type.String()),
+    iso: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+    fStop: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+    shutterSpeed: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+    iptc: Type.Optional(
+      Type.Object({ caption: Type.String() }, { additionalProperties: false }),
+    ),
+  },
+  { additionalProperties: false, $id: "PhotoMetadata" },
+);
+
+export type PhotoMetadata = Static<typeof PhotoMetadataSchema>;
+
 export const LayerAssetSchema = Type.Object(
   {
     id: Type.String(),
@@ -260,18 +277,7 @@ export const LayerAssetSchema = Type.Object(
       Type.Null(),
     ]),
     coordinateSource: CoordinateSourceSchema,
-    bounds: Type.Union([
-      Type.Null(),
-      Type.Object(
-        {
-          west: Type.Number({ minimum: -180, maximum: 180 }),
-          south: Type.Number({ minimum: -90, maximum: 90 }),
-          east: Type.Number({ minimum: -180, maximum: 180 }),
-          north: Type.Number({ minimum: -90, maximum: 90 }),
-        },
-        { additionalProperties: false },
-      ),
-    ]),
+    photoMetadata: Type.Optional(PhotoMetadataSchema),
     previewAvailable: Type.Boolean(),
     errorCode: Type.Union([Type.String(), Type.Null()]),
     errorMessage: Type.Union([Type.String(), Type.Null()]),
@@ -292,18 +298,6 @@ export const LayerAssetPatchSchema = Type.Object(
     latitude: Type.Union([
       Type.Null(),
       Type.Number({ minimum: -90, maximum: 90 }),
-    ]),
-    bounds: Type.Union([
-      Type.Null(),
-      Type.Object(
-        {
-          west: Type.Number({ minimum: -180, maximum: 180 }),
-          south: Type.Number({ minimum: -90, maximum: 90 }),
-          east: Type.Number({ minimum: -180, maximum: 180 }),
-          north: Type.Number({ minimum: -90, maximum: 90 }),
-        },
-        { additionalProperties: false },
-      ),
     ]),
   },
   { additionalProperties: false, $id: "LayerAssetPatch" },
@@ -331,6 +325,29 @@ export const PhotoDirectoryStatusSchema = Type.Object(
   { configured: Type.Boolean(), available: Type.Boolean() },
   { additionalProperties: false, $id: "PhotoDirectoryStatus" },
 );
+
+export type PhotoDirectoryStatus = Static<typeof PhotoDirectoryStatusSchema>;
+
+export const PhotoDirectoryEntrySchema = Type.Object(
+  {
+    name: Type.String(),
+    relativePath: Type.String(),
+  },
+  { additionalProperties: false, $id: "PhotoDirectoryEntry" },
+);
+
+export type PhotoDirectoryEntry = Static<typeof PhotoDirectoryEntrySchema>;
+
+export const PhotoDirectoryListingSchema = Type.Object(
+  {
+    relativeDirectory: Type.String(),
+    parentDirectory: Type.Union([Type.String(), Type.Null()]),
+    items: Type.Array(PhotoDirectoryEntrySchema),
+  },
+  { additionalProperties: false, $id: "PhotoDirectoryListing" },
+);
+
+export type PhotoDirectoryListing = Static<typeof PhotoDirectoryListingSchema>;
 
 export const PhotoScanJobInputSchema = Type.Object(
   {

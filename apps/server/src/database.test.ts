@@ -32,6 +32,7 @@ describe("database migrations", () => {
       { version: 8 },
       { version: 9 },
       { version: 10 },
+      { version: 11 },
     ]);
     expect(
       database.sqlite
@@ -85,6 +86,12 @@ describe("database migrations", () => {
         .all()
         .map((column) => (column as { name: string }).name),
     ).toContain("progress_cursor");
+    expect(
+      database.sqlite
+        .prepare("PRAGMA table_info(layer_assets)")
+        .all()
+        .map((column) => (column as { name: string }).name),
+    ).not.toContain("bounds_json");
     database.close();
   });
 
@@ -192,6 +199,7 @@ describe("database migrations", () => {
       { version: 8 },
       { version: 9 },
       { version: 10 },
+      { version: 11 },
     ]);
     expect(
       reopened.sqlite
@@ -298,7 +306,7 @@ describe("database migrations", () => {
         13.4,
         52.5,
         "exif",
-        null,
+        '{"west":13,"south":52,"east":14,"north":53}',
         '{"capturedAt":"2026-08-30"}',
         null,
         null,

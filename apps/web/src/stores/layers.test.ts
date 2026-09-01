@@ -44,7 +44,6 @@ function photoAsset(id: string): LayerAsset {
     longitude: null,
     latitude: null,
     coordinateSource: "none",
-    bounds: null,
     previewAvailable: true,
     errorCode: null,
     errorMessage: null,
