@@ -5,16 +5,23 @@ import {
 } from "@maptoy/map-adapter-sdk";
 import { describe, expect, it } from "vitest";
 import {
+  clusterProjectedPoints,
   createLeafletXyzFactory,
   LEAFLET_XYZ_ADAPTER_ID,
   leafletXyzManifest,
   leafletXyzTileDecoration,
   leafletXyzTileLabel,
   leafletXyzZoomOptions,
+  MAXIMUM_CLUSTER_POPUP_PHOTOS,
   nonOverlappingScaleMarkIndexes,
+  smartPopupPlacement,
 } from "./index.js";
 
 describe("Leaflet XYZ manifest", () => {
+  it("bounds detailed cluster popups at 100 lazily loaded Photos", () => {
+    expect(MAXIMUM_CLUSTER_POPUP_PHOTOS).toBe(100);
+  });
+
   it("passes registry validation", () => {
     const registry = createMapRendererManifestRegistry([leafletXyzManifest]);
     expect(registry.get(LEAFLET_XYZ_ADAPTER_ID)).toBe(leafletXyzManifest);
@@ -70,6 +77,89 @@ describe("Leaflet XYZ manifest", () => {
         { left: 58, right: 100 },
       ]),
     ).toEqual([0, 3]);
+  });
+
+  it("clusters nearby projected points across adjacent grid cells", () => {
+    expect(
+      clusterProjectedPoints(
+        [
+          { x: 47, y: 47, value: "first" },
+          { x: 52, y: 52, value: "second" },
+          { x: 140, y: 140, value: "third" },
+        ],
+        48,
+      ),
+    ).toEqual([
+      { x: 49.5, y: 49.5, values: ["first", "second"] },
+      { x: 140, y: 140, values: ["third"] },
+    ]);
+  });
+
+  it("rejects invalid point cluster radii", () => {
+    expect(() => clusterProjectedPoints([], 0)).toThrow(
+      "Cluster radius must be a positive finite number.",
+    );
+  });
+
+  it("places Photo popups below near the top edge and keeps them inside horizontally", () => {
+    expect(
+      smartPopupPlacement(
+        {
+          left: -20,
+          top: -20,
+          right: 280,
+          bottom: 130,
+          width: 300,
+          height: 150,
+        },
+        { x: 130, y: 150 },
+        { left: 0, top: 60, right: 500, bottom: 600 },
+        7,
+      ),
+    ).toEqual({
+      belowAnchor: true,
+      horizontalShift: 28,
+      verticalShift: 189,
+      maximumContentHeight: 395,
+    });
+  });
+
+  it("keeps a fitting Photo popup above its marker", () => {
+    expect(
+      smartPopupPlacement(
+        {
+          left: 100,
+          top: 100,
+          right: 300,
+          bottom: 250,
+          width: 200,
+          height: 150,
+        },
+        { x: 200, y: 270 },
+        { left: 0, top: 60, right: 500, bottom: 600 },
+        7,
+      ),
+    ).toMatchObject({
+      belowAnchor: false,
+      horizontalShift: 0,
+      verticalShift: 1,
+    });
+  });
+
+  it("indexes the configured maximum Photo count without losing points", () => {
+    const clusters = clusterProjectedPoints(
+      Array.from({ length: 100_000 }, (_, index) => ({
+        x: index % 1000,
+        y: Math.floor(index / 1000),
+        value: index,
+      })),
+      48,
+    );
+
+    expect(
+      clusters.reduce((total, cluster) => total + cluster.values.length, 0),
+    ).toBe(100_000);
+    expect(clusters.length).toBeLessThan(1000);
   });
 
   it("passes the renderer contract through its Leaflet bridge", async () => {

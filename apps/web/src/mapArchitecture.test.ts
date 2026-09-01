@@ -46,6 +46,7 @@ describe("Map view architecture", () => {
       schemaLayerEditor,
       trackLayerEditor,
       photoLayerEditor,
+      photoMetadataPresentation,
       treeSelectDropdown,
       checkboxTree,
       layerStore,
@@ -91,6 +92,12 @@ describe("Map view architecture", () => {
       ),
       readFile(
         fileURLToPath(
+          new URL("./photoMetadataPresentation.ts", import.meta.url),
+        ),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
           new URL("./components/TreeSelectDropdown.vue", import.meta.url),
         ),
         "utf8",
@@ -114,6 +121,7 @@ describe("Map view architecture", () => {
     expect(layerPanel).toContain("LayerEditor");
     expect(layerPanel).toContain('v-if="selectedLayer"');
     expect(layerPanel).toContain("loadSelectedLayerId");
+    expect(layerPanel).toContain("resolveSelectedLayerId");
     expect(layerPanel).toContain("buildLayerHierarchyRows");
     expect(layerPanel).toContain("Name or folder/name");
     expect(layerPanel).toContain("loadCollapsedLayerHierarchy");
@@ -153,6 +161,18 @@ describe("Map view architecture", () => {
     expect(photoLayerEditor).toContain("data-layer-primary-action");
     expect(photoLayerEditor).toContain("browseDirectory");
     expect(photoLayerEditor).toContain("skipped (no location)");
+    expect(photoLayerEditor).toContain("Relative to MAPTOY_PHOTOS_DIR");
+    expect(photoLayerEditor).toContain('class="selected-directory"');
+    expect(layerPanel).toContain("visibleScanResultJobIds.value = new Set()");
+    expect(layerPanel).toContain("restorePhotoScanSettings");
+    expect(photoLayerEditor).toContain("Fit photos on map");
+    expect(photoLayerEditor).toContain("Cluster nearby photos");
+    expect(layerPanel).toContain("Center map here");
+    expect(layerPanel).toContain("editingPhotoMetadataRows");
+    expect(photoMetadataPresentation).toContain('label: "IPTC caption"');
+    expect(mapView).toContain('@center-map="centerMapOnPhoto"');
+    expect(mapView).toContain('@fit-photo-layer="fitPhotoLayer"');
+    expect(mapView).toContain("loadAssetExtent");
     expect(photoLayerEditor).not.toContain("update:scanDirectory");
     expect(layerPanel).toContain("PhotoDirectoryBrowser");
     expect(layerPanel).toContain(

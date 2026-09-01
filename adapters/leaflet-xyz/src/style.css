@@ -23,3 +23,89 @@
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
+
+.maptoy-smart-popup .leaflet-popup-content {
+  max-height: var(--maptoy-popup-maximum-height, none);
+  overflow: auto;
+}
+
+.maptoy-smart-popup .leaflet-popup-tip-container {
+  transform: translateX(var(--maptoy-popup-tip-shift, 0));
+}
+
+.maptoy-smart-popup.maptoy-smart-popup--below .leaflet-popup-tip-container {
+  top: -20px;
+  margin-top: 0;
+  transform: translateX(var(--maptoy-popup-tip-shift, 0)) rotate(180deg);
+}
+
+.maptoy-point-cluster {
+  border: 0;
+  background: transparent;
+}
+
+.maptoy-point-cluster__count {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  background: #2e77d0;
+  box-shadow: 0 1px 4px rgba(12, 42, 34, 0.45);
+  font: 700 0.75rem / 1 sans-serif;
+}
+
+.maptoy-point-cluster-popup {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.maptoy-point-cluster-popup__list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: min(24rem, 60vh);
+  overflow: auto;
+}
+
+.maptoy-point-cluster-popup__item {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.35rem;
+  border: 1px solid #cfdbd7;
+  border-radius: 0.35rem;
+  background: #f8fbfa;
+}
+
+.maptoy-point-cluster-popup__item:not(
+  :has(.maptoy-point-cluster-popup__preview)
+) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.maptoy-point-cluster-popup__preview {
+  display: block;
+  width: 5.5rem;
+  height: 4.25rem;
+  border-radius: 0.2rem;
+  object-fit: cover;
+}
+
+.maptoy-point-cluster-popup__details {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  color: #536b64;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.maptoy-point-cluster-popup__details strong {
+  color: #183e35;
+  font-size: 0.78rem;
+}

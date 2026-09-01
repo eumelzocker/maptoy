@@ -1,9 +1,12 @@
 # maptoy
 
-*maptoy* is a self-hosted application for viewing, archiving, and exporting maps and custom layers.
+*maptoy* is a self-hosted application for viewing, archiving, and exporting maps and custom layers. For developers, it is a strong foundation for playing around with any kind of geospatial data.
 
-<img src="docs/assets/screenshot0.webp" alt="Screenshot 0" width="600">
-<img src="docs/assets/screenshot1.webp" alt="Screenshot 1" width="600">
+<img src="docs/assets/screenshot0.webp" alt="Screenshot 0" width="400">
+<img src="docs/assets/screenshot1.webp" alt="Screenshot 1" width="400">
+<img src="docs/assets/screenshot2.webp" alt="Screenshot 2" width="400">
+
+*screenshots probably outdated by current version.*
 
 > *maptoy* is under active development. Currently available features include:
 >

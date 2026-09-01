@@ -4,6 +4,28 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-09-01
+
+### Added
+
+- Added Photo map navigation that centers the current coordinate from an icon action
+  on its preview without changing zoom and fits a complete Photo Layer through a
+  compact, antimeridian-aware extent API.
+- Added configurable, zoom-responsive Photo marker clustering with count pins,
+  plus a scrollable click popup with up to 100 lazily loaded previews and configured
+  Photo details.
+
+### Changed
+
+- Keep detailed Photo scan results scoped to the current Layers dialog session and
+  show the persisted relative source folder with its loaded Photo count on reopen.
+- Restore the last browser-local Layer selection whenever the Layers tool opens
+  without an explicit target, falling back to the first visible Layer.
+- Show all captured Photo metadata in the position editor independently of the map
+  popup field configuration.
+- Place individual and clustered Photo popups above or below their marker according
+  to available map space, correcting edge overflow without automatic map movement.
+
 ## [0.3.2] - 2026-09-01
 
 ### Added

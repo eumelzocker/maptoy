@@ -5,8 +5,10 @@ import type {
   JobError,
   Layer,
   LayerAsset,
+  LayerAssetExtent,
   LayerStatus,
 } from "@maptoy/contracts";
+import { minimalWgs84Bounds } from "@maptoy/map-core";
 
 interface LayerRow {
   id: string;
@@ -77,6 +79,11 @@ interface JobErrorRow {
   message: string;
   item: string | null;
   created_at: string;
+}
+
+interface AssetCoordinateRow {
+  longitude: number;
+  latitude: number;
 }
 
 export interface StoredLayerAsset extends LayerAsset {
@@ -334,6 +341,20 @@ export class LayerRepository {
         )
         .all(layerId, "photos") as unknown as AssetRow[]
     ).map(assetFromRow);
+  }
+
+  externalPhotoExtent(layerId: string): LayerAssetExtent {
+    const coordinates = this.database
+      .prepare(
+        `SELECT longitude, latitude FROM layer_assets
+         WHERE layer_id = ? AND kind = 'external-photo' AND status = 'ready'
+           AND longitude IS NOT NULL AND latitude IS NOT NULL`,
+      )
+      .all(layerId) as unknown as AssetCoordinateRow[];
+    return {
+      coordinateCount: coordinates.length,
+      bounds: minimalWgs84Bounds(coordinates),
+    };
   }
 
   getAsset(id: string): StoredLayerAsset | undefined {

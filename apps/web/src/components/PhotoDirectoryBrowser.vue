@@ -128,7 +128,7 @@ watch(
       </p>
     </section>
     <template #footer>
-      <button type="button" @click="close">Cancel</button>
+      <button type="button" class="secondary-button" @click="close">Cancel</button>
       <button
         type="button"
         class="primary-button"
@@ -254,8 +254,18 @@ button:disabled {
   opacity: 0.5;
 }
 
-.primary-button {
+.primary-button,
+.secondary-button {
   padding: 0.45rem 0.7rem;
+}
+
+.secondary-button:hover,
+.secondary-button:focus-visible {
+  border-color: #617870;
+  background: #edf4f1;
+}
+
+.primary-button {
   border-color: #286b5d;
   color: #fff;
   background: #286b5d;

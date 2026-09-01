@@ -159,7 +159,7 @@ Nur tatsächlich gemeinsam verwendeter Code gehört in ein Package. Job-Ausführ
 
 #### Frontend-Renderer-Adapter
 
-Die Vue-Anwendung greift nicht direkt aus fachlichen Komponenten auf Leaflet zu. Ein `MapRendererAdapter` kapselt mindestens Erzeugung und Zerstörung der Karte, Viewport und Zoom, Ereignisse, Basiskarte, Layer-Anbindung, Screenspace-/Geo-Koordinaten sowie verfügbare Fähigkeiten. Ein Adapter-Manifest enthält stabile ID, Version, kompatible SDK-Version, Konfigurationsschema, Capability-Flags und die unterstützten Layer-Deskriptorarten. Plugins deklarieren die von ihnen benötigten Deskriptorarten; ein allgemeines `layerRendering`-Flag ersetzt diese feingranulare Kompatibilitätsprüfung nicht.
+Die Vue-Anwendung greift nicht direkt aus fachlichen Komponenten auf Leaflet zu. Ein `MapRendererAdapter` kapselt mindestens Erzeugung und Zerstörung der Karte, Viewport und Zoom, das Einpassen geografischer Bounds, Ereignisse, Basiskarte, Layer-Anbindung, Screenspace-/Geo-Koordinaten sowie verfügbare Fähigkeiten. Ein Adapter-Manifest enthält stabile ID, Version, kompatible SDK-Version, Konfigurationsschema, Capability-Flags und die unterstützten Layer-Deskriptorarten. Plugins deklarieren die von ihnen benötigten Deskriptorarten; ein allgemeines `layerRendering`-Flag ersetzt diese feingranulare Kompatibilitätsprüfung nicht.
 
 Der in v1.0 enthaltene Adapter `leaflet-xyz` bildet das bestehende XYZ-, Cache- und Exportmodell vollständig ab. Ein kleiner Fake-Adapter dient ausschließlich Vertragstests und beweist, dass zentrale UI-Komponenten nicht von Leaflet-Klassen abhängen. Für Google Maps wird in v1.0 weder Abhängigkeit noch Loader noch API-Key-Konfiguration ausgeliefert; die dokumentierte Adaptergrenze berücksichtigt jedoch, dass ein späterer Adapter clientseitig laden kann und möglicherweise weder Tile-Cache noch Batch-Download oder Serverexport anbietet.
 
@@ -185,7 +185,9 @@ Innenringe.
 Die Frontend-Hooks erzeugen ausschließlich adapterneutrale, typisierte
 Darstellungsdeskriptoren für Punkte, Linien und Flächen. Stil beziehungsweise
 Symbolisierung bleiben von der Geometrie getrennt und werden erst vom aktiven
-Renderer-Adapter in dessen konkrete Darstellung übersetzt.
+Renderer-Adapter in dessen konkrete Darstellung übersetzt. Punktdeskriptoren dürfen
+ein optionales pixelbasiertes Clustering anfordern; dessen dynamische Berechnung bei
+Pan und Zoom verbleibt im Renderer und verändert weder Geometrie noch Exportdaten.
 
 Neben Deskriptoren für persistierte Geometrie unterstützt das SDK
 zustandsabgeleitete Dekorationsdeskriptoren. Deren sichtbarer Inhalt wird aus
@@ -451,6 +453,8 @@ Die Abdeckungs- und Vergleichsantworten sollen nicht Millionen Einzelkacheln an 
 - `PATCH api/layers/:id`
 - `DELETE api/layers/:id`
 - `GET api/layers/:id/assets`
+- `GET api/layers/:id/assets/extent` – kompakte Anzahl und antimeridian-taugliche
+  Ausdehnung positionierter externer Fotos ohne Übertragung des Assetkatalogs
 - `POST api/layers/:id/assets` – pluginvalidierter `multipart/form-data`-Upload
   verwalteter Nicht-Bild-Assets mit Größenlimit und Statusantwort
 - `GET api/layers/:id/assets/:assetId` – kontrollierte Auslieferung eines
@@ -552,7 +556,9 @@ bei Bedarf mit Standardkonfiguration; die Detailbearbeitung bleibt im Layer-Pane
   Capability `layerRendering` nicht als scheinbar nutzbare Verwaltung angeboten.
 - Im Layer-Panel ist stets höchstens ein Layer-Editor im DOM. Der im Dropdown-Baum
   ausgewählte Layer wird oberhalb des Editors mit seinem vollständigen Pfad
-  angezeigt; die Auswahl wird lokal im Browser gespeichert.
+  angezeigt; die Auswahl wird lokal im Browser gespeichert. Öffnen ohne explizite
+  Layer-ID stellt diese Auswahl wieder her und verwendet ersatzweise den ersten
+  sichtbaren Layer.
 - Plugin-Kategorien und alle aus `/`-Namenssegmenten entstehenden Ordner sind auf-
   und zuklappbar; eingeklappte Hierarchieknoten werden lokal im Browser gespeichert
   und sind ohne gespeicherte Präferenz geöffnet.
@@ -1092,6 +1098,17 @@ Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten
 - EXIF-GPS-Positionen sind ohne Einzelbestätigung unmittelbar nutzbar. Manuelle
   Korrekturen und bewusst entfernte Positionen überleben erneute Scans; fehlende oder
   geänderte Originale führen zu nachvollziehbaren Zuständen statt Datenverlust.
+- Einzelne Fotopositionen können bei unverändertem Zoom zentriert und alle
+  positionierten Fotos eines Layers über dessen kompakte Ausdehnung eingepasst
+  werden. Nahe Fotomarker werden optional und zoomabhängig zu Anzahl-Pins
+  zusammengefasst; ein Klick öffnet ohne Zoomänderung eine begrenzte, scrollbare
+  Übersicht mit bis zu 100 verzögert geladenen Vorschauen und konfigurierten
+  Fotodetails.
+- Der Positionsdialog zeigt alle erfassten Fotometadaten unabhängig von der für
+  Karten-Popups konfigurierten Feldauswahl.
+- Foto- und Cluster-Popups bleiben durch richtungsabhängige Platzierung, seitliche
+  Korrektur und begrenzte Inhaltshöhe ohne automatisches Karten-Panning im sichtbaren
+  Kartenbereich.
 - Punkt, Linie und Fläche sind als pluginunabhängige, versionierte Geometriegrundlagen
   mit getrennten fachlichen Eigenschaften und Darstellungsstilen verfügbar. Der
   Leaflet-/XYZ-Adapter und der Fake-Adapter bestehen dafür dieselben Contract-Tests;
@@ -1315,6 +1332,7 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.3.0` | Konsistentes Environment-Schema, vereinfachter Fotokatalog und überarbeitete Dialog- und Kartenwerkzeuge |
 | `0.3.1` | Abschluss von Phase 5 mit belastbarer Scan-Wiederaufnahme, Job-Aufbewahrung, skalierbarem Fotokatalog und gemessenen Fotolimits |
 | `0.3.2` | Cache- und Coverage-Verbesserungen sowie fokussierte Fotoverzeichnis-, Positions- und Metadatenabläufe |
+| `0.3.3` | Fotolayer-Navigation, dynamisches Marker-Clustering und verfeinerte Foto-Popups und -Dialoge |
 
 ### 13.2 Weitere Releases
 

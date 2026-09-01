@@ -22,6 +22,7 @@ const emit = defineEmits<{
   browseDirectory: [];
   jobAction: [action: "pause" | "resume" | "cancel"];
   managePhotos: [];
+  fitPhotos: [];
 }>();
 
 function processedItems(job: Job): number {
@@ -63,6 +64,29 @@ function processedItems(job: Job): number {
       </label>
     </div>
 
+    <div class="cluster-fields">
+      <label class="recursive-field">
+        <input
+          type="checkbox"
+          :checked="Boolean(configuration.clusterNearby ?? true)"
+          :disabled="busy"
+          @change="emit('configurationChange', 'clusterNearby', ($event.target as HTMLInputElement).checked)"
+        />
+        <span>Cluster nearby photos</span>
+      </label>
+      <label>
+        <span>Cluster radius</span>
+        <input
+          type="number"
+          min="20"
+          max="120"
+          :value="Number(configuration.clusterRadius ?? 48)"
+          :disabled="busy || !Boolean(configuration.clusterNearby ?? true)"
+          @change="emit('configurationChange', 'clusterRadius', Number(($event.target as HTMLInputElement).value))"
+        />
+      </label>
+    </div>
+
     <div class="photo-tools">
       <p v-if="!photoDirectory.configured" class="scan-status">
         Configure MAPTOY_PHOTOS_DIR before scanning photos.
@@ -70,12 +94,6 @@ function processedItems(job: Job): number {
       <p v-else-if="!photoDirectory.available" class="scan-status">
         The configured photo directory is unavailable.
       </p>
-      <div class="selected-directory">
-        <span>Subdirectory</span>
-        <strong :title="scanDirectory || 'No subdirectory selected'">
-          {{ scanDirectory || "No subdirectory selected" }}
-        </strong>
-      </div>
       <label class="recursive-field">
         <input
           type="checkbox"
@@ -85,6 +103,17 @@ function processedItems(job: Job): number {
         />
         <span>Recursive</span>
       </label>
+      <div class="selected-directory">
+        <span>Source</span>
+        <strong
+          :title="scanDirectory ? `Relative to MAPTOY_PHOTOS_DIR: ${scanDirectory}` : 'No subdirectory selected'"
+        >
+          {{ scanDirectory || "No subdirectory selected" }}
+        </strong>
+        <small v-if="photosLoaded">
+          {{ photoCount }}{{ hasMorePhotos ? "+" : "" }} {{ photoCount === 1 && !hasMorePhotos ? "photo" : "photos" }}
+        </small>
+      </div>
       <button
         type="button"
         data-layer-primary-action
@@ -117,6 +146,13 @@ function processedItems(job: Job): number {
       >
         {{ photosLoaded ? (photoCount === 0 ? "No photos" : `Manage ${photoCount}${hasMorePhotos ? "+" : ""} photos`) : "Manage photos" }}
       </button>
+      <button
+        type="button"
+        :disabled="busy || (photosLoaded && photoCount === 0)"
+        @click="emit('fitPhotos')"
+      >
+        <i class="mdi mdi-fit-to-screen-outline" aria-hidden="true"></i>Fit photos on map
+      </button>
     </div>
   </section>
 </template>
@@ -129,12 +165,14 @@ function processedItems(job: Job): number {
 }
 
 .plugin-fields,
+.cluster-fields,
 .job-actions {
   display: flex;
   gap: 0.45rem;
 }
 
 .plugin-fields > label,
+.cluster-fields > label,
 .photo-tools > label {
   display: grid;
   flex: 1;
@@ -145,7 +183,9 @@ function processedItems(job: Job): number {
 
 .selected-directory {
   display: grid;
-  gap: 0.15rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: baseline;
   min-width: 0;
   font-size: 0.82rem;
 }
@@ -158,9 +198,19 @@ function processedItems(job: Job): number {
   white-space: nowrap;
 }
 
+.selected-directory small {
+  color: #536b64;
+  white-space: nowrap;
+}
+
 .plugin-fields input[type="number"] {
   min-width: 0;
   width: 100%;
+}
+
+.cluster-fields input[type="number"] {
+  min-width: 5rem;
+  width: 7rem;
 }
 
 .recursive-field {

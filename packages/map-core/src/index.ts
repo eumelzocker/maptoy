@@ -20,6 +20,58 @@ export interface Wgs84Bounds {
   north: number;
 }
 
+function normalizedLongitude(longitude: number): number {
+  if (longitude >= -180 && longitude <= 180) {
+    return longitude;
+  }
+  const wrapped = ((((longitude + 180) % 360) + 360) % 360) - 180;
+  return wrapped === -180 && longitude > 0 ? 180 : wrapped;
+}
+
+export function minimalWgs84Bounds(
+  coordinates: readonly Wgs84Coordinate[],
+): Wgs84Bounds | null {
+  if (coordinates.length === 0) {
+    return null;
+  }
+  const longitudes = coordinates
+    .map(({ longitude }) => normalizedLongitude(longitude))
+    .sort((left, right) => left - right);
+  let largestGap = -1;
+  let largestGapStart = 0;
+  for (let index = 0; index < longitudes.length; index += 1) {
+    const current = longitudes[index] as number;
+    const next =
+      index + 1 < longitudes.length
+        ? (longitudes[index + 1] as number)
+        : (longitudes[0] as number) + 360;
+    const gap = next - current;
+    if (gap > largestGap) {
+      largestGap = gap;
+      largestGapStart = index;
+    }
+  }
+  const west = normalizedLongitude(
+    largestGapStart + 1 < longitudes.length
+      ? (longitudes[largestGapStart + 1] as number)
+      : (longitudes[0] as number),
+  );
+  const east = normalizedLongitude(longitudes[largestGapStart] as number);
+  let south = coordinates[0]?.latitude as number;
+  let north = south;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const latitude = coordinates[index]?.latitude as number;
+    south = Math.min(south, latitude);
+    north = Math.max(north, latitude);
+  }
+  return {
+    west,
+    south,
+    east,
+    north,
+  };
+}
+
 export interface XyzTileRange {
   minimumX: number;
   maximumX: number;

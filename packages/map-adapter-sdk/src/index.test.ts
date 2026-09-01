@@ -57,7 +57,11 @@ describe("map renderer contract", () => {
 
   it("recognizes the shared point, line, and area descriptors", () => {
     expect(
-      isMapPointLayerData({ kind: "point-collection", features: [] }),
+      isMapPointLayerData({
+        kind: "point-collection",
+        features: [],
+        clustering: { enabled: true, radiusPixels: 48 },
+      }),
     ).toBe(true);
     expect(isMapLineLayerData({ kind: "line-collection", features: [] })).toBe(
       true,

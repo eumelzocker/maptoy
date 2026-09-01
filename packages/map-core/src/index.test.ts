@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   geodesicDistanceMeters,
+  minimalWgs84Bounds,
   metricScaleBar,
   segmentedMetricScale,
   wgs84BoundsToXyzTileRanges,
@@ -49,6 +50,38 @@ describe("wgs84ToXyz", () => {
       { minimumX: 3, maximumX: 3, minimumY: 1, maximumY: 2 },
       { minimumX: 0, maximumX: 0, minimumY: 1, maximumY: 2 },
     ]);
+  });
+});
+
+describe("minimalWgs84Bounds", () => {
+  it("returns conventional bounds for a local coordinate collection", () => {
+    expect(
+      minimalWgs84Bounds([
+        { longitude: 13.4, latitude: 52.5 },
+        { longitude: 10.1, latitude: 54.3 },
+        { longitude: 12.2, latitude: 53.1 },
+      ]),
+    ).toEqual({ west: 10.1, south: 52.5, east: 13.4, north: 54.3 });
+  });
+
+  it("uses crossing bounds for coordinates around the antimeridian", () => {
+    expect(
+      minimalWgs84Bounds([
+        { longitude: 179, latitude: -10 },
+        { longitude: -178, latitude: 12 },
+        { longitude: 175, latitude: 3 },
+      ]),
+    ).toEqual({ west: 175, south: -10, east: -178, north: 12 });
+  });
+
+  it("handles empty and single-coordinate collections", () => {
+    expect(minimalWgs84Bounds([])).toBeNull();
+    expect(minimalWgs84Bounds([{ longitude: 13.4, latitude: 52.5 }])).toEqual({
+      west: 13.4,
+      south: 52.5,
+      east: 13.4,
+      north: 52.5,
+    });
   });
 });
 

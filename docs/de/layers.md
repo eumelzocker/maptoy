@@ -23,7 +23,9 @@ erstellt. Der Name ist optional; ein leeres Feld erhält den nächsten freien,
 nummerierten Namen wie `Track 1`. Nach dem Anlegen wird der neue Layer im
 Baum-Dropdown ausgewählt, als einziger Layer-Editor geöffnet und der Import
 beziehungsweise Verzeichnisscan fokussiert. Checkboxen im Dropdown ändern die
-Sichtbarkeit, ohne die Editorauswahl zu wechseln. Der allgemeine Regler
+Sichtbarkeit, ohne die Editorauswahl zu wechseln. Wird das Layer-Werkzeug ohne
+explizites Ziel geöffnet, verwendet es den zuletzt lokal gespeicherten Layer oder,
+falls diese Auswahl fehlt, den ersten sichtbaren Layer. Der allgemeine Regler
 **Opacity** gilt für den gesamten Layer in interaktiver Karte und Export. Alle Layer bilden
 einen globalen, von Map Sets unabhängigen Overlay-Stack. Beim Wechsel des Map Sets
 wird nur die Basiskarte ersetzt; dieselben Overlays werden mit ihrer Reihenfolge,
@@ -80,8 +82,11 @@ Nach der Navigation in ein Unterverzeichnis startet **Scan this directory** den
 persistenten Job. Das konfigurierte Wurzelverzeichnis selbst kann im Browser nicht
 ausgewählt werden. Dadurch kann jedem Fotolayer ein eigener Quellordner zugeordnet
 werden. Der Job kann pausiert, fortgesetzt oder abgebrochen werden. Nach einem Neustart
-wird ein unterbrochener Scan erneut eingereiht. Zuletzt verwendeter Unterordner und
-Rekursiv-Einstellung werden aus dem neuesten Job des jeweiligen Layers wiederhergestellt.
+wird ein unterbrochener Scan erneut eingereiht. Das detaillierte Scan-Ergebnis bleibt
+bis zum Schließen des Layers-Dialogs sichtbar. Beim erneuten Öffnen stehen stattdessen
+der zuletzt gescannte, relativ zu `MAPTOY_PHOTOS_DIR` angegebene Ordner und die
+geladene Fotoanzahl direkt über der Scan-Aktion. Unterordner und Rekursiv-Einstellung
+werden aus dem neuesten Job des jeweiligen Layers wiederhergestellt.
 
 Nur neu gefundene Fotos mit einer vollständigen, gültigen EXIF-GPS-Punktposition
 werden in den Katalog aufgenommen. Für sie wird eine EXIF-orientierte,
@@ -102,13 +107,28 @@ EXIF-GPS wird beim ersten Scan unmittelbar zur wirksamen Punktposition. Es gibt 
 getrennte erkannte und akzeptierte Koordinate. Unter **Manage photos** kann die
 Position korrigiert oder bewusst entfernt werden. Manuelle Änderungen werden von
 späteren Scans nicht überschrieben. Nur eine weiterhin aus EXIF stammende Position
-darf bei geänderter Quelldatei aktualisiert werden. Beim Überfahren eines Markers
+darf bei geänderter Quelldatei aktualisiert werden. **Center map here** verwendet
+die aktuell eingetragene Position, ohne sie zu speichern oder den Kartenzoom zu
+ändern. **Fit photos on map** lädt nur die kompakte Koordinatenausdehnung des Layers
+und passt Mittelpunkt und Zoom so an, dass alle positionierten Fotos hineinpassen.
+Der Dialog **Photo position** zeigt außerdem alle für das ausgewählte Foto erfassten
+Metadaten unabhängig von der konfigurierten Feldauswahl der Karten-Popups.
+
+Nahe Fotomarker werden standardmäßig anhand eines konfigurierbaren Pixelradius
+zusammengefasst. Cluster-Pins aktualisieren sich beim Verschieben und Zoomen und
+zeigen die Fotoanzahl. Ein Klick öffnet ohne Zoomänderung eine scrollbare Übersicht
+mit bis zu 100 verkleinerten, verzögert geladenen Vorschauen, Dateinamen und den
+konfigurierten Popup-Details. Größere Cluster nennen zusätzlich die Restanzahl.
+**Cluster nearby photos** kann dies zugunsten einzelner Marker abschalten. Beim Überfahren eines einzelnen Markers
 erscheint statt des Dateinamen-Tooltips direkt die Vorschau; für Touch- und
 Zeigerbedienung bleibt auch der Klick verfügbar. Unter dem Bild stehen Dateiname und
 Punktkoordinate in DMS-Notation sowie die verfügbare Aufnahmezeit. Diese Feldauswahl
 ist zunächst im Code vorkonfiguriert. Hersteller, Kameramodell, ISO, Blende,
 Belichtungszeit und IPTC-Bildunterschrift bleiben für eine spätere konfigurierbare
 Popup-Auswahl gespeichert, sind anfangs aber ausgeblendet.
+Einzel- und Cluster-Popups wählen abhängig vom verfügbaren Kartenplatz eine Position
+ober- oder unterhalb ihres Markers, korrigieren seitliche Überläufe und begrenzen
+ihre Höhe, ohne die Karte beim Öffnen automatisch zu verschieben.
 
 ## Speicher und Grenzen
 

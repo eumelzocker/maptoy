@@ -5,6 +5,7 @@ import {
   CoverageResponseSchema,
   createDefaultMapSetInput,
   LayerAssetPatchSchema,
+  LayerAssetExtentSchema,
   LayerInputSchema,
   MapSetInputSchema,
   TileRevisionSummarySchema,
@@ -144,5 +145,20 @@ describe("Map Set contracts", () => {
         bounds: { west: 13, south: 52, east: 14, north: 53 },
       }),
     ).toBe(false);
+  });
+
+  it("defines antimeridian-aware Layer Asset extents", () => {
+    expect(
+      Value.Check(LayerAssetExtentSchema, {
+        coordinateCount: 2,
+        bounds: { west: 175, south: -10, east: -178, north: 12 },
+      }),
+    ).toBe(true);
+    expect(
+      Value.Check(LayerAssetExtentSchema, {
+        coordinateCount: 0,
+        bounds: null,
+      }),
+    ).toBe(true);
   });
 });

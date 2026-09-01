@@ -21,4 +21,5 @@ importing a rendering library. The shipped Leaflet/XYZ adapter is the v1 referen
 implementation.
 
 SDK 2.0 removes the raster-overlay descriptor; Photo Layers use point coordinates
-exclusively.
+exclusively. SDK 2.1 adds optional geographic bounds fitting and renderer-managed
+point clustering.

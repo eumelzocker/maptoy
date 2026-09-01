@@ -7,6 +7,7 @@ import type {
   JobCleanupResponse,
   JobError,
   LayerAsset,
+  LayerAssetExtent,
   LayerAssetPatch,
   PhotoScanJobInput,
 } from "@maptoy/contracts";
@@ -266,6 +267,11 @@ export class PhotoScanService {
       items: page.map(publicAsset),
       nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     };
+  }
+
+  assetExtent(layerId: string): LayerAssetExtent {
+    this.layers.get(layerId);
+    return this.layerRepository.externalPhotoExtent(layerId);
   }
 
   getAsset(layerId: string, assetId: string): StoredLayerAsset {

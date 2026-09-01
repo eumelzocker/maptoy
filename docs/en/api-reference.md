@@ -81,7 +81,10 @@ hierarchy below the plugin category.
 
 `GET api/layers/:id/assets` cursor-paginates the Asset catalog. `POST` to the same
 path accepts one plugin-validated `multipart/form-data` non-image file. Its maximum
-size is `MAPTOY_LAYERS_ASSET_MAX_BYTES`. `GET api/layers/:id/assets/:assetId` returns
+size is `MAPTOY_LAYERS_ASSET_MAX_BYTES`.
+`GET api/layers/:id/assets/extent` returns only the count and smallest
+antimeridian-aware bounds of ready, positioned external Photos, allowing map fitting
+without transferring every Asset page. `GET api/layers/:id/assets/:assetId` returns
 the controlled managed file or an external photo's derived WebP preview. It never
 returns an external photo original. `PATCH` updates or clears a photo's complete
 point coordinate. External Photo Assets optionally include typed `photoMetadata`

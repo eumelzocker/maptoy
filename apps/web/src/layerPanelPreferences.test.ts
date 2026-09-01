@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   loadCollapsedLayerHierarchy,
   loadSelectedLayerId,
+  resolveSelectedLayerId,
   saveCollapsedLayerHierarchy,
   saveSelectedLayerId,
 } from "./layerPanelPreferences.js";
@@ -49,6 +50,20 @@ describe("Layer panel preferences", () => {
     expect(loadSelectedLayerId(storage)).toBe("track");
     saveSelectedLayerId(null, storage);
     expect(loadSelectedLayerId(storage)).toBeNull();
+  });
+
+  it("prefers a remembered Layer and otherwise selects the first visible Layer", () => {
+    const layers = [
+      { id: "hidden", visible: false },
+      { id: "visible", visible: true },
+      { id: "later", visible: true },
+    ];
+    expect(resolveSelectedLayerId(layers, "hidden")).toBe("hidden");
+    expect(resolveSelectedLayerId(layers, "missing")).toBe("visible");
+    expect(resolveSelectedLayerId(layers, null)).toBe("visible");
+    expect(
+      resolveSelectedLayerId([{ id: "hidden", visible: false }], null),
+    ).toBeNull();
   });
 
   it("migrates the first formerly expanded Layer", () => {

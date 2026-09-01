@@ -2,7 +2,10 @@
 // biome-ignore-all lint/correctness/noUnusedImports: Vue template references are not detected by Biome.
 // biome-ignore-all lint/correctness/noUnusedVariables: Vue template references are not detected by Biome.
 import type { Layer, LayerAsset } from "@maptoy/contracts";
-import type { MapLayerType } from "@maptoy/map-adapter-sdk";
+import type {
+  GeographicCoordinate,
+  MapLayerType,
+} from "@maptoy/map-adapter-sdk";
 import {
   computed,
   inject,
@@ -28,10 +31,12 @@ import {
 import {
   loadCollapsedLayerHierarchy,
   loadSelectedLayerId,
+  resolveSelectedLayerId,
   saveCollapsedLayerHierarchy,
   saveSelectedLayerId,
 } from "../layerPanelPreferences.js";
 import { availableLocalStorage } from "../localStorage.js";
+import { photoMetadataRows } from "../photoMetadataPresentation.js";
 import { layerTypePresentation } from "../layerEditorRegistry.js";
 import { LAYER_PLUGIN_REGISTRY_KEY } from "../registries.js";
 import { useLayersStore } from "../stores/layers.js";
@@ -49,7 +54,11 @@ const props = withDefaults(
   { supportedLayerTypes: () => [] },
 );
 
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{
+  changed: [];
+  centerMap: [coordinate: GeographicCoordinate];
+  fitPhotoLayer: [layerId: string];
+}>();
 const store = useLayersStore();
 const injectedLayerPlugins = inject(LAYER_PLUGIN_REGISTRY_KEY);
 if (injectedLayerPlugins === undefined) {
@@ -73,12 +82,24 @@ const editingAsset = ref<LayerAsset | null>(null);
 const photoDirectoryBrowserLayerId = ref<string | null>(null);
 const editLongitude = ref("");
 const editLatitude = ref("");
+const visibleScanResultJobIds = ref(new Set<string>());
 const selectedLayerId = ref<string | null>(loadSelectedLayerId(browserStorage));
 const collapsedHierarchyKeys = ref(loadCollapsedLayerHierarchy(browserStorage));
 let jobPoll: number | null = null;
 let previousRunningJobs = new Set<string>();
+const restoredPhotoScanLayerIds = new Set<string>();
 
-function openPanel(): void {
+function openPanel(layerId?: string): void {
+  if (store.loaded) {
+    selectLayer(
+      resolveSelectedLayerId(
+        store.items,
+        layerId ?? loadSelectedLayerId(browserStorage),
+      ),
+    );
+  } else if (layerId !== undefined) {
+    selectLayer(layerId);
+  }
   if (panelOpen.value) {
     layerDialog.value?.activate();
     return;
@@ -89,6 +110,7 @@ function openPanel(): void {
 function closePanel(): void {
   panelOpen.value = false;
   selectorOpen.value = false;
+  visibleScanResultJobIds.value = new Set();
 }
 
 function togglePanel(): void {
@@ -308,15 +330,42 @@ const filteredAssetCount = computed(() => {
       asset.relativePath?.toLocaleLowerCase().includes(query),
   ).length;
 });
+const editingCoordinate = computed<GeographicCoordinate | null>(() => {
+  if (editLongitude.value.trim() === "" || editLatitude.value.trim() === "") {
+    return null;
+  }
+  const longitude = Number(editLongitude.value);
+  const latitude = Number(editLatitude.value);
+  return Number.isFinite(longitude) &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    Number.isFinite(latitude) &&
+    latitude >= -90 &&
+    latitude <= 90
+    ? { longitude, latitude }
+    : null;
+});
+const editingPhotoMetadataRows = computed(() =>
+  photoMetadataRows(editingAsset.value?.photoMetadata),
+);
 
 watch(
-  () => store.items.map(({ id }) => id),
-  (layerIds) => {
+  () => ({
+    loaded: store.loaded,
+    layerIds: store.items.map(({ id }) => id),
+  }),
+  ({ loaded, layerIds }) => {
     if (
-      selectedLayerId.value === null ||
-      !layerIds.includes(selectedLayerId.value)
+      loaded &&
+      (selectedLayerId.value === null ||
+        !layerIds.includes(selectedLayerId.value))
     ) {
-      selectLayer(layerIds[0] ?? null);
+      selectLayer(
+        resolveSelectedLayerId(
+          store.items,
+          selectedLayerId.value ?? loadSelectedLayerId(browserStorage),
+        ),
+      );
     }
   },
   { immediate: true },
@@ -356,10 +405,47 @@ function displayedScanJob(layerId: string) {
   return (
     scanJob(layerId) ??
     store.jobs.find(
-      (job) => job.type === "photo-scan" && job.input.layerId === layerId,
+      (job) =>
+        job.type === "photo-scan" &&
+        job.input.layerId === layerId &&
+        visibleScanResultJobIds.value.has(job.id),
     )
   );
 }
+
+function latestScanJob(layerId: string) {
+  return store.jobs.find(
+    (job) => job.type === "photo-scan" && job.input.layerId === layerId,
+  );
+}
+
+function restorePhotoScanSettings(): void {
+  for (const layer of store.items) {
+    if (
+      layer.pluginId !== "photo-layer" ||
+      restoredPhotoScanLayerIds.has(layer.id)
+    ) {
+      continue;
+    }
+    const previousJob = latestScanJob(layer.id);
+    if (previousJob === undefined) continue;
+    scanDirectories[layer.id] =
+      typeof previousJob.input.relativeDirectory === "string"
+        ? previousJob.input.relativeDirectory
+        : "";
+    recursiveScans[layer.id] =
+      typeof previousJob.input.recursive === "boolean"
+        ? previousJob.input.recursive
+        : true;
+    restoredPhotoScanLayerIds.add(layer.id);
+  }
+}
+
+watch(
+  [() => store.items.map(({ id }) => id), () => store.jobs.map(({ id }) => id)],
+  restorePhotoScanSettings,
+  { immediate: true },
+);
 
 async function run(action: () => Promise<unknown>): Promise<void> {
   busy.value = true;
@@ -575,12 +661,16 @@ function startPhotoScan(layerId: string): void {
     localError.value = "Choose a photo subdirectory before starting a scan.";
     return;
   }
-  void run(() =>
-    store.startPhotoScan(layerId, {
+  void run(async () => {
+    const job = await store.startPhotoScan(layerId, {
       relativeDirectory,
       recursive: recursiveScans[layerId] ?? true,
-    }),
-  );
+    });
+    visibleScanResultJobIds.value = new Set([
+      ...visibleScanResultJobIds.value,
+      job.id,
+    ]);
+  });
 }
 
 function openPhotoDirectoryBrowser(layer: Layer): void {
@@ -667,10 +757,25 @@ function saveAsset(): void {
   });
 }
 
+function centerEditingPhoto(): void {
+  if (editingCoordinate.value !== null) {
+    emit("centerMap", editingCoordinate.value);
+  }
+}
+
 async function pollJobs(): Promise<void> {
   await store.loadJobs();
   const current = new Set(activeJobs.value.map(({ id }) => id));
-  const finished = [...previousRunningJobs].some((id) => !current.has(id));
+  const finishedJobIds = [...previousRunningJobs].filter(
+    (id) => !current.has(id),
+  );
+  const finished = finishedJobIds.length > 0;
+  if (panelOpen.value && finished) {
+    visibleScanResultJobIds.value = new Set([
+      ...visibleScanResultJobIds.value,
+      ...finishedJobIds,
+    ]);
+  }
   previousRunningJobs = current;
   if (finished) {
     await Promise.all(
@@ -687,19 +792,7 @@ async function pollJobs(): Promise<void> {
 
 onMounted(async () => {
   await Promise.all([store.loadPhotoDirectory(), store.loadJobs()]);
-  for (const layer of store.items) {
-    if (layer.pluginId === "photo-layer") {
-      const previousJob = displayedScanJob(layer.id);
-      scanDirectories[layer.id] =
-        typeof previousJob?.input.relativeDirectory === "string"
-          ? previousJob.input.relativeDirectory
-          : "";
-      recursiveScans[layer.id] =
-        typeof previousJob?.input.recursive === "boolean"
-          ? previousJob.input.recursive
-          : true;
-    }
-  }
+  restorePhotoScanSettings();
   previousRunningJobs = new Set(activeJobs.value.map(({ id }) => id));
   jobPoll = window.setInterval(() => void pollJobs(), 1000);
 });
@@ -792,6 +885,7 @@ onBeforeUnmount(() => {
         @browse-scan-directory="withSelectedLayer(openPhotoDirectoryBrowser)"
         @scan-job-action="withSelectedLayer((layer) => { const job = scanJob(layer.id); if (job) controlJob(job.id, $event); })"
         @manage-photos="withSelectedLayer((layer) => openFirstPhoto(layer.id))"
+        @fit-photos="withSelectedLayer((layer) => emit('fitPhotoLayer', layer.id))"
       />
     </section>
   </DialogWindow>
@@ -875,11 +969,35 @@ onBeforeUnmount(() => {
       <section class="asset-detail">
         <strong>{{ editingAsset.fileName }}</strong>
         <small v-if="editingAsset.relativePath">{{ editingAsset.relativePath }}</small>
-        <img
-          v-if="editingAsset.previewAvailable"
-          :src="`api/layers/${editingAsset.layerId}/assets/${editingAsset.id}`"
-          :alt="editingAsset.fileName"
-        />
+        <div v-if="editingAsset.previewAvailable" class="photo-preview">
+          <img
+            :src="`api/layers/${editingAsset.layerId}/assets/${editingAsset.id}`"
+            :alt="editingAsset.fileName"
+          />
+          <button
+            type="button"
+            class="photo-preview-center"
+            title="Center map here"
+            aria-label="Center map here"
+            :disabled="editingCoordinate === null"
+            @click="centerEditingPhoto"
+          >
+            <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>
+          </button>
+        </div>
+        <section
+          v-if="editingPhotoMetadataRows.length > 0"
+          class="photo-metadata"
+          aria-label="Photo metadata"
+        >
+          <strong>Photo metadata</strong>
+          <dl>
+            <div v-for="row in editingPhotoMetadataRows" :key="row.label">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          </dl>
+        </section>
         <p v-if="editingAsset.errorMessage" class="layer-error">{{ editingAsset.errorMessage }}</p>
         <div class="coordinate-fields">
           <label><span>Longitude</span><input v-model="editLongitude" type="number" step="any" /></label>
@@ -1029,14 +1147,94 @@ onBeforeUnmount(() => {
   color: #617870;
 }
 
-.asset-editor img {
+.asset-detail {
+  align-content: start;
+  min-height: 0;
+  padding-right: 0.15rem;
+  overflow-y: auto;
+}
+
+.photo-preview {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+}
+
+.photo-preview img {
   width: 100%;
   max-height: 18rem;
   object-fit: contain;
 }
 
+.photo-preview-center {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: transparent;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 85%));
+  font: inherit;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.photo-preview-center:hover,
+.photo-preview-center:focus-visible {
+  background: rgb(22 56 50 / 68%);
+}
+
+.photo-preview-center:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.photo-preview-center:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .coordinate-fields > label {
   flex: 1;
+}
+
+.photo-metadata {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #d2ded9;
+  border-radius: 0.35rem;
+  background: #f8fbfa;
+}
+
+.photo-metadata dl {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+}
+
+.photo-metadata dl > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.4fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.photo-metadata dt {
+  color: #617870;
+  font-size: 0.78rem;
+}
+
+.photo-metadata dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 650px) {

@@ -25,6 +25,7 @@ const emit = defineEmits<{
   browseScanDirectory: [];
   scanJobAction: [action: "pause" | "resume" | "cancel"];
   managePhotos: [];
+  fitPhotos: [];
 }>();
 </script>
 
@@ -45,5 +46,6 @@ const emit = defineEmits<{
     @browse-directory="emit('browseScanDirectory')"
     @job-action="emit('scanJobAction', $event)"
     @manage-photos="emit('managePhotos')"
+    @fit-photos="emit('fitPhotos')"
   />
 </template>

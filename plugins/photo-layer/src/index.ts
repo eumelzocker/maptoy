@@ -12,12 +12,16 @@ export interface PhotoLayerConfiguration {
   pointColor: string;
   pointRadius: number;
   showPreviews: boolean;
+  clusterNearby: boolean;
+  clusterRadius: number;
 }
 
 const defaultConfiguration: PhotoLayerConfiguration = {
   pointColor: "#2e77d0",
   pointRadius: 7,
   showPreviews: true,
+  clusterNearby: true,
+  clusterRadius: 48,
 };
 
 function requireRecord(value: unknown): Record<string, unknown> {
@@ -32,6 +36,10 @@ function validateConfiguration(value: unknown): PhotoLayerConfiguration {
   const pointColor = input.pointColor ?? defaultConfiguration.pointColor;
   const pointRadius = input.pointRadius ?? defaultConfiguration.pointRadius;
   const showPreviews = input.showPreviews ?? defaultConfiguration.showPreviews;
+  const clusterNearby =
+    input.clusterNearby ?? defaultConfiguration.clusterNearby;
+  const clusterRadius =
+    input.clusterRadius ?? defaultConfiguration.clusterRadius;
   if (
     typeof pointColor !== "string" ||
     !/^#[0-9a-f]{6}$/i.test(pointColor) ||
@@ -39,11 +47,22 @@ function validateConfiguration(value: unknown): PhotoLayerConfiguration {
     !Number.isFinite(pointRadius) ||
     pointRadius < 2 ||
     pointRadius > 30 ||
-    typeof showPreviews !== "boolean"
+    typeof showPreviews !== "boolean" ||
+    typeof clusterNearby !== "boolean" ||
+    typeof clusterRadius !== "number" ||
+    !Number.isFinite(clusterRadius) ||
+    clusterRadius < 20 ||
+    clusterRadius > 120
   ) {
     throw new Error("Photo layer configuration is invalid.");
   }
-  return { pointColor, pointRadius, showPreviews };
+  return {
+    pointColor,
+    pointRadius,
+    showPreviews,
+    clusterNearby,
+    clusterRadius,
+  };
 }
 
 interface PhotoPointProperties {
@@ -206,6 +225,10 @@ function descriptor(input: InteractiveLayerInput) {
       layers: [
         {
           kind: "point-collection" as const,
+          clustering: {
+            enabled: configuration.clusterNearby,
+            radiusPixels: configuration.clusterRadius,
+          },
           features: points.map((feature) => ({
             id: feature.id,
             coordinate: feature.geometry.coordinate,
@@ -248,6 +271,8 @@ export const photoLayerPlugin = {
         pointColor: { type: "string" },
         pointRadius: { type: "number", minimum: 2, maximum: 30 },
         showPreviews: { type: "boolean" },
+        clusterNearby: { type: "boolean" },
+        clusterRadius: { type: "number", minimum: 20, maximum: 120 },
       },
     },
     dataSchema: {

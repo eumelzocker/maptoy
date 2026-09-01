@@ -24,7 +24,9 @@ layer. The name is optional; an empty field gets the next free numbered name, su
 as `Track 1`.
 After creation, the new Layer is selected in the tree dropdown, its single editor
 opens, and its import or scan control receives focus. The checkboxes in the dropdown
-change visibility without changing the editor selection. The general **Opacity**
+change visibility without changing the editor selection. Opening the Layers tool
+without an explicit target restores the last locally stored Layer, or selects the
+first visible Layer if that preference is unavailable. The general **Opacity**
 slider applies to the complete Layer in both the interactive map and exports.
 Layers form one global overlay stack independent of Map Sets. Changing the
 Map Set replaces only the base map and reattaches the same overlays with their
@@ -114,8 +116,10 @@ photo directory and never discloses its absolute path. Navigate into a subdirect
 and select **Scan this directory**. Selecting the configured root itself is disabled
 in the browser, which makes it practical to assign a separate source folder to each
 Photos layer. The persistent job can be paused, resumed, or cancelled. An interrupted
-running scan returns to the queue after restart. The most recently scanned folder and
-recursive setting are restored from that Layer's latest Job when the UI reloads.
+running scan returns to the queue after restart. Detailed scan results remain visible
+until the Layers dialog closes. On reopening, the latest folder relative to
+`MAPTOY_PHOTOS_DIR` and the loaded Photo count appear above the scan action instead.
+The folder and recursive setting are restored from that Layer's latest Job.
 
 The first scan admits only photos with a complete, valid EXIF GPS point into the
 catalog. It creates an EXIF-oriented, metadata-free WebP preview and records a
@@ -134,12 +138,26 @@ EXIF GPS is immediately used as the effective point coordinate. There is no sepa
 “detected” and “accepted” coordinate. Open **Manage photos** to correct or remove the
 point. A manual position—or a deliberate removal—is never overwritten by a later
 scan. Only a position whose source is still `exif` may be refreshed from a changed
-original. Hovering a marker opens its preview popup instead of a filename tooltip;
+original. **Center map here** uses the currently entered position without saving it
+or changing the map zoom. **Fit photos on map** requests only the Layer's compact
+coordinate extent and adjusts map center and zoom so all positioned Photos fit.
+The **Photo position** dialog also shows every captured metadata value for the
+selected Photo independently of the map popup field configuration.
+
+Nearby Photo markers are clustered by default using a configurable screen-pixel
+radius. Cluster pins update after pan or zoom and show their Photo count. Clicking a
+cluster opens a scrollable overview with reduced previews, filenames, and configured
+popup details for up to 100 lazily loaded Photos without changing the zoom. Larger
+clusters also report the remaining count. Disable **Cluster nearby photos** to render every
+marker independently. Hovering an individual marker opens its preview popup instead of a filename tooltip;
 click remains available for touch and pointer interaction. The popup shows the
 filename, point coordinate in DMS notation, and available capture time below the
 image. This field selection is currently configured in code. Manufacturer, camera
 model, ISO, f-stop, shutter speed, and IPTC caption remain stored for a later
 user-configurable popup selection but are initially hidden.
+Individual and cluster popups choose a position above or below their marker based on
+the available map space, correct horizontal overflow, and constrain their height
+without automatically moving the map when they open.
 
 ## What is stored
 

@@ -8,6 +8,7 @@ import {
   isMapRectangleLayerData,
   isMapXyzTileGridLayerData,
   type MapLayerDescriptor,
+  type MapPointFeature,
   type MapRendererEvent,
   type MapRendererFactory,
   type MapRendererInstance,
@@ -23,6 +24,142 @@ import {
 import type * as Leaflet from "leaflet";
 
 export const LEAFLET_XYZ_ADAPTER_ID = "leaflet-xyz";
+export const MAXIMUM_CLUSTER_POPUP_PHOTOS = 100;
+
+export interface ProjectedPoint<T> {
+  x: number;
+  y: number;
+  value: T;
+}
+
+export interface ProjectedPointCluster<T> {
+  x: number;
+  y: number;
+  values: T[];
+}
+
+export interface SmartPopupRectangle {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+export interface SmartPopupPlacement {
+  belowAnchor: boolean;
+  horizontalShift: number;
+  verticalShift: number;
+  maximumContentHeight: number;
+}
+
+export function smartPopupPlacement(
+  popup: SmartPopupRectangle,
+  anchor: Readonly<{ x: number; y: number }>,
+  viewport: Pick<SmartPopupRectangle, "left" | "top" | "right" | "bottom">,
+  markerRadius: number,
+  margin = 8,
+): SmartPopupPlacement {
+  const safeLeft = viewport.left + margin;
+  const safeTop = viewport.top + margin;
+  const safeRight = viewport.right - margin;
+  const safeBottom = viewport.bottom - margin;
+  const gap = markerRadius + 12;
+  const availableAbove = Math.max(0, anchor.y - gap - safeTop);
+  const availableBelow = Math.max(0, safeBottom - anchor.y - gap);
+  const belowAnchor =
+    popup.height > availableAbove && availableBelow > availableAbove;
+  const verticalShift = belowAnchor
+    ? anchor.y + gap - popup.top
+    : anchor.y - gap - popup.bottom;
+  const availableWidth = Math.max(0, safeRight - safeLeft);
+  let horizontalShift: number;
+  if (popup.width > availableWidth) {
+    horizontalShift =
+      (safeLeft + safeRight) / 2 - (popup.left + popup.right) / 2;
+  } else if (popup.left < safeLeft) {
+    horizontalShift = safeLeft - popup.left;
+  } else if (popup.right > safeRight) {
+    horizontalShift = safeRight - popup.right;
+  } else {
+    horizontalShift = 0;
+  }
+  return {
+    belowAnchor,
+    horizontalShift,
+    verticalShift,
+    maximumContentHeight: Math.max(
+      80,
+      Math.floor((belowAnchor ? availableBelow : availableAbove) - 28),
+    ),
+  };
+}
+
+export function clusterProjectedPoints<T>(
+  points: readonly ProjectedPoint<T>[],
+  radiusPixels: number,
+): ProjectedPointCluster<T>[] {
+  if (!Number.isFinite(radiusPixels) || radiusPixels <= 0) {
+    throw new Error("Cluster radius must be a positive finite number.");
+  }
+  interface WorkingCluster {
+    anchorX: number;
+    anchorY: number;
+    sumX: number;
+    sumY: number;
+    values: T[];
+  }
+  const buckets = new Map<string, WorkingCluster[]>();
+  const clusters: WorkingCluster[] = [];
+  const cell = (value: number): number => Math.floor(value / radiusPixels);
+  const key = (x: number, y: number): string => `${x}:${y}`;
+
+  for (const point of points) {
+    const cellX = cell(point.x);
+    const cellY = cell(point.y);
+    let nearest: WorkingCluster | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+        for (const candidate of buckets.get(
+          key(cellX + offsetX, cellY + offsetY),
+        ) ?? []) {
+          const distance = Math.hypot(
+            point.x - candidate.anchorX,
+            point.y - candidate.anchorY,
+          );
+          if (distance <= radiusPixels && distance < nearestDistance) {
+            nearest = candidate;
+            nearestDistance = distance;
+          }
+        }
+      }
+    }
+    if (nearest === undefined) {
+      const cluster: WorkingCluster = {
+        anchorX: point.x,
+        anchorY: point.y,
+        sumX: point.x,
+        sumY: point.y,
+        values: [point.value],
+      };
+      clusters.push(cluster);
+      const bucketKey = key(cellX, cellY);
+      buckets.set(bucketKey, [...(buckets.get(bucketKey) ?? []), cluster]);
+    } else {
+      nearest.sumX += point.x;
+      nearest.sumY += point.y;
+      nearest.values.push(point.value);
+    }
+  }
+
+  return clusters.map((cluster) => ({
+    x: cluster.sumX / cluster.values.length,
+    y: cluster.sumY / cluster.values.length,
+    values: cluster.values,
+  }));
+}
 
 export const leafletXyzManifest = {
   id: LEAFLET_XYZ_ADAPTER_ID,
@@ -291,6 +428,235 @@ async function createLeafletInstance(
     });
   };
 
+  type PopupSource = Leaflet.CircleMarker | Leaflet.Marker;
+  const placePopup = (
+    source: PopupSource,
+    coordinate: Readonly<{ longitude: number; latitude: number }>,
+    markerRadius: number,
+  ): void => {
+    const popup = source.getPopup();
+    const element = popup?.getElement();
+    if (popup === undefined || element === undefined) return;
+    const baseOffset = L.point(0, 7);
+    popup.options.offset = baseOffset;
+    element.classList.remove("maptoy-smart-popup--below");
+    element.style.removeProperty("--maptoy-popup-tip-shift");
+    element.style.removeProperty("--maptoy-popup-maximum-height");
+    popup.update();
+
+    const mapRectangle = map.getContainer().getBoundingClientRect();
+    const popupRectangle = element.getBoundingClientRect();
+    const anchorPoint = map.latLngToContainerPoint([
+      coordinate.latitude,
+      coordinate.longitude,
+    ]);
+    const placement = smartPopupPlacement(
+      popupRectangle,
+      {
+        x: mapRectangle.left + anchorPoint.x,
+        y: mapRectangle.top + anchorPoint.y,
+      },
+      {
+        left: Math.max(0, mapRectangle.left),
+        top: Math.max(0, mapRectangle.top),
+        right: Math.min(window.innerWidth, mapRectangle.right),
+        bottom: Math.min(window.innerHeight, mapRectangle.bottom),
+      },
+      markerRadius,
+    );
+    popup.options.offset = L.point(
+      baseOffset.x + placement.horizontalShift,
+      baseOffset.y + placement.verticalShift,
+    );
+    element.classList.toggle(
+      "maptoy-smart-popup--below",
+      placement.belowAnchor,
+    );
+    element.style.setProperty(
+      "--maptoy-popup-tip-shift",
+      `${-placement.horizontalShift}px`,
+    );
+    element.style.setProperty(
+      "--maptoy-popup-maximum-height",
+      `${placement.maximumContentHeight}px`,
+    );
+    popup.update();
+  };
+
+  const schedulePopupPlacement = (
+    source: PopupSource,
+    coordinate: Readonly<{ longitude: number; latitude: number }>,
+    markerRadius: number,
+  ): void => {
+    window.requestAnimationFrame(() => {
+      placePopup(source, coordinate, markerRadius);
+    });
+  };
+
+  const createPointMarker = (
+    descriptor: MapLayerDescriptor,
+    feature: MapPointFeature,
+  ): Leaflet.CircleMarker => {
+    const point = L.circleMarker(
+      [feature.coordinate.latitude, feature.coordinate.longitude],
+      {
+        radius: feature.symbolizer.radius,
+        color: feature.symbolizer.strokeColor,
+        weight: feature.symbolizer.strokeWidth,
+        fillColor: feature.symbolizer.fillColor,
+        fillOpacity: feature.symbolizer.fillOpacity * descriptor.opacity,
+        opacity: descriptor.opacity,
+        bubblingMouseEvents: false,
+      },
+    );
+    if (feature.previewUrl !== undefined) {
+      const popupContent = document.createElement("div");
+      popupContent.className = "maptoy-point-popup";
+      const preview = document.createElement("img");
+      preview.className = "maptoy-point-popup__preview";
+      preview.alt = feature.title ?? "";
+      preview.loading = "lazy";
+      preview.addEventListener("load", () => {
+        schedulePopupPlacement(
+          point,
+          feature.coordinate,
+          feature.symbolizer.radius,
+        );
+      });
+      preview.src = feature.previewUrl;
+      popupContent.append(preview);
+      if (feature.popupLines !== undefined) {
+        const details = document.createElement("small");
+        details.className = "maptoy-point-popup__details";
+        for (const line of feature.popupLines) {
+          const detail = document.createElement("span");
+          detail.textContent = line;
+          details.append(detail);
+        }
+        popupContent.append(details);
+      }
+      point.bindPopup(popupContent, {
+        autoPan: false,
+        closeButton: false,
+        className: "maptoy-smart-popup",
+      });
+      point.on("popupopen", () => {
+        schedulePopupPlacement(
+          point,
+          feature.coordinate,
+          feature.symbolizer.radius,
+        );
+      });
+      point.on("mouseover", () => point.openPopup());
+      point.on("mouseout", () => point.closePopup());
+    } else if (feature.title !== undefined) {
+      point.bindTooltip(feature.title, { sticky: true });
+    }
+    bindFeatureSelection(point, descriptor, feature.id);
+    return point;
+  };
+
+  const createClusterPopup = (
+    features: readonly MapPointFeature[],
+    onPreviewLoad: () => void,
+  ): HTMLDivElement => {
+    const content = document.createElement("div");
+    content.className = "maptoy-point-cluster-popup";
+    const heading = document.createElement("strong");
+    heading.textContent = `${features.length} photos in this cluster`;
+    content.append(heading);
+    const list = document.createElement("div");
+    list.className = "maptoy-point-cluster-popup__list";
+    list.setAttribute("role", "list");
+    for (const feature of features.slice(0, MAXIMUM_CLUSTER_POPUP_PHOTOS)) {
+      const item = document.createElement("article");
+      item.className = "maptoy-point-cluster-popup__item";
+      item.setAttribute("role", "listitem");
+      if (feature.previewUrl !== undefined) {
+        const preview = document.createElement("img");
+        preview.className = "maptoy-point-cluster-popup__preview";
+        preview.alt = feature.title ?? "";
+        preview.loading = "lazy";
+        preview.addEventListener("load", onPreviewLoad);
+        preview.src = feature.previewUrl;
+        item.append(preview);
+      }
+      const details = document.createElement("div");
+      details.className = "maptoy-point-cluster-popup__details";
+      const title = document.createElement("strong");
+      title.textContent = feature.title ?? feature.id;
+      details.append(title);
+      for (const line of feature.popupLines ?? []) {
+        if (line === feature.title) continue;
+        const detail = document.createElement("small");
+        detail.textContent = line;
+        details.append(detail);
+      }
+      item.append(details);
+      list.append(item);
+    }
+    content.append(list);
+    if (features.length > MAXIMUM_CLUSTER_POPUP_PHOTOS) {
+      const remainder = document.createElement("small");
+      remainder.textContent = `and ${features.length - MAXIMUM_CLUSTER_POPUP_PHOTOS} more`;
+      content.append(remainder);
+    }
+    return content;
+  };
+
+  const createClusterMarker = (
+    descriptor: MapLayerDescriptor,
+    cluster: ProjectedPointCluster<MapPointFeature>,
+  ): Leaflet.Marker => {
+    const position = map.containerPointToLatLng(L.point(cluster.x, cluster.y));
+    const bubble = document.createElement("span");
+    bubble.className = "maptoy-point-cluster__count";
+    bubble.textContent = String(cluster.values.length);
+    bubble.style.backgroundColor =
+      cluster.values[0]?.symbolizer.fillColor ?? "#2e77d0";
+    const diameter = Math.min(48, 30 + Math.log10(cluster.values.length) * 7);
+    const marker = L.marker(position, {
+      bubblingMouseEvents: false,
+      opacity: descriptor.opacity,
+      icon: L.divIcon({
+        className: "maptoy-point-cluster",
+        html: bubble,
+        iconAnchor: [diameter / 2, diameter / 2],
+        iconSize: [diameter, diameter],
+      }),
+    });
+    marker.bindTooltip(`${cluster.values.length} photos`, { sticky: true });
+    marker.bindPopup(
+      createClusterPopup(cluster.values, () => {
+        schedulePopupPlacement(
+          marker,
+          {
+            longitude: position.lng,
+            latitude: position.lat,
+          },
+          diameter / 2,
+        );
+      }),
+      {
+        autoPan: false,
+        className: "maptoy-smart-popup",
+        minWidth: 260,
+        maxWidth: 460,
+      },
+    );
+    marker.on("popupopen", () => {
+      schedulePopupPlacement(
+        marker,
+        {
+          longitude: position.lng,
+          latitude: position.lat,
+        },
+        diameter / 2,
+      );
+    });
+    return marker;
+  };
+
   const createPointLayer = (
     descriptor: MapLayerDescriptor,
   ): Leaflet.LayerGroup | null => {
@@ -300,54 +666,73 @@ async function createLeafletInstance(
     ) {
       return null;
     }
+    const pointData = descriptor.data;
     const group = L.layerGroup();
-    for (const feature of descriptor.data.features) {
-      const point = L.circleMarker(
-        [feature.coordinate.latitude, feature.coordinate.longitude],
-        {
-          radius: feature.symbolizer.radius,
-          color: feature.symbolizer.strokeColor,
-          weight: feature.symbolizer.strokeWidth,
-          fillColor: feature.symbolizer.fillColor,
-          fillOpacity: feature.symbolizer.fillOpacity * descriptor.opacity,
-          opacity: descriptor.opacity,
-          bubblingMouseEvents: false,
-        },
-      );
-      if (feature.previewUrl !== undefined) {
-        const popupContent = document.createElement("div");
-        popupContent.className = "maptoy-point-popup";
-        const preview = document.createElement("img");
-        preview.className = "maptoy-point-popup__preview";
-        preview.alt = feature.title ?? "";
-        preview.loading = "lazy";
-        preview.addEventListener("load", () => {
-          point.getPopup()?.update();
-        });
-        preview.src = feature.previewUrl;
-        popupContent.append(preview);
-        if (feature.popupLines !== undefined) {
-          const details = document.createElement("small");
-          details.className = "maptoy-point-popup__details";
-          for (const line of feature.popupLines) {
-            const detail = document.createElement("span");
-            detail.textContent = line;
-            details.append(detail);
-          }
-          popupContent.append(details);
-        }
-        point.bindPopup(popupContent, {
-          autoPan: false,
-          closeButton: false,
-        });
-        point.on("mouseover", () => point.openPopup());
-        point.on("mouseout", () => point.closePopup());
-      } else if (feature.title !== undefined) {
-        point.bindTooltip(feature.title, { sticky: true });
+    const clustering = pointData.clustering;
+    if (clustering?.enabled !== true) {
+      for (const feature of pointData.features) {
+        createPointMarker(descriptor, feature).addTo(group);
       }
-      bindFeatureSelection(point, descriptor, feature.id);
-      point.addTo(group);
+      return group;
     }
+
+    let redrawFrame: number | null = null;
+    const redraw = (): void => {
+      redrawFrame = null;
+      group.clearLayers();
+      const zoom = map.getZoom();
+      const size = map.getSize();
+      const center = map.project(map.getCenter(), zoom);
+      const worldWidth = (map.options.crs ?? L.CRS.EPSG3857).scale(zoom);
+      const margin = clustering.radiusPixels * 2;
+      const projected = pointData.features.flatMap((feature) => {
+        const point = map.project(
+          L.latLng(feature.coordinate.latitude, feature.coordinate.longitude),
+          zoom,
+        );
+        const wrappedX =
+          point.x - Math.round((point.x - center.x) / worldWidth) * worldWidth;
+        const screenX = wrappedX - center.x + size.x / 2;
+        const screenY = point.y - center.y + size.y / 2;
+        return screenX < -margin ||
+          screenX > size.x + margin ||
+          screenY < -margin ||
+          screenY > size.y + margin
+          ? []
+          : [{ x: screenX, y: screenY, value: feature }];
+      });
+      for (const cluster of clusterProjectedPoints(
+        projected,
+        clustering.radiusPixels,
+      )) {
+        if (cluster.values.length === 1) {
+          const feature = cluster.values[0];
+          if (feature !== undefined) {
+            createPointMarker(descriptor, feature).addTo(group);
+          }
+        } else {
+          createClusterMarker(descriptor, cluster).addTo(group);
+        }
+      }
+    };
+    const scheduleRedraw = (): void => {
+      if (redrawFrame === null) {
+        redrawFrame = window.requestAnimationFrame(redraw);
+      }
+    };
+    group.on("add", () => {
+      map.on("moveend", scheduleRedraw);
+      map.on("zoomend", scheduleRedraw);
+      redraw();
+    });
+    group.on("remove", () => {
+      map.off("moveend", scheduleRedraw);
+      map.off("zoomend", scheduleRedraw);
+      if (redrawFrame !== null) {
+        window.cancelAnimationFrame(redrawFrame);
+        redrawFrame = null;
+      }
+    });
     return group;
   };
 
@@ -638,6 +1023,23 @@ async function createLeafletInstance(
       map.setView(
         [viewport.center.latitude, viewport.center.longitude],
         viewport.zoom,
+      );
+    },
+    fitBounds: (bounds, fitOptions) => {
+      const east = bounds.west > bounds.east ? bounds.east + 360 : bounds.east;
+      const padding = L.point(
+        fitOptions?.paddingPixels ?? 0,
+        fitOptions?.paddingPixels ?? 0,
+      );
+      map.fitBounds(
+        L.latLngBounds([bounds.south, bounds.west], [bounds.north, east]),
+        {
+          animate: false,
+          padding,
+          ...(fitOptions?.maximumZoom === undefined
+            ? {}
+            : { maxZoom: fitOptions.maximumZoom }),
+        },
       );
     },
     setZoomRange: ({ minimum, maximum }) => {

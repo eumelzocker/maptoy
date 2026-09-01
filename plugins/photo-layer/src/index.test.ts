@@ -84,6 +84,7 @@ describe("Photo layer plugin", () => {
         data: expect.objectContaining({
           layers: [
             expect.objectContaining({
+              clustering: { enabled: true, radiusPixels: 48 },
               features: [
                 expect.objectContaining({
                   popupLines: [

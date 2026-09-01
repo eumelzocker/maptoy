@@ -321,6 +321,27 @@ export const LayerAssetListResponseSchema = Type.Object(
   { additionalProperties: false, $id: "LayerAssetListResponse" },
 );
 
+export const LayerAssetExtentSchema = Type.Object(
+  {
+    coordinateCount: Type.Integer({ minimum: 0 }),
+    bounds: Type.Union([
+      Type.Null(),
+      Type.Object(
+        {
+          west: Type.Number({ minimum: -180, maximum: 180 }),
+          south: Type.Number({ minimum: -90, maximum: 90 }),
+          east: Type.Number({ minimum: -180, maximum: 180 }),
+          north: Type.Number({ minimum: -90, maximum: 90 }),
+        },
+        { additionalProperties: false },
+      ),
+    ]),
+  },
+  { additionalProperties: false, $id: "LayerAssetExtent" },
+);
+
+export type LayerAssetExtent = Static<typeof LayerAssetExtentSchema>;
+
 export const PhotoDirectoryStatusSchema = Type.Object(
   { configured: Type.Boolean(), available: Type.Boolean() },
   { additionalProperties: false, $id: "PhotoDirectoryStatus" },

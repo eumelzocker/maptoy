@@ -1,4 +1,4 @@
-export const MAP_ADAPTER_SDK_VERSION = "2.0.0";
+export const MAP_ADAPTER_SDK_VERSION = "2.1.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -63,6 +63,11 @@ export interface MapGeographicBounds {
   north: number;
 }
 
+export interface MapFitBoundsOptions {
+  paddingPixels?: number;
+  maximumZoom?: number;
+}
+
 export interface MapRectangleFeature {
   id: string;
   bounds: MapGeographicBounds;
@@ -97,6 +102,10 @@ export interface MapPointFeature {
 export interface MapPointLayerData {
   kind: "point-collection";
   features: readonly MapPointFeature[];
+  clustering?: Readonly<{
+    enabled: boolean;
+    radiusPixels: number;
+  }>;
 }
 
 export interface MapLineSymbolizer {
@@ -244,6 +253,10 @@ export type Unsubscribe = () => void;
 export interface MapRendererInstance {
   getViewport: () => MapViewport;
   setViewport: (viewport: MapViewport) => MaybePromise<void>;
+  fitBounds?: (
+    bounds: MapGeographicBounds,
+    options?: MapFitBoundsOptions,
+  ) => MaybePromise<void>;
   setZoomRange?: (range: MapZoomRange) => MaybePromise<void>;
   subscribe: (
     event: MapRendererEvent,
@@ -336,6 +349,21 @@ export function createFakeMapRendererFactory(): MapRendererFactory {
                     zoomRange.maximum,
                     Math.max(zoomRange.minimum, value.zoom),
                   ),
+          };
+        },
+        fitBounds: (bounds, fitOptions) => {
+          const east =
+            bounds.west > bounds.east ? bounds.east + 360 : bounds.east;
+          const longitude = (bounds.west + east) / 2;
+          viewport = {
+            center: {
+              longitude: longitude > 180 ? longitude - 360 : longitude,
+              latitude: (bounds.south + bounds.north) / 2,
+            },
+            zoom: Math.min(
+              viewport.zoom,
+              fitOptions?.maximumZoom ?? viewport.zoom,
+            ),
           };
         },
         setZoomRange: (value) => {
@@ -465,6 +493,16 @@ export async function exerciseMapRendererContract(
     JSON.stringify(instance.getViewport()) === JSON.stringify(nextViewport),
     "viewport does not round-trip",
   );
+  if (instance.fitBounds !== undefined) {
+    await instance.fitBounds(
+      { west: 170, south: -10, east: -170, north: 10 },
+      { paddingPixels: 24, maximumZoom: 8 },
+    );
+    invariant(
+      instance.getViewport().zoom <= 8,
+      "fit bounds ignored maximum zoom",
+    );
+  }
 
   const unsubscribe = instance.subscribe("viewport", () => undefined);
   invariant(typeof unsubscribe === "function", "subscribe must return cleanup");

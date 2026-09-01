@@ -3,6 +3,7 @@ import type {
   Job,
   Layer,
   LayerAsset,
+  LayerAssetExtent,
   LayerAssetPatch,
   LayerInput,
   LayerPatch,
@@ -139,6 +140,12 @@ export const useLayersStore = defineStore("layers", {
           assetPageRequests.delete(layerId);
         }
       }
+    },
+
+    async loadAssetExtent(layerId: string): Promise<LayerAssetExtent> {
+      return apiRequest<LayerAssetExtent>(
+        `api/layers/${encodeURIComponent(layerId)}/assets/extent`,
+      );
     },
 
     async loadAllAssets(layerId: string): Promise<void> {

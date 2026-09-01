@@ -358,7 +358,7 @@ describe("maptoy server", () => {
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toEqual({ status: "ready" });
     expect(mapRenderers.json()).toMatchObject({
-      items: [{ id: "leaflet-xyz", sdkVersion: "2.0.0" }],
+      items: [{ id: "leaflet-xyz", sdkVersion: "2.1.0" }],
     });
     expect(layerPlugins.json()).toMatchObject({
       items: [
@@ -546,6 +546,17 @@ describe("maptoy server", () => {
           },
         },
       ],
+    });
+    expect(
+      (
+        await server.inject({
+          method: "GET",
+          url: `/api/layers/${photoLayerId}/assets/extent`,
+        })
+      ).json(),
+    ).toEqual({
+      coordinateCount: 1,
+      bounds: { west: 13.405, south: 52.52, east: 13.405, north: 52.52 },
     });
     const photoAssetId = assetsResponse.json().items[0].id as string;
     const metadataDatabase = new DatabaseSync(config.storage.databasePath);

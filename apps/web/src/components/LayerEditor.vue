@@ -39,6 +39,7 @@ const emit = defineEmits<{
   browseScanDirectory: [];
   scanJobAction: [action: "pause" | "resume" | "cancel"];
   managePhotos: [];
+  fitPhotos: [];
 }>();
 
 function nullableNumber(event: Event): number | null {
@@ -142,6 +143,7 @@ function emitConfigurationChange(
       @browse-scan-directory="emit('browseScanDirectory')"
       @scan-job-action="emit('scanJobAction', $event)"
       @manage-photos="emit('managePhotos')"
+      @fit-photos="emit('fitPhotos')"
     />
 
     <p v-if="compatibilityDiagnostic || layer.diagnostic" class="layer-status">

@@ -2,6 +2,11 @@ import { getItem, setItem } from "./localStorage.js";
 
 type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 
+interface LayerSelectionCandidate {
+  id: string;
+  visible: boolean;
+}
+
 const selectedLayerIdKey = "maptoy:selected-layer";
 const legacyExpandedLayerConfigurationsKey =
   "maptoy:expanded-layer-configurations";
@@ -56,6 +61,20 @@ export function saveSelectedLayerId(
   storage?: PreferenceStorage | null,
 ): void {
   setItem(selectedLayerIdKey, layerId ?? "", storage);
+}
+
+export function resolveSelectedLayerId(
+  layers: readonly LayerSelectionCandidate[],
+  preferredLayerId: string | null | undefined,
+): string | null {
+  if (
+    preferredLayerId !== null &&
+    preferredLayerId !== undefined &&
+    layers.some(({ id }) => id === preferredLayerId)
+  ) {
+    return preferredLayerId;
+  }
+  return layers.find(({ visible }) => visible)?.id ?? null;
 }
 
 export function loadCollapsedLayerHierarchy(

@@ -134,7 +134,7 @@ const showTileGrid = computed(() =>
     ? layers.defaultGridLayer?.visible === true
     : storedShowTileGrid.value,
 );
-const layerPanel = ref<{ open(): void } | null>(null);
+const layerPanel = ref<{ open(layerId?: string): void } | null>(null);
 const displayOptionsOpen = ref(false);
 const displayOptionsDialog = ref<{ activate(): void } | null>(null);
 const gotoCoordinatesOpen = ref(false);
@@ -612,6 +612,71 @@ async function applyMapZoom(sourceZoom: number): Promise<void> {
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function centerMapOnPhoto(
+  coordinate: GeographicCoordinate,
+): Promise<void> {
+  if (renderer === null) {
+    return;
+  }
+  mapError.value = null;
+  await applyMapCenter(renderer, coordinate);
+  const viewport = renderer.getViewport();
+  zoom.value = viewport.zoom;
+  saveMapViewport(browserStorage, viewport);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function fitPhotoLayer(layerId: string): Promise<void> {
+  const activeRenderer = renderer;
+  const mapSet = selected.value;
+  const layer = layers.items.find(({ id }) => id === layerId);
+  if (activeRenderer === null || mapSet === null || layer === undefined) {
+    return;
+  }
+  mapError.value = null;
+  try {
+    const extent = await layers.loadAssetExtent(layerId);
+    if (extent.bounds === null || extent.coordinateCount === 0) {
+      mapError.value = "This Photo Layer has no positioned Photos.";
+      return;
+    }
+    if (
+      extent.bounds.west === extent.bounds.east &&
+      extent.bounds.south === extent.bounds.north
+    ) {
+      await applyMapCenter(activeRenderer, {
+        longitude: extent.bounds.west,
+        latitude: extent.bounds.south,
+      });
+    } else if (activeRenderer.fitBounds !== undefined) {
+      const zoomOptions = leafletXyzZoomOptions(mapSet);
+      await activeRenderer.fitBounds(extent.bounds, {
+        paddingPixels: 32,
+        maximumZoom:
+          Math.min(mapSet.maxZoom, layer.maximumZoom ?? mapSet.maxZoom) -
+          zoomOptions.zoomOffset,
+      });
+    } else {
+      mapError.value = "This Map renderer cannot fit a Layer extent.";
+      return;
+    }
+    const viewport = activeRenderer.getViewport();
+    zoom.value = viewport.zoom;
+    saveMapViewport(browserStorage, viewport);
+    const sourceZoom = viewport.zoom + leafletXyzZoomOptions(mapSet).zoomOffset;
+    if (layer.minimumZoom !== null && sourceZoom < layer.minimumZoom) {
+      mapError.value =
+        "All Photos fit the viewport, but this Layer is hidden below its configured minimum zoom.";
+    }
+  } catch (error) {
+    mapError.value =
+      error instanceof Error
+        ? error.message
+        : "The Photo Layer extent could not be loaded.";
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function resetToInitialViewport(): void {
   const mapSet = selected.value;
   if (mapSet === null || renderer === null) {
@@ -758,6 +823,8 @@ function selectCoordinateFormat(value: string): void {
           :enabled="selected.capabilities.layerRendering"
           :supported-layer-types="supportedLayerTypes"
           @changed="renderPluginLayers"
+          @center-map="centerMapOnPhoto"
+          @fit-photo-layer="fitPhotoLayer"
         />
         <MapSideControlButton
           label="Display Options"

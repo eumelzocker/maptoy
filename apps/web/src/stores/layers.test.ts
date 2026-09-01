@@ -96,4 +96,21 @@ describe("layers store Asset pagination", () => {
       ["api/layers/layer-1/assets?cursor=asset-1&limit=200"],
     ]);
   });
+
+  it("loads a compact Photo extent without fetching Asset pages", async () => {
+    apiRequestMock.mockResolvedValueOnce({
+      coordinateCount: 2,
+      bounds: { west: 13.4, south: 52.5, east: 13.5, north: 52.6 },
+    });
+    const store = useLayersStore();
+
+    await expect(store.loadAssetExtent("layer-1")).resolves.toEqual({
+      coordinateCount: 2,
+      bounds: { west: 13.4, south: 52.5, east: 13.5, north: 52.6 },
+    });
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "api/layers/layer-1/assets/extent",
+    );
+    expect(store.assetsLoaded("layer-1")).toBe(false);
+  });
 });

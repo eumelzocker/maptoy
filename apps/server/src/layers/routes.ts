@@ -14,6 +14,7 @@ import {
   LayerAssetPatchSchema,
   LayerAssetSchema,
   LayerAssetImportResponseSchema,
+  LayerAssetExtentSchema,
   LayerAssetListResponseSchema,
   type LayerInput,
   LayerInputSchema,
@@ -162,6 +163,20 @@ export function registerLayerRoutes(
         request.query.limit ?? 200,
         request.query.cursor,
       ),
+  );
+
+  server.get<{ Params: { id: string } }>(
+    "/api/layers/:id/assets/extent",
+    {
+      schema: {
+        params: idParametersSchema,
+        response: {
+          200: LayerAssetExtentSchema,
+          404: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => photoScans.assetExtent(request.params.id),
   );
 
   server.post<{ Params: { id: string } }>(

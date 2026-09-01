@@ -23,3 +23,9 @@ The Coverage view visualizes fresh, stale, and missing archive tiles at an
 appropriate aggregation level while retaining the geographic context.
 
 <img src="../assets/screenshot1.webp" alt="maptoy Coverage view showing aggregated cache status cells over a map" width="900">
+
+## Photo Layers
+
+This example shows a Photo Layer with clustering and an open preview popup.
+
+<img src="../assets/screenshot2.webp" alt="maptoy Map view showing clustered Photo markers and an open Photo preview" width="900">
