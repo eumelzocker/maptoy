@@ -473,13 +473,14 @@ Bildoriginale werden über keinen Asset-Endpunkt dauerhaft in maptoy übernommen
 
 ### 6.5 Jobs und Exporte
 
-- `POST api/download-jobs/estimate`
-- `POST api/download-jobs`
+- `POST api/map-sets/:id/tile-downloads/estimate`
+- `POST api/map-sets/:id/tile-download-jobs`
 - `GET api/jobs`
 - `GET api/jobs/:id`
 - `POST api/jobs/:id/pause`
 - `POST api/jobs/:id/resume`
 - `POST api/jobs/:id/cancel`
+- `POST api/jobs/:id/retry`
 - `POST api/export-jobs/estimate`
 - `POST api/export-jobs`
 - `GET api/exports/:id/download`
@@ -497,11 +498,9 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
    Navigation.
 2. **Map Sets** – Übersicht, Editor, Validierung und Testabruf.
 3. **Cache** – Tile-Historie, Snapshots, aktuelle/historische Speicherbelegung und ausdrücklich bestätigte Löschaktionen.
-4. **Coverage** – Übersichtskarte mit farblicher Cache-Abdeckung sowie Auswahl und Vergleich von aktuellem Stand, Snapshot oder Zeitpunkt.
-5. **Downloads** – Gebietsauswahl auf der Karte, Schätzung, Terms-/Limit- und Verantwortungshinweise sowie Jobfortschritt.
-6. **Exports** – Ausschnitt, Projektion, Ausgabeparameter, Plugin-Layer, Vorschau und Ergebnisdownload.
-7. **Jobs** – gemeinsame Historie mit Fehlerdetails und Wiederaufnahmeaktionen.
-8. **Documentation** – mehrsprachige Hilfe, API-Referenz, Provider-, Adapter-, Plugin- und Projektionsinformationen, Glossar und Fehlersuche.
+4. **Coverage** – Übersichtskarte mit farblicher Cache-Abdeckung, Auswahl und Vergleich von aktuellem Stand, Snapshot oder Zeitpunkt sowie integriertem Batch-Download mit Gebietsauswahl, Schätzung, Verantwortungshinweisen, Jobfortschritt und Fehlerdetails.
+5. **Exports** – Ausschnitt, Projektion, Ausgabeparameter, Plugin-Layer, Vorschau und Ergebnisdownload.
+6. **Documentation** – mehrsprachige Hilfe, API-Referenz, Provider-, Adapter-, Plugin- und Projektionsinformationen, Glossar und Fehlersuche.
 
 Für Layer, Assets und Fotokatalog wird in v1 keine eigene Hauptansicht und keine
 eigene `/layers`-Route angelegt. Die Kartenansicht bleibt während Auswahl,
@@ -653,7 +652,10 @@ MAPTOY_LOGGING_DIR=${MAPTOY_STORAGE_DATA_DIR}/logs
 MAPTOY_LOGGING_TRAFFIC_MAX_BYTES=10485760
 MAPTOY_LOGGING_TRAFFIC_MAX_FILES=5
 MAPTOY_TILES_MAX_BYTES=10485760
-MAPTOY_JOBS_MAX_CONCURRENCY=1
+MAPTOY_JOBS_RETENTION_DAYS=30
+MAPTOY_JOBS_ERROR_HISTORY_LIMIT=100
+MAPTOY_DOWNLOADS_WARNING_TILE_COUNT=10000
+MAPTOY_DOWNLOADS_MAX_TILE_COUNT=100000
 MAPTOY_EXPORTS_MAX_PIXELS=100000000
 MAPTOY_STORAGE_TEMP_DIR=${MAPTOY_STORAGE_DATA_DIR}/tmp
 MAPTOY_PHOTOS_DIR=./.photos
@@ -1208,6 +1210,9 @@ von Phase 7
 
 ### Phase 6: Batch-Downloads und Erweiterung des Job-Systems
 
+**Status:** am 2. September 2026 abgeschlossen und mit Version `0.4.0`
+veröffentlicht
+
 **Aufgaben**
 
 - den in Phase 5 eingeführten persistenten Jobkern und In-Process-Worker um
@@ -1216,7 +1221,9 @@ von Phase 7
 - providerbezogene Rate-Limits, Parallelität, Retries und `Retry-After` umsetzen
 - Pause, Fortsetzung, Abbruch und Neustart-Recovery für Tile-Download-Einheiten auf
   Grundlage des gemeinsamen Jobkerns ergänzen
-- Download-Ansicht mit Gebietsauswahl und Jobfortschritt erstellen
+- Batch-Download als einklappbaren Workflow mit Gebietsauswahl und Jobfortschritt
+  in Coverage integrieren; Map Sets verlinkt kontextbezogen dorthin, ohne eigene
+  Download- oder Job-Hauptansicht
 - laufende Download-Einheiten als einfache Chip-Overlays über der Coverage-Karte darstellen, ohne sie in Zellstatus oder Farblegende zu integrieren
 - konfigurierte Speicher-, Größen- und Betriebsgrenzen durchsetzen und Terms-/Attributionshinweise vor Start anzeigen
 
@@ -1333,20 +1340,19 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.3.2` | Cache- und Coverage-Verbesserungen sowie fokussierte Fotoverzeichnis-, Positions- und Metadatenabläufe |
 | `0.3.3` | Fotolayer-Navigation, dynamisches Marker-Clustering und verfeinerte Foto-Popups und -Dialoge |
 | `0.3.4` | Gemeinsames Traffic-Log-Verzeichnis sowie aktualisierte Setup-Dokumentation und Screenshots |
+| `0.4.0` | Phase 6: kontrollierte Batch-Downloads, Provider-Limits und Erweiterung des gemeinsamen Job-Systems |
 
 ### 13.2 Weitere Releases
 
-Mit `0.3.1` ist Phase 5 vollständig veröffentlicht. Phase 5a ist bereits seit
+Mit `0.4.0` ist Phase 6 vollständig veröffentlicht. Phase 5a ist bereits seit
 Version `0.2.3` vollständig veröffentlicht; ihre für Phase 7 vorgesehene
 serverseitige Deskriptorausgabe ist kein offener Bestandteil von Phase 5a. Die
 weitere fachliche Reihenfolge erhält erst beim tatsächlichen Release konkrete
-Patchnummern:
+Versionsnummern:
 
-1. Phase 6: kontrollierter Batch-Download, Provider-Limits und Erweiterung des
-   gemeinsamen Job-Systems
-2. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
-3. Phase 8: vollständige Dokumentation und lokalisierte Suche
-4. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
+1. Phase 7: Bildexport, Projektionen, Exporthistorie und Download
+2. Phase 8: vollständige Dokumentation und lokalisierte Suche
+3. Phase 9: Sicherheits-, Performance-, Betriebs- und Release-Härtung
 
 Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als eigene Versionen erscheinen.
 
@@ -1477,12 +1483,17 @@ geführt; Ideen ohne Einfluss auf v1 sind separat geparkt.
   standardmäßig auf 100 Einträge begrenzt. Beide Werte sind konfigurierbar. Die
   Bereinigung läuft beim Start und stündlich oder wird über die API manuell
   ausgelöst; wartende, laufende und pausierte Jobs sind geschützt.
+- Batch-Downloads warnen standardmäßig ab 10.000 ausgewählten Tiles und blockieren
+  oberhalb von 100.000 Tiles. Beide Aufnahmegrenzen sind konfigurierbar; zusätzlich
+  blockiert der Preflight, wenn die geschätzte Datenmenge das konfigurierte
+  Map-Set-Speicherlimit überschreiten würde. Die Werte sind bewusst konservative
+  Betriebsdefaults und nicht durch Abrufe gegen einen externen Provider ermittelt,
+  um fremde Dienste nicht für einen künstlichen Benchmark zu belasten.
 
 ### 16.2 Offen für verbleibende v1-Phasen
 
 | Spätestens vor | Entscheidung | Benötigtes Ergebnis |
 | --- | --- | --- |
-| Phase 6 | Welche Standard- und Hartgrenzen gelten auf der Zielhardware für Gebietsauswahl und Tile-Anzahl, und ab wann warnt beziehungsweise blockiert die Aufnahmeprüfung? Die Coverage-Antwort ist unabhängig davon bereits auf standardmäßig 1.024 und maximal 4.096 aggregierte Zellen begrenzt. | Gemessene Defaults, konfigurierbare Obergrenzen, verständliche Preflight-Fehler und dokumentiertes Verhalten am Speicherlimit. `MAPTOY_TILES_MAX_BYTES` und die Exportpixelgrenzen werden dabei nicht erneut festgelegt. |
 | Phase 7 | Wie lange bleiben fertige Exportdateien erhalten? | Auf der allgemeinen Job-Aufbewahrung aufbauende Standardfrist, konfigurierbare Grenze und nachvollziehbarer Bereinigungsweg für Exportdateien. |
 | Phase 8 | Ist eine ausreichend gute Thai-Suche mit vertretbarem Aufwand möglich? | Entweder getestete Thai-Segmentierung und Suche oder eine bewusst deaktivierte Thai-Suche mit sichtbarem Verweis auf die englische Suche. |
 

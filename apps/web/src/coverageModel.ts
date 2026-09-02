@@ -2,7 +2,9 @@ import type {
   CoverageCell,
   CoverageResponse,
   CoverageSelection,
+  Job,
 } from "@maptoy/contracts";
+import { xyzTileBounds } from "@maptoy/map-core";
 import type {
   GeographicCoordinate,
   MapLayerDescriptor,
@@ -11,6 +13,7 @@ import type {
 } from "@maptoy/map-adapter-sdk";
 
 export const COVERAGE_LAYER_ID = "cache-coverage";
+export const TILE_DOWNLOAD_LAYER_ID = "tile-download-activity";
 
 export const FRESH_COVERAGE_STEPS = [
   { minimumPercent: 0, color: "#b8ddc5", label: ">0–<25%" },
@@ -138,6 +141,60 @@ export function visibleCoverageBounds(
   };
 }
 
+export function screenRectangleBounds(
+  projection: ScreenProjection,
+  start: ScreenPoint,
+  end: ScreenPoint,
+): CoverageResponse["bounds"] {
+  const minimumX = Math.min(start.x, end.x);
+  const maximumX = Math.max(start.x, end.x);
+  const minimumY = Math.min(start.y, end.y);
+  const maximumY = Math.max(start.y, end.y);
+  const middleX = (minimumX + maximumX) / 2;
+  const middleY = (minimumY + maximumY) / 2;
+  const left = projection.screenToGeographic({ x: minimumX, y: middleY });
+  const right = projection.screenToGeographic({ x: maximumX, y: middleY });
+  const top = projection.screenToGeographic({ x: middleX, y: minimumY });
+  const bottom = projection.screenToGeographic({ x: middleX, y: maximumY });
+  const longitudeSpan = right.longitude - left.longitude;
+  const west =
+    longitudeSpan >= 359.999 ? -180 : normalizedLongitude(left.longitude);
+  const east =
+    longitudeSpan >= 359.999 ? 180 : normalizedLongitude(right.longitude);
+  const south = Math.max(-85.05112878, Math.min(85.05112878, bottom.latitude));
+  const north = Math.max(-85.05112878, Math.min(85.05112878, top.latitude));
+  return {
+    west,
+    south: Math.min(south, north - 1e-9),
+    east: west === east ? Math.min(180, east + 1e-9) : east,
+    north,
+  };
+}
+
+export function downloadCoordinatePrecision(maximumZoom: number): number {
+  const pixelsAroundWorld = 256 * 2 ** Math.max(0, maximumZoom);
+  return Math.min(
+    6,
+    Math.max(2, Math.ceil(Math.log10(pixelsAroundWorld / 360))),
+  );
+}
+
+export function roundedDownloadBounds(
+  bounds: CoverageResponse["bounds"],
+  maximumZoom: number,
+): CoverageResponse["bounds"] {
+  const precision = downloadCoordinatePrecision(maximumZoom);
+  const rounded = {
+    west: Number(bounds.west.toFixed(precision)),
+    south: Number(bounds.south.toFixed(precision)),
+    east: Number(bounds.east.toFixed(precision)),
+    north: Number(bounds.north.toFixed(precision)),
+  };
+  return rounded.west === rounded.east || rounded.south >= rounded.north
+    ? bounds
+    : rounded;
+}
+
 export function coverageSelection(
   mode: CoverageSelection["kind"],
   snapshotId: string,
@@ -237,5 +294,81 @@ export function coverageLayer(
     visible: true,
     opacity: 1,
     data: { kind: "rectangle-grid", features },
+  };
+}
+
+export function tileDownloadLayer(
+  selection: CoverageResponse["bounds"] | null,
+  jobs: readonly Job[],
+): MapLayerDescriptor {
+  const activeTiles = jobs.flatMap((job) => {
+    if (job.type !== "tile-download" || job.status !== "running") return [];
+    const { currentZoom, currentX, currentY } = job.summary;
+    if (
+      currentZoom === undefined ||
+      currentX === undefined ||
+      currentY === undefined
+    ) {
+      return [];
+    }
+    const bounds = xyzTileBounds({
+      zoom: currentZoom,
+      x: currentX,
+      y: currentY,
+    });
+    return [
+      {
+        id: job.id,
+        coordinate: {
+          longitude: (bounds.west + bounds.east) / 2,
+          latitude: (bounds.south + bounds.north) / 2,
+        },
+        title: `Downloading ${currentZoom}/${currentX}/${currentY}`,
+        symbolizer: {
+          radius: 8,
+          fillColor: "#7c3aed",
+          strokeColor: "#ffffff",
+          strokeWidth: 2,
+          fillOpacity: 0.95,
+        },
+      },
+    ];
+  });
+  return {
+    id: TILE_DOWNLOAD_LAYER_ID,
+    type: "composite",
+    visible: true,
+    opacity: 1,
+    data: {
+      kind: "composite",
+      layers: [
+        {
+          kind: "rectangle-grid",
+          features:
+            selection === null
+              ? []
+              : [
+                  {
+                    id: "download-selection-halo",
+                    bounds: selection,
+                    fillColor: "transparent",
+                    strokeColor: "#ffffff",
+                    strokeWidth: 7,
+                    fillOpacity: 0,
+                  },
+                  {
+                    id: "download-selection",
+                    bounds: selection,
+                    fillColor: "#b44cff",
+                    strokeColor: "#6d00d9",
+                    strokeWidth: 4,
+                    fillOpacity: 0.22,
+                    label: "Selected Tile Download area",
+                  },
+                ],
+        },
+        { kind: "point-collection", features: activeTiles },
+      ],
+    },
   };
 }

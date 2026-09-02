@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Job, Layer } from "@maptoy/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openDatabase, type MaptoyDatabase } from "../database.js";
+import { JobService } from "../jobs/service.js";
 import type { ImagePreviewStorage } from "./imagePreviewStorage.js";
 import type { PhotoDirectory, ResolvedPhotoFile } from "./photoDirectory.js";
 import { PhotoScanService } from "./photoScanner.js";
@@ -345,7 +346,7 @@ describe("JobRepository lifecycle", () => {
     await finishHarness(harness.service, harness.database);
   });
 
-  it("runs configured retention automatically during service startup", async () => {
+  it("runs configured retention automatically during Job service startup", async () => {
     const harness = await createHarness([]);
     const timestamp = "2000-01-01T00:00:00.000Z";
     harness.jobs.insert({
@@ -365,8 +366,10 @@ describe("JobRepository lifecycle", () => {
       finishedAt: timestamp,
     });
 
-    await harness.service.initialize();
+    const jobService = new JobService(harness.jobs, { retentionDays: 30 });
+    jobService.initialize();
     expect(harness.jobs.get("expired-at-startup")).toBeUndefined();
+    jobService.shutdown();
 
     await finishHarness(harness.service, harness.database);
   });

@@ -32,7 +32,8 @@ docker compose up --build
 ```
 
 Laufzeitvariablen folgen `MAPTOY_<DOMÄNE>_<EIGENSCHAFT>`. Die aktuellen Domänen
-sind `SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, `JOBS` und `PHOTOS`; bei
+sind `SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, `JOBS`, `DOWNLOADS` und
+`PHOTOS`; bei
 Provider-Secrets bildet der Providername die Domäne. Frühere Variablennamen werden
 nicht unterstützt.
 
@@ -63,6 +64,12 @@ erhalten. `MAPTOY_JOBS_RETENTION_DAYS` konfiguriert diese Frist,
 Bereinigung läuft beim Start und stündlich; ein vertrauenswürdiger Betreiber kann
 dieselbe Regel mit `POST api/jobs/cleanup` auslösen. Wartende, laufende und pausierte
 Jobs werden nie durch die Aufbewahrungsregel entfernt.
+
+Die Aufnahmeprüfung für Batch-Downloads warnt standardmäßig ab 10.000 ausgewählten
+Tiles und blockiert oberhalb von 100.000. Diese Schwellen konfigurieren
+`MAPTOY_DOWNLOADS_WARNING_TILE_COUNT` und `MAPTOY_DOWNLOADS_MAX_TILE_COUNT`;
+beide sind auf höchstens 1.000.000 Tiles begrenzt. Zusätzlich gelten die im Map Set
+konfigurierten Request-, Retry-, Tages- und Speichergrenzen.
 
 ## Traffic-Logs
 

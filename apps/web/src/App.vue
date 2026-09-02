@@ -40,8 +40,9 @@ const routeContext = computed(() => {
     case "coverage": {
       const mapSetId = route.params.mapSetId;
       return typeof mapSetId === "string"
-        ? (mapSets.items.find(({ id }) => id === mapSetId)?.name ?? null)
-        : null;
+        ? (mapSets.items.find(({ id }) => id === mapSetId)?.name ??
+            mapViewState.coverageMapSetName)
+        : mapViewState.coverageMapSetName;
     }
     case "docs": {
       const requestedLanguage = String(
@@ -63,13 +64,20 @@ const routeContext = computed(() => {
       return null;
   }
 });
+const routeDetail = computed(() => {
+  const zoom =
+    activeView.value?.id === "map"
+      ? mapViewState.sourceZoom
+      : activeView.value?.id === "coverage"
+        ? mapViewState.coverageSourceZoom
+        : null;
+  return zoom === null ? null : formatMapZoomTitle(zoom);
+});
 const browserTitle = computed(() =>
   applicationDocumentTitle(
     activeView.value?.label.toLowerCase() ?? null,
     routeContext.value,
-    activeView.value?.id === "map" && mapViewState.sourceZoom !== null
-      ? formatMapZoomTitle(mapViewState.sourceZoom)
-      : null,
+    routeDetail.value,
   ),
 );
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template

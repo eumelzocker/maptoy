@@ -179,6 +179,7 @@ async function run(): Promise<void> {
     },
     layers: { assetMaximumBytes: 25 * mebibyte },
     jobs: { retentionDays: 30, errorHistoryLimit: 100 },
+    downloads: { warningTileCount: 10_000, maximumTileCount: 100_000 },
     photos: {
       directory: photosDirectory,
       maximumFileBytes: 100 * mebibyte,

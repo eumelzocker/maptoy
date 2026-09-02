@@ -1,4 +1,4 @@
-import type { CoverageResponse } from "@maptoy/contracts";
+import type { CoverageResponse, Job } from "@maptoy/contracts";
 import { describe, expect, it } from "vitest";
 import {
   FRESH_COVERAGE_STEPS,
@@ -11,9 +11,13 @@ import {
   coveragePreviewZoomRange,
   coverageSelection,
   coverageViewportZoom,
+  downloadCoordinatePrecision,
   freshCoverageColor,
   hasCoveragePreviewZoomRange,
+  screenRectangleBounds,
+  roundedDownloadBounds,
   staleCoverageColor,
+  tileDownloadLayer,
   visibleCoverageBounds,
 } from "./coverageModel.js";
 
@@ -98,6 +102,40 @@ describe("Coverage view model", () => {
     expect(bounds).toEqual({ west: 170, south: 50, east: -170, north: 60 });
   });
 
+  it("turns a dragged screen rectangle into antimeridian-aware WGS84 bounds", () => {
+    const bounds = screenRectangleBounds(
+      {
+        screenToGeographic: ({ x, y }) => ({
+          longitude: 170 + x / 5,
+          latitude: 60 - y / 10,
+        }),
+      },
+      { x: 100, y: 80 },
+      { x: 0, y: 20 },
+    );
+
+    expect(bounds).toEqual({ west: 170, south: 52, east: -170, north: 58 });
+  });
+
+  it("rounds Download bounds to approximately one pixel at the maximum Zoom", () => {
+    expect(downloadCoordinatePrecision(5)).toBe(2);
+    expect(downloadCoordinatePrecision(10)).toBe(3);
+    expect(downloadCoordinatePrecision(14)).toBe(5);
+    expect(downloadCoordinatePrecision(18)).toBe(6);
+    expect(downloadCoordinatePrecision(24)).toBe(6);
+    expect(
+      roundedDownloadBounds(
+        {
+          west: 13.123456789,
+          south: 52.123456789,
+          east: 13.987654321,
+          north: 52.987654321,
+        },
+        10,
+      ),
+    ).toEqual({ west: 13.123, south: 52.123, east: 13.988, north: 52.988 });
+  });
+
   it("normalizes current, Snapshot, and time selections", () => {
     expect(coverageSelection("current", "", "")).toEqual({ kind: "current" });
     expect(coverageSelection("snapshot", "snapshot-id", "")).toEqual({
@@ -169,6 +207,52 @@ describe("Coverage view model", () => {
       coverageLayer(missingResponse, { showGrid: true, dimmed: false }),
     ).toMatchObject({
       data: { features: [{ fillOpacity: 0 }] },
+    });
+  });
+
+  it("keeps the selected download bounds and active Tile separate from Coverage", () => {
+    const job = {
+      id: "job",
+      type: "tile-download",
+      status: "running",
+      input: { mapSetId: "map-set" },
+      total: 4,
+      completed: 1,
+      skipped: 0,
+      failed: 0,
+      summary: { currentZoom: 3, currentX: 4, currentY: 2 },
+      lastError: null,
+      createdAt: "2026-09-02T10:00:00.000Z",
+      startedAt: "2026-09-02T10:00:00.000Z",
+      updatedAt: "2026-09-02T10:00:00.000Z",
+      finishedAt: null,
+    } satisfies Job;
+    const layer = tileDownloadLayer({ west: 0, south: 0, east: 1, north: 1 }, [
+      job,
+    ]);
+
+    expect(layer).toMatchObject({
+      id: "tile-download-activity",
+      type: "composite",
+      data: {
+        kind: "composite",
+        layers: [
+          {
+            features: [
+              { id: "download-selection-halo", strokeWidth: 7 },
+              { id: "download-selection", strokeWidth: 4, fillOpacity: 0.22 },
+            ],
+          },
+          {
+            features: [
+              {
+                id: "job",
+                title: "Downloading 3/4/2",
+              },
+            ],
+          },
+        ],
+      },
     });
   });
 });

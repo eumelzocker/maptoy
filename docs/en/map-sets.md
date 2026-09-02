@@ -114,4 +114,5 @@ During Phase 2, the Map view loads every tile through the relative *maptoy* endp
 `api/map-sets/:id/tiles/:z/:x/:y`; the browser never receives the external provider
 URL or resolved secrets. Persistent Tile Revisions, refresh modes, snapshots, and
 cache-state comparisons are described in the [Tile Cache](docs/en/tile-cache)
-documentation. Batch downloads are implemented in a later phase.
+documentation. A capable Map Set provides **Download tiles**, which opens the
+cache-aware Batch Download workflow in Coverage.

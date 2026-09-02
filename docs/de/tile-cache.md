@@ -147,6 +147,30 @@ Cache-Einträge. Die Hintergrundkarte ist davon getrennt: Sie verwendet den norm
 Tile-Modus `auto` und kann Hintergrund-Tiles über den konfigurierten Provider laden,
 validieren und cachen.
 
+### Batch-Downloads in Coverage
+
+Im einklappbaren Abschnitt **Download tiles** lässt sich ein Rechteck direkt auf
+der Karte aufziehen, der vollständige sichtbare Kartenausschnitt übernehmen oder
+eine genaue WGS84-Grenze eingeben. `Esc` bricht eine aktive Kartenauswahl ab.
+`Strg`+Klick auf die Karte aktiviert die Auswahl ohne Umweg über den Button;
+`Strg`+Ziehen wählt das Rechteck direkt. Anschließend wird ein Bereich von
+Quellzoomstufen gewählt.
+Standardmäßig werden nur fehlende Tiles geladen; optional werden zusätzlich
+veraltete Tiles validiert. Die Schätzung weist Cachebestand, Providerrequests,
+geschätzte Übertragungsgröße, Warnungen, Hartgrenzen und das verbleibende Tageslimit
+aus, ohne den Provider zu kontaktieren.
+
+Vor dem Start müssen die verlinkten Providerbedingungen und die Eigenverantwortung
+ausdrücklich bestätigt werden. Fortschritt, aktuelles Tile, Pause, Fortsetzung,
+Abbruch, erneuter Versuch und begrenzte Fehlerdetails bleiben in derselben
+Coverage-Seitenleiste. Beendete Jobs werden in einer eigenen einklappbaren Historie
+gruppiert. Die Gebietsauswahl bleibt auch bei eingeklapptem Download-Bereich
+sichtbar; Auswahl und aktuell bearbeitetes Tile erscheinen als violette Overlays,
+ohne die Coverage-Statusfarben zu verändern. Mit der Anzeigeoption **Selection**
+lässt sich der ausgewählte Rahmen aus- und wieder einblenden. Die Aktion **Download
+tiles** eines Map Sets öffnet denselben Workflow; eine eigene
+Download-Hauptansicht gibt es nicht.
+
 ## Statistik und Löschung
 
 Die Verwaltungsansicht lädt DB-Summen und Zusammenfassungen je Zoomstufe, ohne das

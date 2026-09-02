@@ -541,14 +541,14 @@ export class JobRepository {
     }
   }
 
-  recoverInterrupted(): void {
+  recoverInterrupted(type: Job["type"]): void {
     const timestamp = new Date().toISOString();
     this.database
       .prepare(
         `UPDATE jobs SET status = 'queued', updated_at = ?
-         WHERE status = 'running' AND type = 'photo-scan'`,
+         WHERE status = 'running' AND type = ?`,
       )
-      .run(timestamp);
+      .run(timestamp, type);
   }
 
   listErrors(jobId: string): JobError[] {

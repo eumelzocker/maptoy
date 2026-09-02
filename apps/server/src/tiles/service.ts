@@ -52,10 +52,24 @@ export class TileArchiveError extends Error {
       | "COVERAGE_QUERY_INVALID",
     message: string,
     readonly statusCode: number,
+    readonly providerStatusCode: number | null = null,
+    readonly retryAfterMilliseconds: number | null = null,
   ) {
     super(message);
     this.name = "TileArchiveError";
   }
+}
+
+function retryAfterMilliseconds(
+  value: string | string[] | undefined,
+): number | null {
+  const text = Array.isArray(value) ? value[0] : value;
+  if (text === undefined) return null;
+  const seconds = Number(text);
+  if (Number.isFinite(seconds) && seconds >= 0)
+    return Math.ceil(seconds * 1000);
+  const timestamp = new Date(text).getTime();
+  return Number.isNaN(timestamp) ? null : Math.max(0, timestamp - Date.now());
 }
 
 export interface ArchivedTileResponse extends ProviderResponse {
@@ -165,6 +179,10 @@ async function validateProviderTile(
       "TILE_CONTENT_INVALID",
       `The provider returned HTTP ${response.statusCode} for the requested tile.`,
       502,
+      response.statusCode,
+      response.statusCode === 429 || response.statusCode === 503
+        ? retryAfterMilliseconds(response.headers["retry-after"])
+        : null,
     );
   }
   const contentType = normalizedContentType(response);
@@ -381,6 +399,56 @@ export class TileArchiveService {
 
   stats(mapSetId: string): TileCacheStats {
     return this.repository.metadataStats(mapSetId);
+  }
+
+  cacheState(
+    mapSet: MapSet,
+    tile: TileCoordinate,
+  ): "fresh" | "stale" | "missing" {
+    const revision = this.repository.selectedRevision(mapSet.id, tile, {
+      kind: "current",
+    });
+    if (revision === undefined) return "missing";
+    return this.isFresh(revision, mapSet.cachePolicy.maximumAgeSeconds)
+      ? "fresh"
+      : "stale";
+  }
+
+  downloadCacheSummary(
+    mapSet: MapSet,
+    ranges: ReadonlyArray<{ zoom: number; range: XyzTileRange }>,
+    totalTiles: number,
+  ): {
+    freshTiles: number;
+    staleTiles: number;
+    missingTiles: number;
+    averageCachedBytes: number | null;
+  } {
+    let freshTiles = 0;
+    let staleTiles = 0;
+    let cachedBytes = 0;
+    for (const { zoom, range } of ranges) {
+      for (const revision of this.repository.currentRevisionsInRange(
+        mapSet.id,
+        zoom,
+        range,
+      )) {
+        cachedBytes += revision.byteLength;
+        if (this.isFresh(revision, mapSet.cachePolicy.maximumAgeSeconds)) {
+          freshTiles += 1;
+        } else {
+          staleTiles += 1;
+        }
+      }
+    }
+    const cachedTiles = freshTiles + staleTiles;
+    return {
+      freshTiles,
+      staleTiles,
+      missingTiles: Math.max(0, totalTiles - cachedTiles),
+      averageCachedBytes:
+        cachedTiles === 0 ? null : Math.ceil(cachedBytes / cachedTiles),
+    };
   }
 
   overview(): TileCacheOverviewStats {
@@ -1015,7 +1083,7 @@ export class TileArchiveService {
   }
 
   private isFresh(
-    revision: StoredTileRevision,
+    revision: Pick<StoredTileRevision, "lastValidatedAt">,
     maximumAgeSeconds: number,
   ): boolean {
     return (

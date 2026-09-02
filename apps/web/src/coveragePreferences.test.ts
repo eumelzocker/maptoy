@@ -21,6 +21,7 @@ const fallback: CoveragePagePreferences = {
   selectionSnapshotId: "",
   selectionTimestamp: "2026-08-26T12:00",
   showGrid: true,
+  showSelection: true,
   dimmed: true,
 };
 
@@ -44,6 +45,7 @@ describe("Coverage page preferences", () => {
       selectionMode: "snapshot",
       selectionSnapshotId: "snapshot-a",
       showGrid: false,
+      showSelection: false,
       dimmed: false,
     };
     saveCoveragePagePreferences(preferences, storage);

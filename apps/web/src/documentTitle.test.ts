@@ -15,6 +15,9 @@ describe("applicationDocumentTitle", () => {
     expect(applicationDocumentTitle("cache", "map-set-id")).toBe(
       "maptoy - cache - map-set-id",
     );
+    expect(applicationDocumentTitle("coverage", "OpenTopoMap", "z12")).toBe(
+      "maptoy - coverage - OpenTopoMap - z12",
+    );
   });
 
   it("omits unavailable context", () => {

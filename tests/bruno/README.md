@@ -11,3 +11,8 @@ Layer requests use `layerId` for a Track Layer, `photoLayerId` for a Photo Layer
 **Photo Directory - Status** reports whether `MAPTOY_PHOTOS_DIR` is available.
 Upload, scan, and Job-retention cleanup requests are explicitly marked as
 state-changing and should be run individually.
+
+Run **Tile Download - Estimate area** before its explicitly state-changing create
+request. Adjust its small example bounds and Zooms to the selected Map Set, review
+the provider terms, and verify that `blockedReasons` is empty before creating a
+Job.

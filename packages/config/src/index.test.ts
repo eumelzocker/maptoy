@@ -102,6 +102,24 @@ describe("loadConfig", () => {
     ).toThrow("must not exceed 1000");
   });
 
+  it("validates Batch Download warning and hard Tile limits", () => {
+    expect(
+      loadConfig({
+        MAPTOY_DOWNLOADS_WARNING_TILE_COUNT: "500",
+        MAPTOY_DOWNLOADS_MAX_TILE_COUNT: "2000",
+      }).downloads,
+    ).toEqual({ warningTileCount: 500, maximumTileCount: 2000 });
+    expect(() =>
+      loadConfig({
+        MAPTOY_DOWNLOADS_WARNING_TILE_COUNT: "2001",
+        MAPTOY_DOWNLOADS_MAX_TILE_COUNT: "2000",
+      }),
+    ).toThrow("must not exceed MAPTOY_DOWNLOADS_MAX_TILE_COUNT");
+    expect(() =>
+      loadConfig({ MAPTOY_DOWNLOADS_MAX_TILE_COUNT: "1000001" }),
+    ).toThrow("MAPTOY_DOWNLOADS_MAX_TILE_COUNT");
+  });
+
   it("does not accept legacy environment aliases", () => {
     const config = loadConfig({
       MAPTOY_HOST: "127.0.0.1",

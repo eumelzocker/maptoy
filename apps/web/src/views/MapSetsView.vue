@@ -14,7 +14,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { onBeforeRouteLeave, useRoute } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetForm from "../components/MapSetForm.vue";
 import { apiRequest } from "../api.js";
@@ -24,6 +24,7 @@ import { useMapSetsStore } from "../stores/mapSets.js";
 
 const store = useMapSetsStore();
 const route = useRoute();
+const router = useRouter();
 const editorMode = ref<"closed" | "create" | "edit">("closed");
 const editorKey = ref("closed");
 const draft = ref<MapSetInput>(createDefaultMapSetInput());
@@ -234,6 +235,14 @@ async function duplicate(mapSet: MapSet): Promise<void> {
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function openTileDownload(mapSet: MapSet): void {
+  void router.push({
+    path: `/coverage/${mapSet.id}`,
+    query: { download: "open" },
+  });
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function duplicateEditing(): Promise<void> {
   const mapSet = store.items.find(({ id }) => id === editingId.value);
   if (mapSet !== undefined) {
@@ -374,6 +383,14 @@ async function test(mapSet: MapSet): Promise<void> {
               </button>
               <button type="button" :disabled="busy" @click="test(item.mapSet)">
                 Test tile
+              </button>
+              <button
+                v-if="item.mapSet.capabilities.batchDownload"
+                type="button"
+                :disabled="busy"
+                @click="openTileDownload(item.mapSet)"
+              >
+                Download tiles
               </button>
               <button type="button" :disabled="busy" @click="duplicate(item.mapSet)">
                 Duplicate

@@ -71,6 +71,22 @@ endpoint reads SQLite metadata only and never contacts a provider.
 Invalid bounds, Zooms, or timestamps return `400 COVERAGE_QUERY_INVALID`; an
 unknown Snapshot returns `404 SNAPSHOT_NOT_FOUND`.
 
+## Batch Downloads
+
+`POST api/map-sets/:id/tile-downloads/estimate` accepts WGS84 `bounds`,
+`minimumZoom`, `maximumZoom`, and a `refreshMode` of `missing` or
+`missing-or-stale`. It returns exact selected, fresh, stale, missing, and provider
+request counts, an estimated transfer size when cached samples exist, daily-limit
+capacity, warnings, and blocking reasons. Estimation never contacts the provider.
+
+`POST api/map-sets/:id/tile-download-jobs` accepts the same body and reruns the
+admission checks before creating a persistent Job. Only one queued, running, or
+paused Tile Download per Map Set is allowed. The worker applies the Map Set's
+request rate, concurrency, retry, daily request, and storage policies. HTTP 429 and
+503 use `Retry-After` when supplied; other retries use bounded exponential backoff.
+Individual Tile failures remain in the bounded Job error history and do not abort
+the remaining batch.
+
 ## Layers and assets
 
 `GET api/layers` lists the global overlay stack. Layer instances are independent of
@@ -99,12 +115,16 @@ outside the configured root. `POST api/layers/:id/photo-scan-jobs` accepts a rel
 
 ## Jobs
 
-`GET api/jobs` lists Jobs and `GET api/jobs/:id` reads one Job. A photo scan in a
-valid state can be controlled with `POST api/jobs/:id/pause`,
+`GET api/jobs` lists Jobs and `GET api/jobs/:id` reads one Job. A controllable Job
+in a valid state uses `POST api/jobs/:id/pause`,
 `POST api/jobs/:id/resume`, and `POST api/jobs/:id/cancel`. Responses include
 `total`, `completed`, `skipped`, `failed`, status timestamps, and a safe last error.
 Photo scans additionally persist `summary` counts for `created`, `changed`,
 `unchanged`, `missing`, and `failed` files.
+
+Failed, cancelled, or partially completed Tile Downloads can be restarted with
+`POST api/jobs/:id/retry`. This creates a new Job with the same bounds and skips
+Tiles that already satisfy its refresh mode.
 
 `GET api/jobs/:id/errors` returns the newest retained per-item diagnostics. Their
 bounded history is configured with `MAPTOY_JOBS_ERROR_HISTORY_LIMIT`.

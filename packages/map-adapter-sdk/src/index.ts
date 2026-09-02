@@ -73,6 +73,7 @@ export interface MapRectangleFeature {
   bounds: MapGeographicBounds;
   fillColor: string;
   strokeColor: string;
+  strokeWidth?: number;
   fillOpacity: number;
   label?: string;
 }

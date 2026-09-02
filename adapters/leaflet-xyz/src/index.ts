@@ -382,7 +382,7 @@ async function createLeafletInstance(
         ],
         {
           color: feature.strokeColor,
-          weight: 1,
+          weight: feature.strokeWidth ?? 1,
           opacity: descriptor.opacity,
           fillColor: feature.fillColor,
           fillOpacity: feature.fillOpacity * descriptor.opacity,
@@ -1011,6 +1011,14 @@ async function createLeafletInstance(
     }
   };
 
+  const bringLayerToFront = (layer: Leaflet.Layer): void => {
+    if (layer instanceof L.LayerGroup) {
+      layer.eachLayer(bringLayerToFront);
+    } else if (layer instanceof L.Path || layer instanceof L.GridLayer) {
+      layer.bringToFront();
+    }
+  };
+
   return {
     getViewport: () => {
       const center = map.wrapLatLng(map.getCenter());
@@ -1115,14 +1123,8 @@ async function createLeafletInstance(
       }
       for (const layerId of layerIds) {
         const leafletLayer = layers.get(layerId)?.leafletLayer;
-        if (leafletLayer instanceof L.LayerGroup) {
-          leafletLayer.eachLayer((child: Leaflet.Layer) => {
-            if (child instanceof L.Path || child instanceof L.GridLayer) {
-              child.bringToFront();
-            }
-          });
-        } else if (leafletLayer instanceof L.GridLayer) {
-          leafletLayer.bringToFront();
+        if (leafletLayer !== null && leafletLayer !== undefined) {
+          bringLayerToFront(leafletLayer);
         }
       }
     },

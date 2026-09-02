@@ -1,0 +1,36 @@
+meta {
+  name: Tile Download - Create Job (writes data)
+  type: http
+  seq: 22
+}
+
+post {
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/tile-download-jobs
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "bounds": {
+      "west": 13.25,
+      "south": 52.4,
+      "east": 13.65,
+      "north": 52.65
+    },
+    "minimumZoom": 8,
+    "maximumZoom": 10,
+    "refreshMode": "missing"
+  }
+}
+
+docs {
+  Repeats admission checks and queues a persistent Tile Download. Review the provider terms and run the estimate first.
+}
+
+tests {
+  test("queues a Tile Download", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.type).to.equal("tile-download");
+  });
+}

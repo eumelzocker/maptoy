@@ -3,6 +3,28 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 describe("Map view architecture", () => {
+  it("publishes the Coverage source Zoom in the browser title", async () => {
+    const [app, coverageView, mapViewState] = await Promise.all([
+      readFile(fileURLToPath(new URL("./App.vue", import.meta.url)), "utf8"),
+      readFile(
+        fileURLToPath(new URL("./views/CoverageView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./stores/mapViewState.ts", import.meta.url)),
+        "utf8",
+      ),
+    ]);
+
+    expect(app).toContain('activeView.value?.id === "coverage"');
+    expect(app).toContain("mapViewState.coverageSourceZoom");
+    expect(app).toContain("mapViewState.coverageMapSetName");
+    expect(coverageView).toContain("setCoverageSourceZoom");
+    expect(coverageView).toContain("setCoverageMapSetName");
+    expect(mapViewState).toContain("coverageSourceZoom");
+    expect(mapViewState).toContain("coverageMapSetName");
+  });
+
   it("uses the neutral adapter and a relative maptoy tile URL", async () => {
     const [mapView, tileUrl] = await Promise.all([
       readFile(
@@ -213,6 +235,10 @@ describe("Map view architecture", () => {
     expect(coverageView).toContain("applyPreviewZoomRange(sourceZoom.value)");
     expect(coverageView).toContain("rendererTransition.then");
     expect(coverageView).toContain("MapZoomControl");
+    expect(coverageView).toContain('class="coverage-sidebar-head"');
+    expect(coverageView).toContain("(min-height: 720px)");
+    expect(coverageView).toContain("position: sticky");
+    expect(coverageView).toContain("top: -1.25rem");
     expect(coverageView).toContain("zoomControl: false");
     expect(coverageView).toContain("cachedTilesOnly: false");
     expect(coverageView).toContain("onSelectionChanged");
@@ -341,6 +367,60 @@ describe("Map view architecture", () => {
     expect(main).toContain('path: "/map-sets/:mapSetId?"');
     expect(mapSetsView).toContain("await openRequestedEditor()");
     expect(mapSetsView).toContain("await scrollEditorIntoView()");
+  });
+
+  it("keeps Batch Downloads inside Coverage without a separate main view", async () => {
+    const [coverageView, downloadPanel, mapSetsView, main] = await Promise.all([
+      readFile(
+        fileURLToPath(new URL("./views/CoverageView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/TileDownloadPanel.vue", import.meta.url),
+        ),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./views/MapSetsView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(fileURLToPath(new URL("./main.ts", import.meta.url)), "utf8"),
+    ]);
+
+    expect(coverageView).toContain("<TileDownloadPanel");
+    expect(coverageView).toContain('class="download-area-selector"');
+    expect(coverageView).toContain("screenRectangleBounds(renderer");
+    expect(coverageView).toContain("!event.ctrlKey");
+    expect(coverageView).toContain(
+      '@pointerdown.capture="startDownloadAreaDrag"',
+    );
+    expect(downloadPanel).toContain("Use visible area");
+    expect(downloadPanel).toContain("Select area on map");
+    expect(downloadPanel).toContain("Ctrl+click or Ctrl+drag on map");
+    expect(downloadPanel).toContain('emit("requestAreaSelection")');
+    expect(downloadPanel).toContain("mdi-chevron-right");
+    expect(downloadPanel).toContain("mdi-chevron-down");
+    expect(downloadPanel).toContain("Queue download");
+    expect(downloadPanel).toContain("defaultInput(props.mapSet, true)");
+    expect(downloadPanel).toContain("input?.bounds ?? null");
+    expect(coverageView).toContain('v-model="showSelection"');
+    expect(coverageView).toContain(
+      "showSelection.value ? downloadSelection.value : null",
+    );
+    expect(downloadPanel).toContain("Finished downloads");
+    expect(downloadPanel).toContain("finishedJobsOpen");
+    expect(downloadPanel).toContain("jobMapSetName(job)");
+    expect(downloadPanel).toContain("jobZoomRange(job)");
+    expect(downloadPanel).toContain("skipped ·");
+    const startHandler = downloadPanel.slice(
+      downloadPanel.indexOf("async function start"),
+      downloadPanel.indexOf("async function control"),
+    );
+    expect(startHandler).not.toContain("acceptedResponsibility.value = false");
+    expect(mapSetsView).toContain("openTileDownload");
+    expect(mapSetsView).toContain('query: { download: "open" }');
+    expect(main).not.toMatch(/path:\s*["']\/(?:downloads|jobs)/);
   });
 
   it("delegates generic context-menu overlay behavior to AppContextMenu", async () => {

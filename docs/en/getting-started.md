@@ -43,7 +43,7 @@ docker compose up --build
 ```
 
 Runtime settings follow `MAPTOY_<DOMAIN>_<PROPERTY>`. The current domains are
-`SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, `JOBS`, and `PHOTOS`; provider
+`SERVER`, `STORAGE`, `LOGGING`, `TILES`, `LAYERS`, `JOBS`, `DOWNLOADS`, and `PHOTOS`; provider
 secrets use the provider name as their domain. Previous variable names are not
 supported.
 
@@ -71,6 +71,13 @@ Terminal Jobs are retained for 30 days by default. Configure that period with
 `MAPTOY_JOBS_ERROR_HISTORY_LIMIT`. Cleanup runs during startup and hourly; a trusted
 operator can also trigger the same policy with `POST api/jobs/cleanup`. Queued,
 running, and paused Jobs are never removed by retention.
+
+Batch Download admission warns at 10,000 selected Tiles and blocks above 100,000
+by default. Configure these thresholds with
+`MAPTOY_DOWNLOADS_WARNING_TILE_COUNT` and `MAPTOY_DOWNLOADS_MAX_TILE_COUNT`.
+The warning threshold must not exceed the hard limit, and neither setting can
+exceed the built-in ceiling of 1,000,000 Tiles. Map Set request rate,
+concurrency, retry, daily request, and storage limits apply independently.
 
 ## Traffic logs
 

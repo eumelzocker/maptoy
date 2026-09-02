@@ -738,6 +738,54 @@ export const CoverageBoundsSchema = Type.Object(
 
 export type CoverageBounds = Static<typeof CoverageBoundsSchema>;
 
+export const TileDownloadRefreshModeSchema = Type.Union([
+  Type.Literal("missing"),
+  Type.Literal("missing-or-stale"),
+]);
+
+export type TileDownloadRefreshMode = Static<
+  typeof TileDownloadRefreshModeSchema
+>;
+
+export const TileDownloadInputSchema = Type.Object(
+  {
+    bounds: CoverageBoundsSchema,
+    minimumZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    maximumZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    refreshMode: TileDownloadRefreshModeSchema,
+  },
+  { additionalProperties: false, $id: "TileDownloadInput" },
+);
+
+export type TileDownloadInput = Static<typeof TileDownloadInputSchema>;
+
+export const TileDownloadEstimateSchema = Type.Object(
+  {
+    bounds: CoverageBoundsSchema,
+    minimumZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    maximumZoom: Type.Integer({ minimum: 0, maximum: 24 }),
+    refreshMode: TileDownloadRefreshModeSchema,
+    totalTiles: Type.Integer({ minimum: 0 }),
+    freshTiles: Type.Integer({ minimum: 0 }),
+    staleTiles: Type.Integer({ minimum: 0 }),
+    missingTiles: Type.Integer({ minimum: 0 }),
+    requestTiles: Type.Integer({ minimum: 0 }),
+    estimatedBytes: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+    warningTileCount: Type.Integer({ minimum: 1 }),
+    maximumTileCount: Type.Integer({ minimum: 1 }),
+    dailyRequestLimit: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
+    dailyRequestsRemaining: Type.Union([
+      Type.Integer({ minimum: 0 }),
+      Type.Null(),
+    ]),
+    warnings: Type.Array(Type.String()),
+    blockedReasons: Type.Array(Type.String()),
+  },
+  { additionalProperties: false, $id: "TileDownloadEstimate" },
+);
+
+export type TileDownloadEstimate = Static<typeof TileDownloadEstimateSchema>;
+
 export const CoverageSelectionSchema = Type.Object(
   {
     kind: Type.Union([

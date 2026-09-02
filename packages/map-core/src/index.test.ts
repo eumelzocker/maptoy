@@ -5,6 +5,8 @@ import {
   metricScaleBar,
   segmentedMetricScale,
   wgs84BoundsToXyzTileRanges,
+  wgs84BoundsXyzTileCount,
+  wgs84BoundsXyzTiles,
   wgs84ToXyz,
   xyzTileBounds,
   xyzToWgs84,
@@ -49,6 +51,19 @@ describe("wgs84ToXyz", () => {
     ).toEqual([
       { minimumX: 3, maximumX: 3, minimumY: 1, maximumY: 2 },
       { minimumX: 0, maximumX: 0, minimumY: 1, maximumY: 2 },
+    ]);
+  });
+
+  it("counts and enumerates a bounded multi-zoom download deterministically", () => {
+    const bounds = xyzTileBounds({ zoom: 2, x: 2, y: 1 });
+    expect(wgs84BoundsXyzTileCount(bounds, 1, 3)).toBe(6);
+    expect([...wgs84BoundsXyzTiles(bounds, 1, 3)]).toEqual([
+      { zoom: 1, x: 1, y: 0 },
+      { zoom: 2, x: 2, y: 1 },
+      { zoom: 3, x: 4, y: 2 },
+      { zoom: 3, x: 5, y: 2 },
+      { zoom: 3, x: 4, y: 3 },
+      { zoom: 3, x: 5, y: 3 },
     ]);
   });
 });

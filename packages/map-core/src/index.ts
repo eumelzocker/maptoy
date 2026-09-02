@@ -332,3 +332,50 @@ export function wgs84BoundsToXyzTileRanges(
     ? [xRange(bounds.west, bounds.east)]
     : [xRange(bounds.west, 180), xRange(-180, bounds.east)];
 }
+
+export function xyzTileRangeCount(range: XyzTileRange): number {
+  return (
+    (range.maximumX - range.minimumX + 1) *
+    (range.maximumY - range.minimumY + 1)
+  );
+}
+
+export function wgs84BoundsXyzTileCount(
+  bounds: Wgs84Bounds,
+  minimumZoom: number,
+  maximumZoom: number,
+): number {
+  if (
+    !Number.isInteger(minimumZoom) ||
+    !Number.isInteger(maximumZoom) ||
+    minimumZoom < 0 ||
+    maximumZoom < minimumZoom
+  ) {
+    throw new Error("Tile zoom range is invalid.");
+  }
+  let total = 0;
+  for (let zoom = minimumZoom; zoom <= maximumZoom; zoom += 1) {
+    total += wgs84BoundsToXyzTileRanges(bounds, zoom).reduce(
+      (count, range) => count + xyzTileRangeCount(range),
+      0,
+    );
+  }
+  return total;
+}
+
+export function* wgs84BoundsXyzTiles(
+  bounds: Wgs84Bounds,
+  minimumZoom: number,
+  maximumZoom: number,
+): Generator<TileCoordinate> {
+  wgs84BoundsXyzTileCount(bounds, minimumZoom, maximumZoom);
+  for (let zoom = minimumZoom; zoom <= maximumZoom; zoom += 1) {
+    for (const range of wgs84BoundsToXyzTileRanges(bounds, zoom)) {
+      for (let y = range.minimumY; y <= range.maximumY; y += 1) {
+        for (let x = range.minimumX; x <= range.maximumX; x += 1) {
+          yield { zoom, x, y };
+        }
+      }
+    }
+  }
+}

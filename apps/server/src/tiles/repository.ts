@@ -157,6 +157,41 @@ export class TileArchiveRepository {
     );
   }
 
+  currentRevisionsInRange(
+    mapSetId: string,
+    zoom: number,
+    range: {
+      minimumX: number;
+      maximumX: number;
+      minimumY: number;
+      maximumY: number;
+    },
+  ): Array<{ lastValidatedAt: string; byteLength: number }> {
+    const rows = this.database
+      .prepare(
+        `SELECT tr.last_validated_at, tr.byte_length
+           FROM logical_tiles lt
+           JOIN tile_revisions tr ON tr.id = lt.current_revision_id
+          WHERE lt.map_set_id = ? AND lt.zoom = ?
+            AND lt.tile_x BETWEEN ? AND ? AND lt.tile_y BETWEEN ? AND ?`,
+      )
+      .all(
+        mapSetId,
+        zoom,
+        range.minimumX,
+        range.maximumX,
+        range.minimumY,
+        range.maximumY,
+      ) as unknown as Array<{
+      last_validated_at: string;
+      byte_length: number;
+    }>;
+    return rows.map((row) => ({
+      lastValidatedAt: row.last_validated_at,
+      byteLength: row.byte_length,
+    }));
+  }
+
   selectedRevision(
     mapSetId: string,
     tile: { zoom: number; x: number; y: number },

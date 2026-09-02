@@ -104,7 +104,10 @@ export function registerMapSetRoutes(
   server: FastifyInstance,
   service: MapSetService,
   tileArchive: TileArchiveService,
-  options: { maximumTileBytes: number },
+  options: {
+    maximumTileBytes: number;
+    assertMapSetIdle: (mapSetId: string) => void;
+  },
 ): void {
   server.get(
     "/api/map-sets",
@@ -181,6 +184,7 @@ export function registerMapSetRoutes(
     "/api/map-sets/:id",
     { schema: { params: idParametersSchema } },
     async (request, reply) => {
+      options.assertMapSetIdle(request.params.id);
       await service.delete(request.params.id);
       return reply.code(204).send();
     },

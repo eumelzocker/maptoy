@@ -4,11 +4,13 @@ import type {
   CacheSnapshot,
   CacheSnapshotListResponse,
   CoverageCell,
+  CoverageBounds,
   CoverageResponse,
   CoverageSelection,
+  Job,
   MapSetListItem,
 } from "@maptoy/contracts";
-import type { MapRendererInstance } from "@maptoy/map-adapter-sdk";
+import type { MapRendererInstance, ScreenPoint } from "@maptoy/map-adapter-sdk";
 import {
   computed,
   inject,
@@ -23,6 +25,8 @@ import { apiRequest } from "../api.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import HtmlTooltip from "../components/HtmlTooltip.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import TileDownloadPanel from "../components/TileDownloadPanel.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapSetSelect from "../components/MapSetSelect.vue";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
 import MapZoomControl from "../components/MapZoomControl.vue";
@@ -35,6 +39,7 @@ import {
   COVERAGE_LAYER_ID,
   // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
   COVERAGE_STATUS_SCALES,
+  TILE_DOWNLOAD_LAYER_ID,
   type CoveragePreviewViewport,
   constrainedCoveragePreviewViewport,
   constrainedCoverageSourceZoom,
@@ -42,10 +47,12 @@ import {
   coverageGridCellTileCapacity,
   coverageGridZoom,
   coverageLayer,
+  tileDownloadLayer,
   coveragePreviewZoomRange,
   coverageSelection,
   coverageViewportZoom,
   hasCoveragePreviewZoomRange,
+  screenRectangleBounds,
   visibleCoverageBounds,
 } from "../coverageModel.js";
 // biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
@@ -54,6 +61,7 @@ import { mapTileUrl } from "../mapTileUrl.js";
 import { availableLocalStorage } from "../localStorage.js";
 import { MAP_RENDERER_FACTORY_REGISTRY_KEY } from "../registries.js";
 import { useMapSetsStore } from "../stores/mapSets.js";
+import { useMapViewStateStore } from "../stores/mapViewState.js";
 
 const injectedFactories = inject(MAP_RENDERER_FACTORY_REGISTRY_KEY);
 if (injectedFactories === undefined) {
@@ -64,12 +72,14 @@ const factories = injectedFactories;
 const route = useRoute();
 const router = useRouter();
 const store = useMapSetsStore();
+const mapViewState = useMapViewStateStore();
 const browserStorage = availableLocalStorage();
 const selectedId = ref<string | null>(null);
 const selected = computed(
   () => store.items.find((mapSet) => mapSet.id === selectedId.value) ?? null,
 );
 const mapHost = ref<HTMLElement | null>(null);
+const downloadAreaSurface = ref<HTMLElement | null>(null);
 const cellDetail = ref<HTMLElement | null>(null);
 const snapshots = ref<CacheSnapshot[]>([]);
 const sourceZoom = ref(0);
@@ -79,14 +89,22 @@ const selectionMode = ref<CoverageSelection["kind"]>("current");
 const selectionSnapshotId = ref("");
 const selectionTimestamp = ref(new Date().toISOString().slice(0, 16));
 const showGrid = ref(true);
+const showSelection = ref(true);
 const dimmed = ref(true);
 const response = ref<CoverageResponse | null>(null);
 const selectedCell = ref<CoverageCell | null>(null);
+const downloadJobs = ref<Job[]>([]);
+const downloadSelection = ref<CoverageBounds | null>(null);
+const drawnDownloadBounds = ref<CoverageBounds | null>(null);
+const selectingDownloadArea = ref(false);
+const downloadDragStart = ref<ScreenPoint | null>(null);
+const downloadDragCurrent = ref<ScreenPoint | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const rendererReady = ref(false);
 let renderer: MapRendererInstance | null = null;
 let layerAttached = false;
+let downloadLayerAttached = false;
 let renderGeneration = 0;
 let snapshotLoadGeneration = 0;
 let queryGeneration = 0;
@@ -96,6 +114,7 @@ let adjustingPreviewZoom = false;
 let mapSetChangesInFlight = 0;
 let preferencesReady = false;
 let rendererTransition: Promise<void> = Promise.resolve();
+let downloadDragPointerId: number | null = null;
 
 const selectionReady = computed(
   () =>
@@ -118,6 +137,18 @@ const aggregationGridTileCapacity = computed(() =>
         response.value.aggregationZoom,
       ),
 );
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const downloadDragStyle = computed(() => {
+  const start = downloadDragStart.value;
+  const current = downloadDragCurrent.value;
+  if (start === null || current === null) return {};
+  return {
+    left: `${Math.min(start.x, current.x)}px`,
+    top: `${Math.min(start.y, current.y)}px`,
+    width: `${Math.abs(start.x - current.x)}px`,
+    height: `${Math.abs(start.y - current.y)}px`,
+  };
+});
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function formatNumber(value: number): string {
@@ -188,6 +219,7 @@ function defaultCoveragePreferences(
     selectionSnapshotId: "",
     selectionTimestamp: fallbackTimestamp,
     showGrid: true,
+    showSelection: true,
     dimmed: true,
   };
 }
@@ -199,6 +231,7 @@ function applyCoveragePreferences(stored: CoveragePagePreferences): void {
   selectionMode.value = stored.selectionMode;
   selectionSnapshotId.value = stored.selectionSnapshotId;
   showGrid.value = stored.showGrid;
+  showSelection.value = stored.showSelection;
   dimmed.value = stored.dimmed;
   selectionTimestamp.value = validTimestampInput(stored.selectionTimestamp)
     ? stored.selectionTimestamp
@@ -224,6 +257,7 @@ function saveCurrentCoveragePreferences(): void {
       selectionSnapshotId: selectionSnapshotId.value,
       selectionTimestamp: selectionTimestamp.value,
       showGrid: showGrid.value,
+      showSelection: showSelection.value,
       dimmed: dimmed.value,
     },
     browserStorage,
@@ -262,6 +296,7 @@ async function showCellDetails(featureId: string): Promise<void> {
 }
 
 async function destroyRenderer(): Promise<void> {
+  cancelDownloadAreaSelection();
   if (refreshTimer !== null) {
     window.clearTimeout(refreshTimer);
     refreshTimer = null;
@@ -273,6 +308,171 @@ async function destroyRenderer(): Promise<void> {
   rendererReady.value = false;
   previewZoom.value = null;
   layerAttached = false;
+  downloadLayerAttached = false;
+}
+
+async function renderDownloadLayer(): Promise<void> {
+  const activeRenderer = renderer;
+  if (activeRenderer === null) return;
+  const layer = tileDownloadLayer(
+    showSelection.value ? downloadSelection.value : null,
+    downloadJobs.value,
+  );
+  if (downloadLayerAttached) {
+    await activeRenderer.updateLayer(layer);
+  } else {
+    await activeRenderer.attachLayer(layer);
+    downloadLayerAttached = true;
+  }
+  if (layerAttached) {
+    await activeRenderer.reorderLayers([
+      COVERAGE_LAYER_ID,
+      TILE_DOWNLOAD_LAYER_ID,
+    ]);
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function updateDownloadJobs(value: Job[]): void {
+  downloadJobs.value = value;
+  void renderDownloadLayer();
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function updateDownloadSelection(value: CoverageBounds | null): void {
+  downloadSelection.value = value;
+  void renderDownloadLayer();
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function startDownloadAreaSelection(): void {
+  if (renderer === null) return;
+  selectingDownloadArea.value = true;
+  downloadDragStart.value = null;
+  downloadDragCurrent.value = null;
+  downloadDragPointerId = null;
+}
+
+function cancelDownloadAreaSelection(): void {
+  const surface = downloadAreaSurface.value;
+  if (
+    surface !== null &&
+    downloadDragPointerId !== null &&
+    surface.hasPointerCapture(downloadDragPointerId)
+  ) {
+    surface.releasePointerCapture(downloadDragPointerId);
+  }
+  selectingDownloadArea.value = false;
+  downloadDragStart.value = null;
+  downloadDragCurrent.value = null;
+  downloadDragPointerId = null;
+}
+
+function downloadAreaScreenPoint(
+  event: PointerEvent,
+  overlay: HTMLElement,
+): ScreenPoint {
+  const rectangle = overlay.getBoundingClientRect();
+  return {
+    x: Math.max(
+      0,
+      Math.min(overlay.clientWidth, event.clientX - rectangle.left),
+    ),
+    y: Math.max(
+      0,
+      Math.min(overlay.clientHeight, event.clientY - rectangle.top),
+    ),
+  };
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function startDownloadAreaDrag(event: PointerEvent): void {
+  if (
+    (!selectingDownloadArea.value && !event.ctrlKey) ||
+    (event.pointerType === "mouse" && event.button !== 0)
+  ) {
+    return;
+  }
+  if (
+    !selectingDownloadArea.value &&
+    event.target instanceof Element &&
+    event.target.closest("button, input, select, textarea, a") !== null
+  ) {
+    return;
+  }
+  if (renderer === null) return;
+  selectingDownloadArea.value = true;
+  const surface = event.currentTarget as HTMLElement;
+  const point = downloadAreaScreenPoint(event, surface);
+  downloadDragPointerId = event.pointerId;
+  downloadDragStart.value = point;
+  downloadDragCurrent.value = point;
+  surface.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function moveDownloadAreaDrag(event: PointerEvent): void {
+  if (downloadDragPointerId !== event.pointerId) return;
+  downloadDragCurrent.value = downloadAreaScreenPoint(
+    event,
+    event.currentTarget as HTMLElement,
+  );
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function finishDownloadAreaDrag(event: PointerEvent): void {
+  if (downloadDragPointerId !== event.pointerId) return;
+  const surface = event.currentTarget as HTMLElement;
+  const start = downloadDragStart.value;
+  const end = downloadAreaScreenPoint(event, surface);
+  if (surface.hasPointerCapture(event.pointerId)) {
+    surface.releasePointerCapture(event.pointerId);
+  }
+  downloadDragPointerId = null;
+  downloadDragCurrent.value = end;
+  if (
+    start === null ||
+    Math.abs(start.x - end.x) < 4 ||
+    Math.abs(start.y - end.y) < 4 ||
+    renderer === null
+  ) {
+    downloadDragStart.value = null;
+    downloadDragCurrent.value = null;
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  const bounds = screenRectangleBounds(renderer, start, end);
+  drawnDownloadBounds.value = bounds;
+  downloadSelection.value = bounds;
+  void renderDownloadLayer();
+  cancelDownloadAreaSelection();
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function cancelDownloadAreaDrag(event: PointerEvent): void {
+  if (downloadDragPointerId !== event.pointerId) return;
+  const surface = event.currentTarget as HTMLElement;
+  if (surface.hasPointerCapture(event.pointerId)) {
+    surface.releasePointerCapture(event.pointerId);
+  }
+  downloadDragPointerId = null;
+  downloadDragStart.value = null;
+  downloadDragCurrent.value = null;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function onDocumentKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape" && selectingDownloadArea.value) {
+    cancelDownloadAreaSelection();
+  }
 }
 
 async function loadSnapshots(): Promise<boolean> {
@@ -399,6 +599,7 @@ async function renderMapGeneration(generation: number): Promise<void> {
       }
     });
     await queryVisibleCoverage();
+    await renderDownloadLayer();
   } catch (cause) {
     error.value =
       cause instanceof Error
@@ -509,6 +710,7 @@ async function executeQuery(bounds: CoverageResponse["bounds"]): Promise<void> {
       await activeRenderer.attachLayer(layer);
       layerAttached = true;
     }
+    await renderDownloadLayer();
   } catch (cause) {
     if (generation === queryGeneration) {
       error.value =
@@ -552,6 +754,8 @@ async function onSourceZoomChanged(value: number): Promise<void> {
 }
 
 async function onMapSetChanged(): Promise<void> {
+  cancelDownloadAreaSelection();
+  drawnDownloadBounds.value = null;
   if (!mounted) return;
   mapSetChangesInFlight += 1;
   const id = selectedId.value;
@@ -579,6 +783,22 @@ function onSelectionChanged(): void {
 watch(selectedId, onMapSetChanged);
 watch(sourceZoom, (value) => void onSourceZoomChanged(value));
 watch(
+  [selected, sourceZoom],
+  ([mapSet, zoom]) => {
+    mapViewState.setCoverageMapSetName(mapSet?.name ?? null);
+    mapViewState.setCoverageSourceZoom(
+      mapSet !== null &&
+        hasCoveragePreviewZoomRange(mapSet.minZoom, mapSet.maxZoom) &&
+        Number.isInteger(zoom) &&
+        zoom >= mapSet.minZoom + 1 &&
+        zoom <= mapSet.maxZoom
+        ? zoom
+        : null,
+    );
+  },
+  { immediate: true },
+);
+watch(
   [selectionMode, selectionSnapshotId, selectionTimestamp],
   onSelectionChanged,
 );
@@ -591,6 +811,7 @@ watch(
     selectionSnapshotId,
     selectionTimestamp,
     showGrid,
+    showSelection,
     dimmed,
   ],
   saveCurrentCoveragePreferences,
@@ -614,7 +835,10 @@ watch([showGrid, dimmed], ([showGridValue, dimmedValue]) => {
   }
 });
 
+watch(showSelection, () => void renderDownloadLayer());
+
 onMounted(async () => {
+  document.addEventListener("keydown", onDocumentKeydown);
   try {
     await store.load();
     const requestedMapSetId =
@@ -650,57 +874,64 @@ onMounted(async () => {
   }
 });
 
-onBeforeUnmount(destroyRenderer);
+onBeforeUnmount(async () => {
+  document.removeEventListener("keydown", onDocumentKeydown);
+  mapViewState.setCoverageMapSetName(null);
+  mapViewState.setCoverageSourceZoom(null);
+  await destroyRenderer();
+});
 </script>
 
 <template>
   <main class="coverage-page">
     <aside class="coverage-sidebar">
-      <header>
-        <div>
-          <p class="eyebrow">Tile Archive</p>
-          <h1>Coverage</h1>
+      <div class="coverage-sidebar-head">
+        <header>
+          <div>
+            <p class="eyebrow">Tile Archive</p>
+            <h1>Coverage</h1>
+          </div>
+          <button type="button" class="icon-button" :disabled="loading || !canQuery" title="Refresh visible area" @click="queryVisibleCoverage">
+            <i class="mdi mdi-refresh" aria-hidden="true"></i>
+          </button>
+        </header>
+
+        <label class="field">
+          <span>Map Set</span>
+          <MapSetSelect v-model="selectedId" :items="store.items" />
+        </label>
+        <div v-if="selected" class="map-set-meta">
+          <RouterLink
+            class="map-set-meta-button"
+            :to="`/cache/${selected.id}`"
+            title="View cache details"
+            aria-label="View cache details"
+          >
+            <i class="mdi mdi-eye-outline" aria-hidden="true"></i>
+          </RouterLink>
+          <RouterLink
+            class="map-set-meta-button"
+            :to="`/map-sets/${selected.id}`"
+            title="Edit Map Set"
+            aria-label="Edit Map Set"
+          >
+            <i class="mdi mdi-pencil-outline" aria-hidden="true"></i>
+          </RouterLink>
+          <span class="map-set-meta-details">
+            {{ selected.tileSize }} <span aria-hidden="true">●</span>
+            {{ selected.tileFormat.toUpperCase() }} <span aria-hidden="true">●</span>
+            Zoom {{ selected.minZoom }}–{{ selected.maxZoom }}
+          </span>
         </div>
-        <button type="button" class="icon-button" :disabled="loading || !canQuery" title="Refresh visible area" @click="queryVisibleCoverage">
-          <i class="mdi mdi-refresh" aria-hidden="true"></i>
-        </button>
-      </header>
 
-      <label class="field">
-        <span>Map Set</span>
-        <MapSetSelect v-model="selectedId" :items="store.items" />
-      </label>
-      <div v-if="selected" class="map-set-meta">
-        <RouterLink
-          class="map-set-meta-button"
-          :to="`/cache/${selected.id}`"
-          title="View cache details"
-          aria-label="View cache details"
+        <label
+          v-if="selected && hasCoveragePreviewZoomRange(selected.minZoom, selected.maxZoom)"
+          class="field"
         >
-          <i class="mdi mdi-eye-outline" aria-hidden="true"></i>
-        </RouterLink>
-        <RouterLink
-          class="map-set-meta-button"
-          :to="`/map-sets/${selected.id}`"
-          title="Edit Map Set"
-          aria-label="Edit Map Set"
-        >
-          <i class="mdi mdi-pencil-outline" aria-hidden="true"></i>
-        </RouterLink>
-        <span class="map-set-meta-details">
-          {{ selected.tileSize }} <span aria-hidden="true">●</span>
-          {{ selected.tileFormat.toUpperCase() }} <span aria-hidden="true">●</span>
-          Zoom {{ selected.minZoom }}–{{ selected.maxZoom }}
-        </span>
+          <span>Source zoom</span>
+          <input v-model.number="sourceZoom" type="number" :min="selected.minZoom + 1" :max="selected.maxZoom" />
+        </label>
       </div>
-
-      <label
-        v-if="selected && hasCoveragePreviewZoomRange(selected.minZoom, selected.maxZoom)"
-        class="field"
-      >
-        <span>Source zoom</span>
-        <input v-model.number="sourceZoom" type="number" :min="selected.minZoom + 1" :max="selected.maxZoom" />
-      </label>
 
       <details class="cache-state" open>
         <summary>Cache state</summary>
@@ -735,6 +966,10 @@ onBeforeUnmount(destroyRenderer);
           <label>
             <input v-model="dimmed" type="checkbox" />
             <span>Dimmed</span>
+          </label>
+          <label>
+            <input v-model="showSelection" type="checkbox" />
+            <span>Selection</span>
           </label>
         </div>
         <div
@@ -808,10 +1043,45 @@ onBeforeUnmount(destroyRenderer);
       </section>
 
       <p v-if="error" class="error-message" role="alert">{{ error }}</p>
+
+      <TileDownloadPanel
+        :map-set="selected"
+        :visible-bounds="response?.bounds ?? null"
+        :default-maximum-zoom="sourceZoom"
+        :drawn-bounds="drawnDownloadBounds"
+        :area-selection-active="selectingDownloadArea"
+        :area-selection-available="rendererReady"
+        :initially-open="route.query.download === 'open'"
+        @jobs-updated="updateDownloadJobs"
+        @selection-updated="updateDownloadSelection"
+        @request-area-selection="startDownloadAreaSelection"
+        @cancel-area-selection="cancelDownloadAreaSelection"
+        @refresh-coverage="queryVisibleCoverage"
+      />
     </aside>
 
-    <section class="coverage-map" aria-label="Cache Coverage map">
+    <section
+      ref="downloadAreaSurface"
+      class="coverage-map"
+      aria-label="Cache Coverage map"
+      @pointerdown.capture="startDownloadAreaDrag"
+      @pointermove.capture="moveDownloadAreaDrag"
+      @pointerup.capture="finishDownloadAreaDrag"
+      @pointercancel.capture="cancelDownloadAreaDrag"
+    >
       <div ref="mapHost" class="map-host"></div>
+      <div
+        v-if="selectingDownloadArea"
+        class="download-area-selector"
+        aria-label="Drag on the map to select a Tile Download area"
+      >
+        <span class="download-area-instruction">Drag to select · Esc to cancel</span>
+        <span
+          v-if="downloadDragStart && downloadDragCurrent"
+          class="download-area-draft"
+          :style="downloadDragStyle"
+        ></span>
+      </div>
       <MapZoomControl
         v-if="selected"
         :zoom="previewZoom"
@@ -829,7 +1099,7 @@ onBeforeUnmount(destroyRenderer);
 <style scoped>
 .coverage-page { display: grid; grid-template-columns: minmax(19rem, 24rem) minmax(0, 1fr); height: 100%; min-height: 0; }
 .coverage-sidebar { min-height: 0; overflow-y: auto; padding: 1.25rem; border-right: 1px solid #b6c6bc; background: #f4f7f4; }
-.coverage-sidebar > header, .summary header, .cell-detail header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.coverage-sidebar-head > header, .summary header, .cell-detail header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .coverage-sidebar h1 { margin: 0; font-size: 1.8rem; }
 .eyebrow { margin: 0 0 0.2rem; color: #617870; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 .icon-button { width: 2.3rem; height: 2.3rem; border: 1px solid #b6c6bc; border-radius: 50%; color: #17453c; background: white; cursor: pointer; }
@@ -865,6 +1135,10 @@ dt { color: #617870; } dd { margin: 0; font-weight: 750; text-align: right; }
 .error-message { padding: 0.65rem; border-left: 0.2rem solid #b64030; color: #812d25; background: #ffe9e5; }
 .coverage-map { position: relative; min-width: 0; min-height: 0; background: #a6c4b5; }
 .map-host { width: 100%; height: 100%; }
+.download-area-selector { position: absolute; inset: 0; z-index: 1100; overflow: hidden; cursor: crosshair; touch-action: none; }
+.download-area-instruction { position: absolute; top: 1rem; left: 50%; z-index: 1; padding: 0.5rem 0.7rem; border-radius: 0.4rem; color: white; background: rgb(49 31 89 / 88%); box-shadow: 0 0.3rem 1rem rgb(24 14 48 / 25%); font-size: 0.78rem; font-weight: 800; pointer-events: none; transform: translateX(-50%); }
+.download-area-draft { position: absolute; border: 4px solid #6d00d9; background: rgb(180 76 255 / 25%); box-shadow: 0 0 0 2px white, 0 0 1rem rgb(70 0 130 / 35%); pointer-events: none; }
 .map-message { position: absolute; top: 1rem; left: 50%; z-index: 500; padding: 0.75rem 1rem; border-radius: 0.55rem; background: rgb(255 255 255 / 94%); box-shadow: 0 0.5rem 1.5rem rgb(24 54 45 / 18%); transform: translateX(-50%); }
+@media (min-width: 801px) and (min-height: 720px) { .coverage-sidebar-head { position: sticky; top: -1.25rem; z-index: 600; margin: -1.25rem -1.25rem 0; padding: 1.25rem 1.25rem 0.85rem; background: #f4f7f4; } }
 @media (max-width: 800px) { .coverage-page { grid-template-columns: 1fr; grid-template-rows: minmax(18rem, 48%) minmax(20rem, 52%); } .coverage-sidebar { border-right: 0; border-bottom: 1px solid #b6c6bc; } }
 </style>

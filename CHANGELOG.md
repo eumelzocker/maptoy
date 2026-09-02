@@ -4,6 +4,18 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-02
+
+### Added
+
+- Added cache-aware Batch Download estimates and persistent Tile Download Jobs
+  with provider rate limits, concurrency, Retry-After handling, pause, resume,
+  cancellation, restart recovery, retry, bounded errors, and configurable Tile
+  admission limits.
+- Integrated Batch Download configuration, responsibility confirmation, progress,
+  controls, error details, draggable map-area selection, selected bounds, and active
+  Tile overlays into Coverage.
+
 ## [0.3.4] - 2026-09-02
 
 ### Changed

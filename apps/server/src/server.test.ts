@@ -62,6 +62,7 @@ async function testConfig(): Promise<MaptoyConfig> {
     },
     layers: { assetMaximumBytes: 1024 * 1024 },
     jobs: { retentionDays: 30, errorHistoryLimit: 100 },
+    downloads: { warningTileCount: 10_000, maximumTileCount: 100_000 },
     photos: {
       directory: null,
       maximumFileBytes: 10 * 1024 * 1024,
@@ -265,6 +266,420 @@ describe("maptoy server", () => {
     expect(invalidTime.json()).toMatchObject({
       error: { code: "COVERAGE_QUERY_INVALID" },
     });
+    await server.close();
+  });
+
+  it("estimates, runs, retries, and reports a persistent Tile Download Job", async () => {
+    const requestProvider = vi
+      .fn<ProviderClient["request"]>()
+      .mockResolvedValueOnce({
+        statusCode: 503,
+        headers: { "content-type": "text/plain", "retry-after": "0" },
+        body: Buffer.from("temporarily unavailable"),
+      })
+      .mockResolvedValueOnce({
+        statusCode: 429,
+        headers: { "content-type": "text/plain", "retry-after": "0" },
+        body: Buffer.from("rate limited"),
+      })
+      .mockResolvedValue({
+        statusCode: 200,
+        headers: { "content-type": "image/png" },
+        body: validPng,
+      });
+    const server = await buildServer({
+      config: await testConfig(),
+      providerClient: { request: requestProvider },
+      serveWeb: false,
+    });
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        downloadPolicy: {
+          requestsPerSecond: 1000,
+          concurrency: 2,
+          retryLimit: 2,
+          dailyRequestLimit: 10,
+        },
+      },
+    });
+    const mapSetId = created.json().id as string;
+    const input = {
+      bounds: xyzTileBounds({ zoom: 3, x: 4, y: 2 }),
+      minimumZoom: 3,
+      maximumZoom: 3,
+      refreshMode: "missing",
+    };
+    const estimate = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-downloads/estimate`,
+      payload: input,
+    });
+    expect(estimate.statusCode, estimate.body).toBe(200);
+    expect(estimate.json()).toMatchObject({
+      totalTiles: 1,
+      freshTiles: 0,
+      staleTiles: 0,
+      missingTiles: 1,
+      requestTiles: 1,
+      dailyRequestsRemaining: 10,
+      blockedReasons: [],
+    });
+
+    const started = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-download-jobs`,
+      payload: input,
+    });
+    expect(started.statusCode, started.body).toBe(201);
+    const jobId = started.json().id as string;
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${jobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        total: 1,
+        completed: 1,
+        skipped: 0,
+        failed: 0,
+        summary: { requested: 3, downloaded: 1, retries: 2 },
+      });
+    });
+    expect(requestProvider).toHaveBeenCalledTimes(3);
+
+    const cachedEstimate = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-downloads/estimate`,
+      payload: input,
+    });
+    expect(cachedEstimate.json()).toMatchObject({
+      freshTiles: 1,
+      missingTiles: 0,
+      requestTiles: 0,
+      dailyRequestsRemaining: 7,
+    });
+    await server.close();
+  });
+
+  it("enforces the daily provider request limit during Tile retries", async () => {
+    const requestProvider = vi.fn<ProviderClient["request"]>(async () => ({
+      statusCode: 429,
+      headers: { "content-type": "text/plain", "retry-after": "0" },
+      body: Buffer.from("rate limited"),
+    }));
+    const server = await buildServer({
+      config: await testConfig(),
+      providerClient: { request: requestProvider },
+      serveWeb: false,
+    });
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        downloadPolicy: {
+          requestsPerSecond: 1000,
+          concurrency: 1,
+          retryLimit: 2,
+          dailyRequestLimit: 1,
+        },
+      },
+    });
+    const mapSetId = created.json().id as string;
+    const started = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-download-jobs`,
+      payload: {
+        bounds: xyzTileBounds({ zoom: 3, x: 4, y: 2 }),
+        minimumZoom: 3,
+        maximumZoom: 3,
+        refreshMode: "missing",
+      },
+    });
+    const jobId = started.json().id as string;
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${jobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        total: 1,
+        completed: 0,
+        failed: 1,
+        summary: { requested: 1, retries: 0 },
+      });
+    });
+    expect(requestProvider).toHaveBeenCalledTimes(1);
+    const errors = await server.inject({
+      method: "GET",
+      url: `/api/jobs/${jobId}/errors`,
+    });
+    expect(errors.json()).toMatchObject({
+      items: [{ code: "PROVIDER_DAILY_LIMIT_REACHED", item: "3/4/2" }],
+    });
+    await server.close();
+  });
+
+  it("recovers an interrupted Tile Download from its durable cursor", async () => {
+    const config = await testConfig();
+    const firstServer = await buildServer({
+      config,
+      providerClient,
+      serveWeb: false,
+    });
+    const created = await firstServer.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        downloadPolicy: {
+          requestsPerSecond: 1000,
+          concurrency: 1,
+          retryLimit: 0,
+          dailyRequestLimit: null,
+        },
+      },
+    });
+    const mapSetId = created.json().id as string;
+    await firstServer.close();
+
+    const database = new DatabaseSync(config.storage.databasePath);
+    const timestamp = "2026-09-02T10:00:00.000Z";
+    const jobId = "10000000-0000-4000-8000-000000000001";
+    database
+      .prepare(
+        `INSERT INTO jobs (
+          id, type, status, input_json, total, completed, skipped, failed,
+          summary_json, last_error, created_at, started_at, updated_at,
+          finished_at, progress_cursor
+        ) VALUES (?, 'tile-download', 'running', ?, 5, 1, 0, 0, ?, NULL, ?, ?, ?, NULL, ?)`,
+      )
+      .run(
+        jobId,
+        JSON.stringify({
+          mapSetId,
+          bounds: xyzTileBounds({ zoom: 2, x: 2, y: 1 }),
+          minimumZoom: 2,
+          maximumZoom: 3,
+          refreshMode: "missing",
+        }),
+        JSON.stringify({
+          requested: 1,
+          downloaded: 1,
+          validated: 0,
+          cached: 0,
+          retries: 0,
+        }),
+        timestamp,
+        timestamp,
+        timestamp,
+        "2/2/1",
+      );
+    database.close();
+
+    const recoveredServer = await buildServer({
+      config,
+      providerClient,
+      serveWeb: false,
+    });
+    await vi.waitFor(async () => {
+      const response = await recoveredServer.inject({
+        method: "GET",
+        url: `/api/jobs/${jobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        total: 5,
+        completed: 5,
+      });
+    });
+    await recoveredServer.close();
+  });
+
+  it("pauses and resumes a running Tile Download between durable batches", async () => {
+    let releaseProvider = () => undefined;
+    let reportProviderStarted = () => undefined;
+    const providerGate = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    const providerStarted = new Promise<void>((resolve) => {
+      reportProviderStarted = resolve;
+    });
+    const requestProvider = vi.fn<ProviderClient["request"]>(async () => {
+      if (requestProvider.mock.calls.length === 1) {
+        reportProviderStarted();
+        await providerGate;
+      }
+      return {
+        statusCode: 200,
+        headers: { "content-type": "image/png" },
+        body: validPng,
+      };
+    });
+    const server = await buildServer({
+      config: await testConfig(),
+      providerClient: { request: requestProvider },
+      serveWeb: false,
+    });
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        downloadPolicy: {
+          requestsPerSecond: 1000,
+          concurrency: 1,
+          retryLimit: 0,
+          dailyRequestLimit: null,
+        },
+      },
+    });
+    const mapSetId = created.json().id as string;
+    const started = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-download-jobs`,
+      payload: {
+        bounds: xyzTileBounds({ zoom: 2, x: 2, y: 1 }),
+        minimumZoom: 2,
+        maximumZoom: 3,
+        refreshMode: "missing",
+      },
+    });
+    const jobId = started.json().id as string;
+    await providerStarted;
+
+    const paused = await server.inject({
+      method: "POST",
+      url: `/api/jobs/${jobId}/pause`,
+    });
+    expect(paused.statusCode, paused.body).toBe(200);
+    releaseProvider();
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${jobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "paused",
+        total: 5,
+        completed: 1,
+      });
+    });
+    expect(requestProvider).toHaveBeenCalledTimes(1);
+
+    const resumed = await server.inject({
+      method: "POST",
+      url: `/api/jobs/${jobId}/resume`,
+    });
+    expect(resumed.statusCode, resumed.body).toBe(200);
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${jobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        total: 5,
+        completed: 5,
+      });
+    });
+    expect(requestProvider).toHaveBeenCalledTimes(5);
+    await server.close();
+  });
+
+  it("cancels and retries a Tile Download through the shared Job API", async () => {
+    let releaseProvider = () => undefined;
+    let reportProviderStarted = () => undefined;
+    const providerGate = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    const providerStarted = new Promise<void>((resolve) => {
+      reportProviderStarted = resolve;
+    });
+    const requestProvider = vi.fn<ProviderClient["request"]>(async () => {
+      if (requestProvider.mock.calls.length === 1) {
+        reportProviderStarted();
+        await providerGate;
+      }
+      return {
+        statusCode: 200,
+        headers: { "content-type": "image/png" },
+        body: validPng,
+      };
+    });
+    const server = await buildServer({
+      config: await testConfig(),
+      providerClient: { request: requestProvider },
+      serveWeb: false,
+    });
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        downloadPolicy: {
+          requestsPerSecond: 1000,
+          concurrency: 1,
+          retryLimit: 0,
+          dailyRequestLimit: null,
+        },
+      },
+    });
+    const mapSetId = created.json().id as string;
+    const started = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-download-jobs`,
+      payload: {
+        bounds: xyzTileBounds({ zoom: 3, x: 4, y: 2 }),
+        minimumZoom: 3,
+        maximumZoom: 3,
+        refreshMode: "missing",
+      },
+    });
+    const jobId = started.json().id as string;
+    await providerStarted;
+
+    const cancelled = await server.inject({
+      method: "POST",
+      url: `/api/jobs/${jobId}/cancel`,
+    });
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+    releaseProvider();
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${jobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "cancelled",
+        total: 1,
+        completed: 1,
+      });
+    });
+
+    const retried = await server.inject({
+      method: "POST",
+      url: `/api/jobs/${jobId}/retry`,
+    });
+    expect(retried.statusCode, retried.body).toBe(201);
+    const retriedJobId = retried.json().id as string;
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${retriedJobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        total: 1,
+        skipped: 1,
+      });
+    });
+    expect(requestProvider).toHaveBeenCalledTimes(1);
     await server.close();
   });
 

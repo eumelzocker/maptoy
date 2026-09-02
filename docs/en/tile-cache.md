@@ -136,6 +136,28 @@ the provider or creates cache entries. The background map is separate from that
 read-only query: it uses the normal `auto` Tile mode and may fetch, validate, and
 cache background Tiles through the configured provider.
 
+### Batch Downloads in Coverage
+
+Expand **Download tiles** in the Coverage sidebar, drag a rectangle directly on the
+map, use the complete visible map area, or enter exact WGS84 bounds. Press `Esc` to
+cancel an active map selection. `Ctrl`+click on the map activates selection without
+using the sidebar button; `Ctrl`+drag selects the rectangle immediately. Then choose
+a minimum and maximum source Zoom. The
+default downloads only missing Tiles; the optional mode also revalidates stale
+Tiles. The estimate updates before admission and reports cache-aware request counts,
+transfer size when a cached sample exists, configured warning and hard limits, and
+remaining daily requests.
+
+Review the linked provider terms and explicitly accept responsibility before
+queuing the Job. Running Jobs remain in the same sidebar with progress, current
+Tile, pause, resume, cancel, retry, and bounded error details. Finished Jobs are
+grouped in a nested collapsible history. The selected bounds remain visible when
+the Download section is collapsed, and the current worker Tile appears with them as
+purple overlays above Coverage without changing its status colors. The
+**Selection** display checkbox can hide or restore the selected bounds. A **Download
+tiles** action on each capable Map Set opens this same Coverage workflow; there is
+no separate Downloads page.
+
 ## Statistics and deletion
 
 The management view loads database totals and per-zoom summaries without walking

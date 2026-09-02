@@ -12,6 +12,7 @@ export interface CoveragePagePreferences {
   selectionSnapshotId: string;
   selectionTimestamp: string;
   showGrid: boolean;
+  showSelection: boolean;
   dimmed: boolean;
 }
 
@@ -93,6 +94,10 @@ export function loadCoveragePagePreferences(
       typeof stored.showGrid === "boolean"
         ? stored.showGrid
         : fallback.showGrid,
+    showSelection:
+      typeof stored.showSelection === "boolean"
+        ? stored.showSelection
+        : fallback.showSelection,
     dimmed:
       typeof stored.dimmed === "boolean" ? stored.dimmed : fallback.dimmed,
   };

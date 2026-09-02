@@ -4,13 +4,13 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type {
   Job,
-  JobCleanupResponse,
-  JobError,
   LayerAsset,
   LayerAssetExtent,
   LayerAssetPatch,
   PhotoScanJobInput,
 } from "@maptoy/contracts";
+import { JobNotFoundError, JobStateError } from "../jobs/errors.js";
+import type { JobController } from "../jobs/service.js";
 import type { LayerService } from "./service.js";
 import type {
   JobRepository,
@@ -21,26 +21,6 @@ import type { ImagePreviewStorage } from "./imagePreviewStorage.js";
 import type { PhotoDirectory, ResolvedPhotoFile } from "./photoDirectory.js";
 
 const executeFile = promisify(execFile);
-
-export class JobNotFoundError extends Error {
-  readonly code = "JOB_NOT_FOUND";
-  readonly statusCode = 404;
-
-  constructor() {
-    super("The requested job does not exist.");
-    this.name = "JobNotFoundError";
-  }
-}
-
-export class JobStateError extends Error {
-  readonly code = "JOB_STATE_INVALID";
-  readonly statusCode = 409;
-
-  constructor(message: string) {
-    super(message);
-    this.name = "JobStateError";
-  }
-}
 
 interface StoredScanInput extends Record<string, unknown> {
   layerId: string;
@@ -182,9 +162,9 @@ function publicAsset(asset: StoredLayerAsset): LayerAsset {
   } as LayerAsset;
 }
 
-export class PhotoScanService {
+export class PhotoScanService implements JobController {
+  readonly type = "photo-scan" as const;
   private activeRun: Promise<void> | null = null;
-  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private shuttingDown = false;
 
   constructor(
@@ -199,22 +179,14 @@ export class PhotoScanService {
       maximumFiles: number;
     },
     private readonly jobPolicy: {
-      retentionDays: number;
       errorHistoryLimit: number;
     },
   ) {}
 
   async initialize(): Promise<void> {
     await this.previews.initialize();
-    this.jobs.recoverInterrupted();
-    this.cleanupJobs();
-    this.cleanupTimer = setInterval(() => this.cleanupJobs(), 60 * 60 * 1000);
-    this.cleanupTimer.unref();
+    this.jobs.recoverInterrupted(this.type);
     this.pump();
-  }
-
-  listJobs(): Job[] {
-    return this.jobs.list();
   }
 
   getJob(id: string): Job {
@@ -223,18 +195,6 @@ export class PhotoScanService {
       throw new JobNotFoundError();
     }
     return job;
-  }
-
-  listJobErrors(id: string): JobError[] {
-    this.getJob(id);
-    return this.jobs.listErrors(id);
-  }
-
-  cleanupJobs(referenceTime = new Date()): JobCleanupResponse {
-    const cutoff = new Date(
-      referenceTime.getTime() - this.jobPolicy.retentionDays * 86_400_000,
-    ).toISOString();
-    return { deletedJobs: this.jobs.deleteExpired(cutoff), cutoff };
   }
 
   assertLayerIdle(layerId: string): void {
@@ -413,10 +373,6 @@ export class PhotoScanService {
 
   async shutdown(): Promise<void> {
     this.shuttingDown = true;
-    if (this.cleanupTimer !== null) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-    }
     await this.activeRun;
   }
 

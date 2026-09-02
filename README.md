@@ -16,10 +16,11 @@
 > - Immutable tile revisions
 > - Snapshots
 > - Cache coverage overview
+> - Controlled Batch Downloads
 > - Track and external photo layers
 > - Integrated documentation
 >
-> Batch downloads and exports in additional map projections will be added soon.<br>
+> Exports in additional map projections will be added soon.<br>
 > Support for vector maps comes in v2.
 
 ## Start with Docker Compose 🐳
@@ -38,7 +39,7 @@ When the server starts with an empty Map Set table, *maptoy* creates an **OpenTo
 
 Compose bind-mounts the host directories configured by `MAPTOY_STORAGE_DATA_DIR` and `MAPTOY_LOGGING_DIR`. They must exist and be writable by the container user. The defaults created above keep everything below `.data`.
 
-Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](./docs/en/getting-started)** and **[Map Sets](./docs/en/map-sets)** documentation.
+Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](./docs/en/getting-started.md)** and **[Map Sets](./docs/en/map-sets.md)** documentation.
 
 To scan an existing photo directory without copying originals into *maptoy*, set the host path in `.env`:
 

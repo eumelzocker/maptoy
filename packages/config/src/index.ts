@@ -11,6 +11,8 @@ export const DEFAULT_TILES_MAX_BYTES = 10 * 1024 * 1024;
 export const DEFAULT_LAYERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
 export const DEFAULT_JOBS_RETENTION_DAYS = 30;
 export const DEFAULT_JOBS_ERROR_HISTORY_LIMIT = 100;
+export const DEFAULT_DOWNLOADS_WARNING_TILE_COUNT = 10_000;
+export const DEFAULT_DOWNLOADS_MAX_TILE_COUNT = 100_000;
 export const DEFAULT_PHOTOS_MAX_FILE_BYTES = 100 * 1024 * 1024;
 export const DEFAULT_PHOTOS_MAX_DECODED_PIXELS = 100_000_000;
 export const DEFAULT_PHOTOS_PREVIEW_MAX_EDGE = 640;
@@ -31,6 +33,8 @@ const JOBS_LIMITS = {
   retentionDays: 3650,
   errorHistory: 1000,
 } as const;
+
+const DOWNLOADS_LIMITS = { tiles: 1_000_000 } as const;
 
 export type LogLevel =
   | "fatal"
@@ -59,6 +63,10 @@ export interface MaptoyConfig {
   jobs: {
     retentionDays: number;
     errorHistoryLimit: number;
+  };
+  downloads: {
+    warningTileCount: number;
+    maximumTileCount: number;
   };
   photos: {
     directory: string | null;
@@ -158,6 +166,23 @@ export function loadConfig(
     environment.MAPTOY_STORAGE_DATA_DIR?.trim() || DEFAULT_STORAGE_DATA_DIR,
   );
   const databasePath = path.join(dataDirectory, "maptoy.sqlite");
+  const downloadWarningTileCount = parseBoundedPositiveInteger(
+    environment.MAPTOY_DOWNLOADS_WARNING_TILE_COUNT,
+    DEFAULT_DOWNLOADS_WARNING_TILE_COUNT,
+    DOWNLOADS_LIMITS.tiles,
+    "MAPTOY_DOWNLOADS_WARNING_TILE_COUNT",
+  );
+  const downloadMaximumTileCount = parseBoundedPositiveInteger(
+    environment.MAPTOY_DOWNLOADS_MAX_TILE_COUNT,
+    DEFAULT_DOWNLOADS_MAX_TILE_COUNT,
+    DOWNLOADS_LIMITS.tiles,
+    "MAPTOY_DOWNLOADS_MAX_TILE_COUNT",
+  );
+  if (downloadWarningTileCount > downloadMaximumTileCount) {
+    throw new Error(
+      "MAPTOY_DOWNLOADS_WARNING_TILE_COUNT must not exceed MAPTOY_DOWNLOADS_MAX_TILE_COUNT.",
+    );
+  }
 
   return {
     server: { host, port: parsePort(environment.MAPTOY_SERVER_PORT) },
@@ -215,6 +240,10 @@ export function loadConfig(
         JOBS_LIMITS.errorHistory,
         "MAPTOY_JOBS_ERROR_HISTORY_LIMIT",
       ),
+    },
+    downloads: {
+      warningTileCount: downloadWarningTileCount,
+      maximumTileCount: downloadMaximumTileCount,
     },
     photos: {
       directory: parsePhotoDirectory(environment.MAPTOY_PHOTOS_DIR),

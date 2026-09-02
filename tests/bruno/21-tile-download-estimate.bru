@@ -1,0 +1,38 @@
+meta {
+  name: Tile Download - Estimate area (read only)
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{appUrl}}/api/map-sets/{{mapSetId}}/tile-downloads/estimate
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "bounds": {
+      "west": 13.25,
+      "south": 52.4,
+      "east": 13.65,
+      "north": 52.65
+    },
+    "minimumZoom": 8,
+    "maximumZoom": 10,
+    "refreshMode": "missing"
+  }
+}
+
+docs {
+  Calculates cache-aware Tile and provider-request counts without contacting the provider or creating a Job.
+}
+
+tests {
+  test("returns a bounded Batch Download estimate", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.totalTiles).to.be.a("number");
+    expect(res.body.requestTiles).to.be.a("number");
+    expect(res.body.blockedReasons).to.be.an("array");
+  });
+}

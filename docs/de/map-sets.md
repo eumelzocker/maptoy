@@ -123,5 +123,6 @@ In Phase 2 lädt die Kartenansicht jedes Tile über den relativen *maptoy*-Endpu
 `api/map-sets/:id/tiles/:z/:x/:y`; der Browser erhält weder die externe
 Provider-URL noch aufgelöste Secrets. Dauerhafte Tile-Revisionen,
 Aktualisierungsmodi, Snapshots und Vergleiche von Cache-Ständen beschreibt die
-[Tile-Cache-Dokumentation](docs/de/tile-cache). Batch-Downloads folgen in einer
-späteren Phase.
+[Tile-Cache-Dokumentation](docs/de/tile-cache). Ein technisch geeignetes Map Set
+bietet **Download tiles** als Einstieg in den cachebewussten Batch-Download unter
+Coverage.

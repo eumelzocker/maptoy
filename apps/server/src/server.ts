@@ -11,6 +11,10 @@ import Fastify, {
 } from "fastify";
 import { layerPluginRegistry, mapRendererRegistry } from "./registries.js";
 import { openDatabase } from "./database.js";
+import { registerTileDownloadRoutes } from "./downloads/routes.js";
+import { TileDownloadService } from "./downloads/service.js";
+import { registerJobRoutes } from "./jobs/routes.js";
+import { JobService } from "./jobs/service.js";
 import { ImagePreviewStorage } from "./layers/imagePreviewStorage.js";
 import { PhotoDirectory } from "./layers/photoDirectory.js";
 import { PhotoScanService } from "./layers/photoScanner.js";
@@ -81,6 +85,8 @@ const configurationEnvironmentNames = new Set([
   "MAPTOY_LAYERS_ASSET_MAX_BYTES",
   "MAPTOY_JOBS_RETENTION_DAYS",
   "MAPTOY_JOBS_ERROR_HISTORY_LIMIT",
+  "MAPTOY_DOWNLOADS_WARNING_TILE_COUNT",
+  "MAPTOY_DOWNLOADS_MAX_TILE_COUNT",
   "MAPTOY_PHOTOS_DIR",
   "MAPTOY_PHOTOS_MAX_FILE_BYTES",
   "MAPTOY_PHOTOS_MAX_DECODED_PIXELS",
@@ -197,6 +203,15 @@ export async function buildServer(
     },
     config.jobs,
   );
+  const tileDownloadService = new TileDownloadService(
+    mapSetService,
+    tileArchive,
+    jobRepository,
+    { ...config.downloads, errorHistoryLimit: config.jobs.errorHistoryLimit },
+  );
+  const jobService = new JobService(jobRepository, config.jobs);
+  jobService.register(photoScanService);
+  jobService.register(tileDownloadService);
   const managedAssetService = new ManagedAssetService(
     layerService,
     layerPluginRegistry,
@@ -206,9 +221,15 @@ export async function buildServer(
   );
   await managedAssetService.initialize();
   await photoScanService.initialize();
+  tileDownloadService.initialize();
+  jobService.initialize();
 
   server.addHook("onClose", async () => {
-    await photoScanService.shutdown();
+    jobService.shutdown();
+    await Promise.all([
+      photoScanService.shutdown(),
+      tileDownloadService.shutdown(),
+    ]);
     await Promise.all([apiTrafficLog.close(), providerTrafficLog.close()]);
     database.close();
   });
@@ -291,7 +312,11 @@ export async function buildServer(
 
   registerMapSetRoutes(server, mapSetService, tileArchive, {
     maximumTileBytes: config.tiles.maximumBytes,
+    assertMapSetIdle: (mapSetId) =>
+      tileDownloadService.assertMapSetIdle(mapSetId),
   });
+  registerTileDownloadRoutes(server, tileDownloadService);
+  registerJobRoutes(server, jobService);
   registerLayerRoutes(
     server,
     layerService,
