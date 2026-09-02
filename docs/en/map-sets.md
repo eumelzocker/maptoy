@@ -44,6 +44,34 @@ area visible so sources can be compared directly. If the new Map Set has a narro
 zoom range, *maptoy* clamps the shared zoom to its nearest limit. The configured
 default viewport is used when no valid stored value exists.
 
+## Compare Maps
+
+Open **Display Options** in the Map view and enable **Compare Maps** to show two or
+four Map areas. Every area has its own Map Set selector; the same Map Set may be
+selected more than once. The first area is primary for reset, coordinate navigation,
+and the Tile Calculator. The normal Map Set selector and Map information control are
+hidden while comparing because every area is identified directly on the Map.
+
+Choose one of two display modes:
+
+- **Continuous area** overlays full-size Maps and clips them at the splitters. The
+  visible geography therefore continues across every divider while the Map Set
+  changes.
+- **Same center and scale** gives every area its own available space. All areas show
+  the same geographic centre at the same visual scale, even after a splitter moves.
+
+Drag the borderless dividers to resize the areas. A focused divider also accepts
+the arrow keys, **Home**, and **End**. Pan or zoom any Map to move all Maps live.
+The shared Zoom control uses the intersection of the selected Map Sets' visual zoom
+ranges and accounts for 256- and 512-pixel source Zoom offsets automatically.
+
+Comparison mode keeps one Zoom control and coordinate readout and combines the
+attributions required by all visible sources. Custom Layers, including Tile Grid,
+are temporarily hidden; their stored visibility and configuration do not change.
+The browser stores the selected mode, Map count, Map Sets, and splitter positions.
+The initial comparison UI displays current Tile states. Its saved source model is
+prepared for a later choice of snapshots and points in time per area.
+
 ## Source settings after caching
 
 Once a Map Set contains its first cached Tile Revision, *maptoy* locks the fields that

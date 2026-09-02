@@ -44,6 +44,9 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 
 - Map Sets anlegen, bearbeiten, validieren, duplizieren und löschen
 - Rasterkarten im Vue-/Leaflet-Frontend anzeigen
+- zwei oder vier Map Sets in einer geteilten Kartenansicht mit verschiebbaren
+  randlosen Splittern, gemeinsamem Pan/Zoom und wahlweise zusammenhängendem Gebiet
+  oder demselben Mittelpunkt und Maßstab vergleichen
 - Tiles über das Backend laden und lokal cachen
 - Tile-Bytes über die API kontrolliert einspielen und als revisionsfähige Cache-Stände speichern
 - sämtliche inhaltlich unterschiedlichen Tile-Revisionen dauerhaft nachvollziehbar speichern
@@ -492,7 +495,9 @@ Für den Fortschritt genügt zunächst Polling. Server-Sent Events können spät
 
 ### 7.1 Hauptansichten
 
-1. **Map** – ausgewähltes Map Set im aktiven Renderer-Adapter, optional
+1. **Map** – ausgewähltes Map Set im aktiven Renderer-Adapter oder Vergleich von
+   zwei beziehungsweise vier frei wählbaren, auch identischen Map Sets mit
+   synchronisiertem Viewport und verschiebbaren Splittern; optional
    einblendbares Layer-Panel mit Plugin-Auswahl, Import, Fotoverzeichnisscan,
    Konfiguration, Reihenfolge, Sichtbarkeit und Status, Koordinatenanzeige und
    Navigation.
@@ -778,6 +783,9 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Retry-/Backoff- und Rate-Limit-Logik mit kontrollierter Zeit
 - Exportgrößen- und Tile-Anzahlschätzung
 - Map-Adapter-Vertrag, Capability-Auswertung und adapterneutrale Viewport-Ereignisse
+- persistente Vergleichskonfiguration einschließlich 2-/4-facher Aufteilung,
+  Modus, doppelter Map-Set-Auswahl, Splittergrenzen und vorbereiteter Auswahl von
+  aktuellem Stand, Snapshot oder Zeitpunkt
 - gemeinsame Geometrie- und Laufzeitschemata für Punkt, Linie und Fläche einschließlich
   Feature-/Stützpunkteigenschaften, Ringvalidierung und Trennung von Geometrie und Stil
 - adapterneutrale Darstellungsdeskriptoren und Symbolisierung für Punkt, Linie und Fläche
@@ -824,6 +832,9 @@ HTTP 429 und 503 führen zu verlangsamter Verarbeitung. Die globale und provider
 - Abbruch, Wiederaufnahme und Neustart-Recovery eines persistenten Fotoscan-Jobs
   sowie verständliche Diagnose eines nicht verfügbaren Fotoverzeichnisses
 - Contract-Test des Leaflet-/XYZ-Adapters und eines minimalen Fake-Adapters
+- Live-Synchronisierung mehrerer Renderer, Größenanpassung nach Splitterbewegung,
+  gemeinsamer effektiver Zoombereich sowie vollständiges Aufräumen aller
+  Vergleichsrenderer
 - Darstellung, Aktualisierung, Reihenfolge und Entfernung der gemeinsamen Punkt-,
   Linien- und Flächendeskriptoren im Leaflet-/XYZ-Adapter und Fake-Adapter
 - explizite Löschung einer unreferenzierten Tile-Revision ohne Beeinflussung anderer Revisionen oder Snapshots
@@ -836,6 +847,9 @@ Tests verwenden keine echten öffentlichen Tile-Dienste.
 ### 11.3 End-to-End- und Betriebstests
 
 - Map Set erstellen, Karte laden und Attribution sehen
+- Vergleich mit zwei und vier Karten in beiden Modi öffnen, Splitter per Zeiger und
+  Tastatur verschieben, aus jeder Teilansicht panen und zoomen sowie gemeinsame
+  Koordinatenanzeige und Attributionen prüfen
 - Gebiet auswählen, Schätzung bestätigen, Download abschließen und Coverage prüfen
 - einen Snapshot anlegen, ein Tile aktualisieren und aktuellen, historischen sowie verglichenen Stand anzeigen
 - Track und GPS-getaggtes Bild über Panel und Dialoge des Standard-Map-View
@@ -1235,6 +1249,51 @@ veröffentlicht
 - Die Coverage-Ansicht zeigt die vom Worker aktuell bearbeiteten Tiles konsistent als separate Chip-Overlays an.
 - Die Oberfläche macht die Eigenverantwortung sichtbar, trifft aber keine rechtliche Zulässigkeitsentscheidung für den Nutzer.
 
+### Phase 6a: Interaktiver Map-Set-Vergleich
+
+**Status:** am 2. September 2026 abgeschlossen und mit Version `0.4.1`
+veröffentlicht
+
+**Aufgaben**
+
+- Vergleichsmodus über die Display Options aktivieren und vollständig konfigurieren
+- zwei vertikal geteilte oder vier als 2×2 angeordnete Karten mit randlosen,
+  per Zeiger und Tastatur verschiebbaren Splittern darstellen
+- im Modus `continuous` deckungsgleiche Vollkarten an den Splittern ausschneiden,
+  sodass das geografische Gebiet zusammenhängend bleibt
+- im Modus `synchronized` echte Teilansichten mit gemeinsamem Mittelpunkt und
+  gemeinsamer visueller Skalierung darstellen
+- Pan und Zoom aus jeder Teilansicht live auf alle Renderer übertragen und den
+  gemeinsamen visuellen Zoombereich auf die Schnittmenge der Map-Set-Grenzen
+  beschränken; 256-/512-Pixel-Source-Zoom-Offsets bleiben rendererabhängig
+- genau ein Zoom-Control, ein Koordinaten-Overlay und eine zusammengefasste
+  Attribution aller verwendeten Quellen anzeigen
+- Map Sets je Teilansicht frei und auch mehrfach auswählbar machen; die erste
+  Teilansicht bleibt führend für Reset, Koordinatennavigation und Tile Calculator;
+  allgemeine Map-Set-Auswahl und Karteninformation im Vergleich ausblenden
+- Vergleichskonfiguration und Splitterpositionen lokal speichern
+- Custom Layers einschließlich Tile Grid im Vergleich ausblenden, ohne persistierte
+  Sichtbarkeit oder Konfiguration zu verändern
+- die Quellenkonfiguration bereits als diskriminierte Auswahl `current`, `snapshot`
+  oder `asOf` modellieren; die erste Oberfläche bietet nur `current` an
+- den Adaptervertrag um Live-Viewport-Ereignisse und optionale explizite
+  Größenanpassung erweitern sowie Leaflet- und Fake-Adapter abdecken
+
+**Ergebnis/Akzeptanz**
+
+- Zwei und vier Karten lassen sich in beiden Modi ohne zusätzliche Route innerhalb
+  des Standard-Map-View vergleichen.
+- Splitter ändern ausschließlich die Aufteilung; Karten bleiben korrekt ausgerichtet
+  und werden nach jeder Größenänderung neu vermessen.
+- Pan oder Zoom in einer beliebigen Teilansicht hält alle Karten live auf demselben
+  Mittelpunkt und derselben visuellen Skalierung, ohne Ereignisschleifen.
+- 256- und 512-Pixel-Map-Sets verwenden ihre korrekten Source-Zooms; Map Sets ohne
+  gemeinsamen visuellen Zoombereich werden verständlich abgelehnt.
+- Doppelte Map-Set-Auswahl ist zulässig. Layer bleiben während des Vergleichs
+  ungemountet und erscheinen nach dessen Ende mit unverändertem Zustand wieder.
+- Die spätere Auswahl verschiedener Snapshots oder Zeitpunkte je Teilansicht
+  erfordert keinen Umbau von Layout, Renderer-Verbund oder Persistenzmodell.
+
 ### Phase 7: Kartenbild-Export
 
 **Aufgaben**
@@ -1341,10 +1400,11 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.3.3` | Fotolayer-Navigation, dynamisches Marker-Clustering und verfeinerte Foto-Popups und -Dialoge |
 | `0.3.4` | Gemeinsames Traffic-Log-Verzeichnis sowie aktualisierte Setup-Dokumentation und Screenshots |
 | `0.4.0` | Phase 6: kontrollierte Batch-Downloads, Provider-Limits und Erweiterung des gemeinsamen Job-Systems |
+| `0.4.1` | Phase 6a: interaktiver Vergleich von zwei oder vier Map Sets |
 
 ### 13.2 Weitere Releases
 
-Mit `0.4.0` ist Phase 6 vollständig veröffentlicht. Phase 5a ist bereits seit
+Mit `0.4.1` ist Phase 6a vollständig veröffentlicht. Phase 5a ist bereits seit
 Version `0.2.3` vollständig veröffentlicht; ihre für Phase 7 vorgesehene
 serverseitige Deskriptorausgabe ist kein offener Bestandteil von Phase 5a. Die
 weitere fachliche Reihenfolge erhält erst beim tatsächlichen Release konkrete
@@ -1403,6 +1463,10 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 - keine historische Revision automatisch gelöscht wird und explizite Löschungen aktuelle beziehungsweise von Snapshots referenzierte Revisionen schützen;
 - Batch-Jobs konfigurierte technische Limits und Provider-Signale respektieren sowie Neustart, Pause und Abbruch konsistent behandeln;
 - die Coverage-Ansicht große Caches und Vergleiche aggregiert und verständlich darstellt;
+- der Map View zwei oder vier auch identische Map Sets mit verschiebbaren Splittern
+  als zusammenhängendes Gebiet oder synchronisierte Teilansichten vergleichen kann,
+  dabei genau ein Zoom-Control und Koordinaten-Overlay verwendet, alle benötigten
+  Attributionen erhält und Custom Layers ohne Zustandsverlust vorübergehend ausblendet;
 - das allgemeine Layer-Plugin-System versionierte Manifeste, Schemas, Migrationen sowie Frontend-/Server-Hooks bereitstellt und seine Contract-Tests besteht;
 - Layerauswahl, Import, Fotoscan, Konfiguration, Reihenfolge, Sichtbarkeit und
   Diagnosen im optionalen Panel beziehungsweise in Dialogen des Standard-Map-View

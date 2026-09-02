@@ -26,6 +26,17 @@ appropriate aggregation level while retaining the geographic context.
 
 ## Photo Layers
 
-This example shows a Photo Layer with clustering and an open preview popup.
+These examples show a Photo Layer with clustered markers, an open preview popup,
+and the scrollable contents of a selected cluster.
 
 <img src="../assets/screenshot2.webp" alt="maptoy Map view showing clustered Photo markers and an open Photo preview" width="900">
+
+<img src="../assets/screenshot3.webp" alt="maptoy Map view showing the Photo list for a selected marker cluster" width="900">
+
+## Compare Maps
+
+Compare Maps displays two or four Map areas with synchronized pan and zoom. This
+example compares street and satellite Map Sets side by side in continuous-area
+mode.
+
+<img src="../assets/screenshot4.webp" alt="maptoy Compare Maps view showing street and satellite Map Sets side by side" width="900">

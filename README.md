@@ -2,12 +2,7 @@
 
 *maptoy* is a self-hosted application for viewing, archiving, and exporting maps and custom layers. For developers, it is a strong foundation for playing around with any kind of geospatial data.
 
-<img src="docs/assets/screenshot0.webp" alt="Screenshot 0" width="400">
-<img src="docs/assets/screenshot1.webp" alt="Screenshot 1" width="400">
-<img src="docs/assets/screenshot2.webp" alt="Screenshot 2" width="400">
-<img src="docs/assets/screenshot3.webp" alt="Screenshot 3" width="400">
-
-*screenshots probably outdated by current version.*
+**[Screenshots](./docs/en/screenshots.md)**
 
 > *maptoy* is under active development. Currently available features include:
 >
@@ -16,7 +11,8 @@
 > - Immutable tile revisions
 > - Snapshots
 > - Cache coverage overview
-> - Controlled Batch Downloads
+> - Controlled batch downloads
+> - Map compare
 > - Track and external photo layers
 > - Integrated documentation
 >

@@ -362,7 +362,9 @@ async function createLeafletInstance(
       ? "mousemove"
       : event === "selection"
         ? "click"
-        : "moveend";
+        : event === "viewport-live"
+          ? "move"
+          : "moveend";
 
   const createRectangleLayer = (
     descriptor: MapLayerDescriptor,
@@ -1031,6 +1033,7 @@ async function createLeafletInstance(
       map.setView(
         [viewport.center.latitude, viewport.center.longitude],
         viewport.zoom,
+        { animate: false },
       );
     },
     fitBounds: (bounds, fitOptions) => {
@@ -1062,6 +1065,9 @@ async function createLeafletInstance(
           animate: false,
         });
       }
+    },
+    resize: () => {
+      map.invalidateSize({ animate: false, pan: false });
     },
     setAttributionVisible: (visible) => {
       if (visible) {

@@ -27,4 +27,26 @@ describe("map Tile URL", () => {
     expect(first).toContain("refresh=cache-only");
     expect(first).not.toBe(second);
   });
+
+  it("prepares snapshot and point-in-time sources without changing the renderer", () => {
+    expect(
+      mapTileUrl({
+        mapSetId: "map-set-id",
+        cachedTilesOnly: false,
+        displayGeneration: 1,
+        tileSelection: { kind: "snapshot", snapshotId: "snapshot/a" },
+      }),
+    ).toBe("api/map-sets/map-set-id/tiles/{z}/{x}/{y}?snapshot=snapshot%2Fa");
+    expect(
+      mapTileUrl({
+        mapSetId: "map-set-id",
+        cachedTilesOnly: false,
+        displayGeneration: 1,
+        tileSelection: {
+          kind: "asOf",
+          timestamp: "2026-09-02T10:00:00.000Z",
+        },
+      }),
+    ).toContain("asOf=2026-09-02T10%3A00%3A00.000Z");
+  });
 });

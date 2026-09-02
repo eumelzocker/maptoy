@@ -4,6 +4,18 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-02
+
+### Added
+
+- Added persistent two- and four-Map comparison in Display Options with continuous
+  and same-centre modes, synchronized pan and zoom, accessible borderless
+  splitters, duplicate Map Set selection, shared controls and attribution, and
+  temporary Custom Layer suppression.
+- Extended Map Adapter SDK 2.2 with live viewport events and optional renderer
+  resizing, while preparing comparison sources for later Snapshot and point-in-time
+  selection without exposing those choices in the initial UI.
+
 ## [0.4.0] - 2026-09-02
 
 ### Added

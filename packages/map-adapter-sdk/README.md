@@ -22,4 +22,5 @@ implementation.
 
 SDK 2.0 removes the raster-overlay descriptor; Photo Layers use point coordinates
 exclusively. SDK 2.1 adds optional geographic bounds fitting and renderer-managed
-point clustering.
+point clustering. SDK 2.2 adds live viewport events and optional resize notification
+for synchronized, resizable comparison panes.

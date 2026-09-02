@@ -1,4 +1,4 @@
-export const MAP_ADAPTER_SDK_VERSION = "2.1.0";
+export const MAP_ADAPTER_SDK_VERSION = "2.2.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -247,7 +247,11 @@ export function isMapCompositeLayerData(
   );
 }
 
-export type MapRendererEvent = "pointer" | "selection" | "viewport";
+export type MapRendererEvent =
+  | "pointer"
+  | "selection"
+  | "viewport"
+  | "viewport-live";
 export type MapRendererEventListener = (payload: unknown) => void;
 export type Unsubscribe = () => void;
 
@@ -259,6 +263,7 @@ export interface MapRendererInstance {
     options?: MapFitBoundsOptions,
   ) => MaybePromise<void>;
   setZoomRange?: (range: MapZoomRange) => MaybePromise<void>;
+  resize?: () => MaybePromise<void>;
   subscribe: (
     event: MapRendererEvent,
     listener: MapRendererEventListener,
@@ -378,6 +383,7 @@ export function createFakeMapRendererFactory(): MapRendererFactory {
             ),
           };
         },
+        resize: () => undefined,
         subscribe: () => () => undefined,
         attachLayer: (layer) => {
           layers.set(layer.id, layer);
@@ -504,10 +510,17 @@ export async function exerciseMapRendererContract(
       "fit bounds ignored maximum zoom",
     );
   }
+  await instance.resize?.();
 
   const unsubscribe = instance.subscribe("viewport", () => undefined);
   invariant(typeof unsubscribe === "function", "subscribe must return cleanup");
   unsubscribe();
+  const unsubscribeLive = instance.subscribe("viewport-live", () => undefined);
+  invariant(
+    typeof unsubscribeLive === "function",
+    "live viewport subscribe must return cleanup",
+  );
+  unsubscribeLive();
 
   const layerData: readonly MapSupportedLayerData[] = [
     { kind: "point-collection", features: [] },

@@ -27,6 +27,7 @@ describe("Map context menu items", () => {
       cachedTilesOnly: true,
       showTitleBar: false,
       showMapSelector: true,
+      mapSelectorAvailable: true,
       showCoordinates: true,
       showAttribution: false,
       showTileGrid: true,
@@ -93,7 +94,11 @@ describe("Map context menu items", () => {
     expect(items[4]?.children).toMatchObject([
       { id: mapContextMenuIds.cachedTilesOnly, checked: true },
       { id: mapContextMenuIds.showTitleBar, checked: false },
-      { id: mapContextMenuIds.showMapSelector, checked: true },
+      {
+        id: mapContextMenuIds.showMapSelector,
+        checked: true,
+        disabled: false,
+      },
       { id: mapContextMenuIds.showCoordinates, checked: true },
       { id: mapContextMenuIds.showAttribution, checked: false },
       {
@@ -102,5 +107,34 @@ describe("Map context menu items", () => {
         disabled: false,
       },
     ]);
+  });
+
+  it("disables the map selector option when it is unavailable", () => {
+    const items = createMapContextMenuItems({
+      mapSets: [],
+      selectedMapSetId: null,
+      minimumZoom: null,
+      maximumZoom: null,
+      currentZoom: null,
+      documentationLanguage: "en",
+      documentationPages: [],
+      toolsEnabled: false,
+      layersEnabled: false,
+      cachedTilesOnly: false,
+      showTitleBar: true,
+      showMapSelector: true,
+      mapSelectorAvailable: false,
+      showCoordinates: true,
+      showAttribution: true,
+      showTileGrid: false,
+      tileGridAvailable: false,
+    });
+
+    expect(items[4]?.children).toContainEqual(
+      expect.objectContaining({
+        id: mapContextMenuIds.showMapSelector,
+        disabled: true,
+      }),
+    );
   });
 });

@@ -48,6 +48,39 @@ lassen. Hat das neue Map Set engere Zoomgrenzen, begrenzt *maptoy* den gemeinsam
 auf die nächstgelegene erlaubte Stufe. Der konfigurierte Startausschnitt gilt, wenn
 kein gültiger gespeicherter Wert vorhanden ist.
 
+## Karten vergleichen
+
+Öffne in der Kartenansicht die **Display Options** und aktiviere **Compare Maps**, um
+zwei oder vier Kartenbereiche anzuzeigen. Jeder Bereich hat eine eigene Map-Set-
+Auswahl; dasselbe Map Set darf mehrfach verwendet werden. Der erste Bereich ist für
+Reset, Koordinatennavigation und Tile Calculator führend. Die normale Map-Set-Auswahl
+und Karteninformation sind im Vergleich ausgeblendet, weil jeder Bereich direkt in
+der Karte bezeichnet ist.
+
+Es gibt zwei Darstellungsmodi:
+
+- **Continuous area** legt vollständige Karten deckungsgleich übereinander und
+  schneidet sie an den Splittern aus. Das sichtbare Gebiet setzt sich dadurch über
+  jede Trennlinie hinweg fort, während dort das Map Set wechselt.
+- **Same center and scale** gibt jedem Bereich seine eigene Teilfläche. Alle Bereiche
+  zeigen auch nach dem Verschieben eines Splitters denselben geografischen
+  Mittelpunkt mit derselben visuellen Skalierung.
+
+Ziehe die randlosen Trennlinien, um die Bereiche zu vergrößern oder zu verkleinern.
+Ein fokussierter Splitter kann außerdem mit den Pfeiltasten sowie **Pos1** und
+**Ende** bewegt werden. Pan oder Zoom in einer beliebigen Karte bewegt alle Karten
+unmittelbar. Das gemeinsame Zoom-Control verwendet die Schnittmenge der visuellen
+Zoombereiche und berücksichtigt automatisch die Source-Zoom-Versätze von 256- und
+512-Pixel-Tiles.
+
+Im Vergleich gibt es nur ein Zoom-Control und eine Koordinatenanzeige. Die
+Attributionen aller sichtbaren Quellen werden zusammengefasst. Custom Layers
+einschließlich Tile Grid sind vorübergehend ausgeblendet; ihre gespeicherte
+Sichtbarkeit und Konfiguration ändern sich nicht. Der Browser speichert Modus,
+Kartenanzahl, Map Sets und Splitterpositionen lokal. Die erste Oberfläche zeigt den
+aktuellen Tile-Stand. Das gespeicherte Quellenmodell ist bereits für eine spätere
+Auswahl von Snapshots und Zeitpunkten je Bereich vorbereitet.
+
 ## Quelle nach dem ersten Cache-Eintrag
 
 Sobald ein Map Set seine erste Tile-Revision im Cache enthält, sperrt *maptoy* die

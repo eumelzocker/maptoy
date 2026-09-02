@@ -314,8 +314,8 @@ describe("Map view architecture", () => {
     ]);
 
     expect(mapView).toContain("<MapZoomControl");
-    expect(mapView).toContain(':minimum="selected.minZoom"');
-    expect(mapView).toContain(':maximum="selected.maxZoom"');
+    expect(mapView).toContain(':minimum="controlMinimumZoom"');
+    expect(mapView).toContain(':maximum="controlMaximumZoom"');
     expect(mapView).toContain("auto-close-on-change");
     expect(coverageView).toContain("<MapZoomControl");
     expect(coverageView).toContain("auto-close-on-change");
@@ -336,6 +336,72 @@ describe("Map view architecture", () => {
     expect(applyHandler).toContain("props.autoCloseOnChange");
     expect(applyHandler).toContain("closeSlider()");
     expect(zoomControl).toContain("{ autoCloseOnChange: false }");
+  });
+
+  it("coordinates two or four renderer instances through the Display Options comparison", async () => {
+    const [
+      mapView,
+      comparisonLayout,
+      comparisonOptions,
+      comparisonPreferences,
+      adapter,
+    ] = await Promise.all([
+      readFile(
+        fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/MapComparisonLayout.vue", import.meta.url),
+        ),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./components/MapComparisonOptions.vue", import.meta.url),
+        ),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL("./mapComparisonPreferences.ts", import.meta.url),
+        ),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(
+          new URL(
+            "../../../adapters/leaflet-xyz/src/index.ts",
+            import.meta.url,
+          ),
+        ),
+        "utf8",
+      ),
+    ]);
+
+    expect(mapView).toContain("<MapComparisonOptions");
+    expect(comparisonOptions).toContain("Compare Maps");
+    expect(mapView).toContain("activeRenderers");
+    expect(mapView).toContain("synchronizeViewport");
+    expect(mapView).toContain(
+      "renderOperation.then(() => renderSelectedMaps(generation))",
+    );
+    expect(mapView).toContain('v-if="selected && !comparisonActive"');
+    expect(mapView).toContain(
+      'v-if="store.items.length > 0 && !comparisonActive"',
+    );
+    expect(mapView).toContain("comparisonAttributions");
+    expect(comparisonLayout).toContain('role="separator"');
+    expect(comparisonLayout).toContain("clipPath");
+    expect(comparisonLayout).toContain('props.mode === "synchronized"');
+    expect(comparisonPreferences).toContain(
+      '{ kind: "snapshot"; snapshotId: string }',
+    );
+    expect(comparisonPreferences).toContain(
+      '{ kind: "asOf"; timestamp: string }',
+    );
+    expect(adapter).toContain('event === "viewport-live"');
+    expect(adapter).toContain("map.invalidateSize");
   });
 
   it("deep-links from Coverage to Cache details and the Map Set editor", async () => {

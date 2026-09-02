@@ -21,6 +21,7 @@ interface MapContextMenuState {
   cachedTilesOnly: boolean;
   showTitleBar: boolean;
   showMapSelector: boolean;
+  mapSelectorAvailable: boolean;
   showCoordinates: boolean;
   showAttribution: boolean;
   showTileGrid: boolean;
@@ -183,6 +184,7 @@ export function createMapContextMenuItems(
           id: mapContextMenuIds.showMapSelector,
           label: "Show Map Selector",
           checked: state.showMapSelector,
+          disabled: !state.mapSelectorAvailable,
         },
         {
           id: mapContextMenuIds.showCoordinates,
