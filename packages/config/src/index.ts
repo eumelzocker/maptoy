@@ -46,8 +46,7 @@ export interface MaptoyConfig {
   storage: { dataDirectory: string; databasePath: string };
   logging: {
     level: LogLevel;
-    apiTrafficDirectory: string;
-    providerTrafficDirectory: string;
+    directory: string;
     trafficMaximumBytes: number;
     trafficMaximumFiles: number;
   };
@@ -75,15 +74,12 @@ export interface MaptoyConfig {
 function parseLogDirectory(
   value: string | undefined,
   dataDirectory: string,
-  defaultName: string,
 ): string {
   const dataDirectoryReference = "$" + "{MAPTOY_STORAGE_DATA_DIR}";
   const configured = value
     ?.trim()
     .replaceAll(dataDirectoryReference, dataDirectory);
-  return path.resolve(
-    configured || path.join(dataDirectory, "logs", defaultName),
-  );
+  return path.resolve(configured || path.join(dataDirectory, "logs"));
 }
 
 function parsePort(value: string | undefined): number {
@@ -168,15 +164,9 @@ export function loadConfig(
     storage: { dataDirectory, databasePath },
     logging: {
       level: parseLogLevel(environment.MAPTOY_LOGGING_LEVEL),
-      apiTrafficDirectory: parseLogDirectory(
-        environment.MAPTOY_LOGGING_API_TRAFFIC_DIR,
+      directory: parseLogDirectory(
+        environment.MAPTOY_LOGGING_DIR,
         dataDirectory,
-        "api",
-      ),
-      providerTrafficDirectory: parseLogDirectory(
-        environment.MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR,
-        dataDirectory,
-        "provider",
       ),
       trafficMaximumBytes: parsePositiveInteger(
         environment.MAPTOY_LOGGING_TRAFFIC_MAX_BYTES,

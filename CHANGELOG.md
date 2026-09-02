@@ -4,6 +4,14 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-09-02
+
+### Changed
+
+- Consolidated the separate API and provider traffic-log directory settings into
+  `MAPTOY_LOGGING_DIR`; maptoy now creates their `api` and `provider`
+  subdirectories below that shared location when needed.
+
 ## [0.3.3] - 2026-09-01
 
 ### Added

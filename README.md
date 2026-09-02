@@ -5,6 +5,7 @@
 <img src="docs/assets/screenshot0.webp" alt="Screenshot 0" width="400">
 <img src="docs/assets/screenshot1.webp" alt="Screenshot 1" width="400">
 <img src="docs/assets/screenshot2.webp" alt="Screenshot 2" width="400">
+<img src="docs/assets/screenshot3.webp" alt="Screenshot 3" width="400">
 
 *screenshots probably outdated by current version.*
 
@@ -27,31 +28,31 @@
 
 ```sh
 cp .env.example .env
-mkdir -p .data/logs/api .data/logs/provider
-docker compose up --build
+mkdir -p .data/logs
+docker compose up --build --detach
 ```
 
 Open <http://localhost:4004>.
 
 When the server starts with an empty Map Set table, *maptoy* creates an **OpenTopoMap** Map Set automatically. It uses no provider secret and includes the OpenTopoMap CC-BY-SA and OpenStreetMap contributor attribution. Existing Map Sets are never changed or supplemented; if all Map Sets are deleted, the default is created again on the next server start. Review the linked provider information before using the service beyond low-volume exploration.
 
-Compose bind-mounts the host directory configured by `MAPTOY_STORAGE_DATA_DIR` and the two traffic-log directories. They must exist and be writable by the container user. The defaults created above keep all of them below `.data`.
+Compose bind-mounts the host directories configured by `MAPTOY_STORAGE_DATA_DIR` and `MAPTOY_LOGGING_DIR`. They must exist and be writable by the container user. The defaults created above keep everything below `.data`.
 
-Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](http://localhost:4004/docs/en/getting-started)** and **[Map Sets](http://localhost:4004/docs/en/map-sets)** documentation.
+Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](./docs/en/getting-started)** and **[Map Sets](./docs/en/map-sets)** documentation.
 
-To scan an existing photo directory without copying originals into *maptoy*, set the absolute host path in `.env`:
+To scan an existing photo directory without copying originals into *maptoy*, set the host path in `.env`:
 
 ```dotenv
-MAPTOY_PHOTOS_DIR=/srv/photos
+MAPTOY_PHOTOS_DIR=~/Pictures
 ```
 
 Then start maptoy normally:
 
 ```sh
-docker compose up --build
+docker compose up --build --detach
 ```
 
-Compose mounts the directory read-only at a fixed internal path; neither that path nor the host path is exposed to the browser. See **Layers, tracks, and external photos** in the integrated documentation for storage rules and limits.
+Compose mounts the directory read-only; neither that path nor the host path is exposed to the browser. See **[Layers, tracks, and external photos](./docs/en/layers.md)** in the integrated documentation for storage rules and limits.
 
 To stop the application without deleting its data:
 

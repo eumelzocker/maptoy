@@ -38,7 +38,7 @@ HTML base ที่สร้างขึ้น และการเรียก
 
 ```sh
 cp .env.example .env
-mkdir -p .data/logs/api .data/logs/provider
+mkdir -p .data/logs
 docker compose up --build
 ```
 
@@ -60,19 +60,19 @@ Tile Revision ในเวอร์ชัน 5 เวอร์ชัน 1 ถึ
 ## บันทึกทราฟฟิก
 
 *maptoy* เก็บบันทึกการรับส่งข้อมูลฝั่ง client/API และฝั่ง backend/ผู้ให้บริการไทล์แยกจากกัน
-โดยบันทึกเป็น JSON Lines Compose จะ bind-mount ไดเรกทอรีที่กำหนดด้วย
-`MAPTOY_LOGGING_API_TRAFFIC_DIR` และ `MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR` ค่าเริ่มต้นของทั้งสอง
-อยู่ภายใต้ `MAPTOY_STORAGE_DATA_DIR` แต่สามารถชี้ไปยังที่อื่นบนโฮสต์ได้ทั้งคู่ ไฟล์ที่ใช้งานอยู่มีชื่อว่า
-`api-traffic.log` และ `provider-traffic.log`
+โดยบันทึกเป็น JSON Lines Compose จะ bind-mount ไดเรกทอรีร่วมที่กำหนดด้วย
+`MAPTOY_LOGGING_DIR` ค่าเริ่มต้นอยู่ภายใต้ `MAPTOY_STORAGE_DATA_DIR`
+แต่สามารถชี้ไปยังที่อื่นบนโฮสต์ได้ *maptoy* จะสร้างไดเรกทอรีย่อย `api` และ `provider`
+โดยอัตโนมัติเมื่อจำเป็น ไฟล์ที่ใช้งานอยู่มีชื่อว่า `api-traffic.log` และ `provider-traffic.log`
 
 `MAPTOY_LOGGING_TRAFFIC_MAX_BYTES` กำหนดขนาดของแต่ละไฟล์ก่อนหมุนเวียน (rotation)
 `MAPTOY_LOGGING_TRAFFIC_MAX_FILES` กำหนดจำนวนไฟล์ทั้งหมดที่เก็บไว้ต่อประเภททราฟฟิก
 รวมถึงไฟล์ที่ใช้งานอยู่ Header สำหรับการยืนยันตัวตน คุกกี้ และพารามิเตอร์ query
-ที่มักเป็นความลับจะถูกปิดบัง (redact) ไดเรกทอรี log ต้องมีอยู่ก่อนเริ่ม Compose และต้องเขียนได้โดย
+ที่มักเป็นความลับจะถูกปิดบัง (redact) ไดเรกทอรี log ร่วมต้องมีอยู่ก่อนเริ่ม Compose และต้องเขียนได้โดย
 UID `1000` คำขอไปยัง endpoint สำหรับ liveness ที่ `api/health` จะไม่ถูกบันทึกใน API traffic log
 ไม่ว่าจะมาจากที่ใด ส่วน Docker ยังคงตรวจสอบและรายงานสถานะสุขภาพของคอนเทนเนอร์ตามปกติ
 
 Endpoint สำหรับ readiness จะตรวจสอบฐานข้อมูลและความสามารถในการเขียนต่อเนื่องของไดเรกทอรีข้อมูล
-แอปพลิเคชันและไดเรกทอรี traffic log ทั้งสอง traffic log ที่ตั้งค่าไว้นอก `MAPTOY_STORAGE_DATA_DIR`
+แอปพลิเคชันและไดเรกทอรีย่อย traffic log ทั้งสองที่ระบบสร้างขึ้น traffic log ที่ตั้งค่าไว้นอก `MAPTOY_STORAGE_DATA_DIR`
 ไม่ถือเป็นส่วนหนึ่งของการสำรองข้อมูลแอปพลิเคชันหลัก และต้องสำรองแยกต่างหากเฉพาะเมื่อต้องการเก็บ
 บันทึกการทำงานที่มีขอบเขตจำกัดเหล่านี้ไว้

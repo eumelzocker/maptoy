@@ -72,8 +72,7 @@ const configurationEnvironmentNames = new Set([
   "MAPTOY_SERVER_PORT",
   "MAPTOY_STORAGE_DATA_DIR",
   "MAPTOY_LOGGING_LEVEL",
-  "MAPTOY_LOGGING_API_TRAFFIC_DIR",
-  "MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR",
+  "MAPTOY_LOGGING_DIR",
   "MAPTOY_LOGGING_TRAFFIC_MAX_BYTES",
   "MAPTOY_LOGGING_TRAFFIC_MAX_FILES",
   "MAPTOY_TILES_ALLOW_PRIVATE_HOSTS",
@@ -128,14 +127,19 @@ export async function buildServer(
       server.log.error({ error }, "Traffic log write failed");
     },
   };
+  const apiTrafficDirectory = path.join(config.logging.directory, "api");
+  const providerTrafficDirectory = path.join(
+    config.logging.directory,
+    "provider",
+  );
   const apiTrafficLog = await RotatingTrafficLog.create({
     ...trafficLogOptions,
-    directory: config.logging.apiTrafficDirectory,
+    directory: apiTrafficDirectory,
     filename: "api-traffic.log",
   });
   const providerTrafficLog = await RotatingTrafficLog.create({
     ...trafficLogOptions,
-    directory: config.logging.providerTrafficDirectory,
+    directory: providerTrafficDirectory,
     filename: "provider-traffic.log",
   });
   registerApiTrafficLogging(server, apiTrafficLog);
@@ -265,8 +269,8 @@ export async function buildServer(
       try {
         await Promise.all([
           assertWritableDirectory(config.storage.dataDirectory),
-          assertWritableDirectory(config.logging.apiTrafficDirectory),
-          assertWritableDirectory(config.logging.providerTrafficDirectory),
+          assertWritableDirectory(apiTrafficDirectory),
+          assertWritableDirectory(providerTrafficDirectory),
         ]);
         database.assertReady();
         return { status: "ready" };

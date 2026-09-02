@@ -168,8 +168,7 @@ async function run(): Promise<void> {
     },
     logging: {
       level: "silent",
-      apiTrafficDirectory: path.join(dataDirectory, "logs", "api"),
-      providerTrafficDirectory: path.join(dataDirectory, "logs", "provider"),
+      directory: path.join(dataDirectory, "logs"),
       trafficMaximumBytes: mebibyte,
       trafficMaximumFiles: 1,
     },

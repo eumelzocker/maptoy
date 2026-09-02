@@ -2,7 +2,7 @@
 
 Status: accepted
 Date: 2026-08-21
-Amended: 2026-08-24
+Amended: 2026-09-02
 
 ## Context
 
@@ -26,9 +26,10 @@ data from an existing baseline-4-or-newer database.
 Core persistent application data remains below `MAPTOY_STORAGE_DATA_DIR`, making its
 bind-mount persistence, backup, and restore behavior unambiguous. Rotating API and
 provider traffic logs are operational artifacts rather than core application state.
-They default to subdirectories of `MAPTOY_STORAGE_DATA_DIR`, but may use independently
-configured host bind mounts and must then be backed up separately if retention
-outside maptoy's bounded log rotation is desired.
+Their shared `MAPTOY_LOGGING_DIR` defaults below `MAPTOY_STORAGE_DATA_DIR`; maptoy
+creates separate `api` and `provider` subdirectories within it. The shared directory
+may use a separately configured host bind mount and must then be backed up separately
+if retention outside maptoy's bounded log rotation is desired.
 
 Synchronous statements are acceptable for the small, single-user configuration
 transactions in Phase 2. HTTP and filesystem work remains asynchronous. Repository
@@ -44,10 +45,10 @@ container. Startup fails rather than continuing with a partially applied migrati
 Tests create the version 4 baseline directly, reopen it without rerunning the
 baseline, and must preserve its data when future migrations are added.
 
-Readiness checks a database query and verifies that `MAPTOY_STORAGE_DATA_DIR` plus both
-configured traffic-log directories remain writable. Losing a traffic-log bind mount
-therefore makes the instance not ready instead of silently presenting full
-operational readiness.
+Readiness checks a database query and verifies that `MAPTOY_STORAGE_DATA_DIR` plus
+both generated traffic-log subdirectories remain writable. Losing the shared
+traffic-log bind mount therefore makes the instance not ready instead of silently
+presenting full operational readiness.
 
 Later phases must keep long scans and batch mutations bounded and measured. Backup,
 restore, migration recovery, and WAL handling still require dedicated operational

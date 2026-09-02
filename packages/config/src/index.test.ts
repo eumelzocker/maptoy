@@ -35,21 +35,16 @@ describe("loadConfig", () => {
     );
   });
 
-  it("derives independently configurable traffic log directories", () => {
+  it("derives the shared traffic log directory", () => {
     const config = loadConfig({
       MAPTOY_STORAGE_DATA_DIR: "test-data",
-      MAPTOY_LOGGING_API_TRAFFIC_DIR:
-        "$" + "{MAPTOY_STORAGE_DATA_DIR}/custom-api",
-      MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR: "outside/provider",
+      MAPTOY_LOGGING_DIR: "$" + "{MAPTOY_STORAGE_DATA_DIR}/custom-logs",
       MAPTOY_LOGGING_TRAFFIC_MAX_BYTES: "2048",
       MAPTOY_LOGGING_TRAFFIC_MAX_FILES: "3",
     });
 
-    expect(config.logging.apiTrafficDirectory).toBe(
-      path.join(config.storage.dataDirectory, "custom-api"),
-    );
-    expect(config.logging.providerTrafficDirectory).toBe(
-      path.resolve("outside/provider"),
+    expect(config.logging.directory).toBe(
+      path.join(config.storage.dataDirectory, "custom-logs"),
     );
     expect(config.logging.trafficMaximumBytes).toBe(2048);
     expect(config.logging.trafficMaximumFiles).toBe(3);
@@ -112,6 +107,8 @@ describe("loadConfig", () => {
       MAPTOY_HOST: "127.0.0.1",
       MAPTOY_PORT: "1234",
       MAPTOY_DATA_DIR: "/legacy-data",
+      MAPTOY_LOGGING_API_TRAFFIC_DIR: "/legacy-api-logs",
+      MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR: "/legacy-provider-logs",
       MAPTOY_IMAGE_ROOTS_JSON: '{"legacy":"/photos"}',
       MAPTOY_MAX_IMAGE_BYTES: "2048",
     });
@@ -121,6 +118,9 @@ describe("loadConfig", () => {
       port: 4004,
     });
     expect(config.storage.dataDirectory).not.toBe("/legacy-data");
+    expect(config.logging.directory).toBe(
+      path.join(config.storage.dataDirectory, "logs"),
+    );
     expect(config.photos.directory).toBeNull();
     expect(config.photos.maximumFileBytes).toBe(100 * 1024 * 1024);
   });

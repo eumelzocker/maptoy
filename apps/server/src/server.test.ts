@@ -51,8 +51,7 @@ async function testConfig(): Promise<MaptoyConfig> {
     },
     logging: {
       level: "silent",
-      apiTrafficDirectory: path.join(dataDirectory, "logs", "api"),
-      providerTrafficDirectory: path.join(dataDirectory, "logs", "provider"),
+      directory: path.join(dataDirectory, "logs"),
       trafficMaximumBytes: 1024 * 1024,
       trafficMaximumFiles: 3,
     },
@@ -306,14 +305,11 @@ describe("maptoy server", () => {
     await server.close();
 
     const apiLog = await readFile(
-      path.join(config.logging.apiTrafficDirectory, "api-traffic.log"),
+      path.join(config.logging.directory, "api", "api-traffic.log"),
       "utf8",
     );
     const providerLog = await readFile(
-      path.join(
-        config.logging.providerTrafficDirectory,
-        "provider-traffic.log",
-      ),
+      path.join(config.logging.directory, "provider", "provider-traffic.log"),
       "utf8",
     );
     expect(health.statusCode).toBe(200);
@@ -929,12 +925,12 @@ describe("maptoy server", () => {
     await server.close();
   });
 
-  it.each(["apiTrafficDirectory", "providerTrafficDirectory"] as const)(
-    "reports not-ready when %s is no longer writable",
-    async (key) => {
+  it.each(["api", "provider"] as const)(
+    "reports not-ready when the generated %s log directory is no longer writable",
+    async (name) => {
       const config = await testConfig();
       const server = await buildServer({ config, serveWeb: false });
-      const directory = config.logging[key];
+      const directory = path.join(config.logging.directory, name);
       await rename(directory, `${directory}-moved`);
       await writeFile(directory, "blocks directory recreation");
 

@@ -27,7 +27,7 @@ Hostverzeichnis ein und lege es vor dem Compose-Start an. Die Vorgabe verwendet:
 
 ```sh
 cp .env.example .env
-mkdir -p .data/logs/api .data/logs/provider
+mkdir -p .data/logs
 docker compose up --build
 ```
 
@@ -67,26 +67,27 @@ Jobs werden nie durch die Aufbewahrungsregel entfernt.
 ## Traffic-Logs
 
 *maptoy* protokolliert Client/API-Traffic und Backend/Tile-Provider-Traffic getrennt
-als JSON Lines. Compose bind-mountet die mit `MAPTOY_LOGGING_API_TRAFFIC_DIR` und
-`MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR` konfigurierten Verzeichnisse. Standardmäßig
-liegen sie unterhalb von `MAPTOY_STORAGE_DATA_DIR`; beide dürfen aber auf beliebige andere
-Hostpfade zeigen. Die aktiven Dateien heißen `api-traffic.log` und
-`provider-traffic.log`.
+als JSON Lines. Compose bind-mountet das mit `MAPTOY_LOGGING_DIR` konfigurierte
+gemeinsame Verzeichnis. Standardmäßig liegt es unterhalb von
+`MAPTOY_STORAGE_DATA_DIR`, darf aber auf einen anderen Hostpfad zeigen. *maptoy*
+legt darin bei Bedarf die Unterverzeichnisse `api` und `provider` an. Die aktiven
+Dateien heißen `api-traffic.log` und `provider-traffic.log`.
 
 `MAPTOY_LOGGING_TRAFFIC_MAX_BYTES` begrenzt die Größe jeder Datei vor der Rotation.
 `MAPTOY_LOGGING_TRAFFIC_MAX_FILES` bestimmt je Traffic-Typ die Gesamtzahl der
 aufbewahrten Dateien einschließlich der aktiven Datei. Authentifizierungsheader,
-Cookies und übliche geheime Query-Parameter werden redigiert. Die
-Logverzeichnisse müssen vor dem Compose-Start existieren und für UID `1000`
+Cookies und übliche geheime Query-Parameter werden redigiert. Das gemeinsame
+Logverzeichnis muss vor dem Compose-Start existieren und für UID `1000`
 beschreibbar sein. Aufrufe des Liveness-Endpunkts `api/health` werden unabhängig
 von ihrer Herkunft nicht im API-Traffic-Log erfasst; Docker prüft den Endpunkt
 weiterhin und stellt den Containerzustand bereit.
 
 Der Readiness-Endpunkt prüft die Datenbank sowie fortlaufend die Schreibbarkeit des
-Anwendungsdatenverzeichnisses und beider Traffic-Log-Verzeichnisse. Außerhalb von
-`MAPTOY_STORAGE_DATA_DIR` konfigurierte Traffic-Logs gehören nicht zum Backup der fachlichen
-Anwendungsdaten und müssen nur separat gesichert werden, wenn diese begrenzten
-Betriebsprotokolle erhalten bleiben sollen.
+Anwendungsdatenverzeichnisses und beider automatisch angelegten
+Traffic-Log-Unterverzeichnisse. Außerhalb von `MAPTOY_STORAGE_DATA_DIR`
+konfigurierte Traffic-Logs gehören nicht zum Backup der fachlichen Anwendungsdaten
+und müssen nur separat gesichert werden, wenn diese begrenzten Betriebsprotokolle
+erhalten bleiben sollen.
 
 ## Entwicklungsbefehle
 

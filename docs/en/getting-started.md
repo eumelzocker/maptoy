@@ -38,7 +38,7 @@ and create it before starting Compose. The default setup is:
 
 ```sh
 cp .env.example .env
-mkdir -p .data/logs/api .data/logs/provider
+mkdir -p .data/logs
 docker compose up --build
 ```
 
@@ -75,20 +75,22 @@ running, and paused Jobs are never removed by retention.
 ## Traffic logs
 
 *maptoy* keeps client/API traffic and backend/tile-provider traffic in separate
-JSON Lines logs. Compose bind-mounts the directories configured by
-`MAPTOY_LOGGING_API_TRAFFIC_DIR` and `MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR`; their defaults
-are below `MAPTOY_STORAGE_DATA_DIR`, but either path can point elsewhere on the host. The
-active files are named `api-traffic.log` and `provider-traffic.log`.
+JSON Lines logs. Compose bind-mounts the shared directory configured by
+`MAPTOY_LOGGING_DIR`; its default is below `MAPTOY_STORAGE_DATA_DIR`, but it can
+point elsewhere on the host. *maptoy* creates the `api` and `provider`
+subdirectories when needed. Their active files are named `api-traffic.log` and
+`provider-traffic.log`.
 
 `MAPTOY_LOGGING_TRAFFIC_MAX_BYTES` controls the size of each file before rotation.
 `MAPTOY_LOGGING_TRAFFIC_MAX_FILES` controls the total retained files per traffic type,
 including the active file. Authentication headers, cookies, and common secret
-query parameters are redacted. The log directories must exist before Compose
+query parameters are redacted. The shared log directory must exist before Compose
 starts and must be writable by UID `1000`. Requests to the liveness endpoint
 `api/health` are excluded from API traffic logs regardless of their origin; Docker
 continues to evaluate and expose the container health status.
 
 The readiness endpoint verifies the database and the continued writability of the
-application data directory and both traffic-log directories. Traffic logs configured
-outside `MAPTOY_STORAGE_DATA_DIR` are not part of the core application-data backup and only
-need a separate backup if these bounded operational records should be retained.
+application data directory and both generated traffic-log subdirectories. Traffic
+logs configured outside `MAPTOY_STORAGE_DATA_DIR` are not part of the core
+application-data backup and only need a separate backup if these bounded
+operational records should be retained.

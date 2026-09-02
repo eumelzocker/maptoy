@@ -412,7 +412,7 @@ Alle Endpunkte liegen relativ unter `api/`; keine Antwort darf absolute interne 
 ### 6.1 System
 
 - `GET api/health` – einfacher Liveness-Check
-- `GET api/ready` – prüft Datenbank sowie Schreibbarkeit des Anwendungsdatenverzeichnisses und beider Traffic-Log-Verzeichnisse
+- `GET api/ready` – prüft Datenbank sowie Schreibbarkeit des Anwendungsdatenverzeichnisses und beider automatisch angelegten Traffic-Log-Unterverzeichnisse
 - `GET api/config/public` – ausschließlich ungefährliche Frontend-Konfiguration
 - `GET api/openapi.json` – zur laufenden Serverversion passende OpenAPI-Spezifikation ohne interne oder geheime Konfigurationswerte
 - `GET api/map-renderers` – registrierte Frontend-Adapter und ihre Capability-Flags
@@ -649,8 +649,7 @@ MAPTOY_SERVER_HOST=0.0.0.0
 MAPTOY_SERVER_PORT=4004
 MAPTOY_STORAGE_DATA_DIR=./.data
 MAPTOY_LOGGING_LEVEL=info
-MAPTOY_LOGGING_API_TRAFFIC_DIR=${MAPTOY_STORAGE_DATA_DIR}/logs/api
-MAPTOY_LOGGING_PROVIDER_TRAFFIC_DIR=${MAPTOY_STORAGE_DATA_DIR}/logs/provider
+MAPTOY_LOGGING_DIR=${MAPTOY_STORAGE_DATA_DIR}/logs
 MAPTOY_LOGGING_TRAFFIC_MAX_BYTES=10485760
 MAPTOY_LOGGING_TRAFFIC_MAX_FILES=5
 MAPTOY_TILES_MAX_BYTES=10485760
@@ -674,7 +673,7 @@ Bilddateigröße, dekodierte Pixelzahl, Vorschauabmessungen und Scanumfang gelte
 eigene konfigurierbare Grenzen; ihre Defaults und Hartgrenzen werden in Phase 5 mit
 repräsentativen Bildbeständen gemessen und nicht vom Tile-Bytelimit abgeleitet.
 
-`MAPTOY_STORAGE_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Pfad für persistente Fachdaten. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Anwendungsdatenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr sind Betriebsartefakte und erhalten eigene konfigurierbare Hostverzeichnisse und Bind-Mounts; ihre Vorgaben liegen unterhalb von `MAPTOY_STORAGE_DATA_DIR`, dürfen aber auf andere Hostpfade zeigen. Für persistente Fachdaten oder Traffic-Logs werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Fotovorschauen, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar. Ein Backup des Anwendungsdatenverzeichnisses umfasst Fotokatalog, Metadaten und Vorschauen, aber ausdrücklich nicht die extern referenzierten Originalfotos. Das konfigurierte Fotoverzeichnis und extern konfigurierte Traffic-Logs müssen bei gewünschter Erhaltung separat gesichert werden.
+`MAPTOY_STORAGE_DATA_DIR` bezeichnet auf dem Host den ausdrücklich gewählten, beschreibbaren Pfad für persistente Fachdaten. Docker Compose bind-mountet genau diesen Pfad nach `/data`; die Anwendung legt die Datenbank immer als `maptoy.sqlite` in diesem Anwendungsdatenverzeichnis an. Ein separater Datenbankpfad ist nicht konfigurierbar. Die beiden getrennten, größenrotierten JSONL-Traffic-Logs für Client/API- und Backend/Tile-Provider-Verkehr sind Betriebsartefakte und liegen in automatisch angelegten Unterverzeichnissen eines gemeinsamen, mit `MAPTOY_LOGGING_DIR` konfigurierbaren Hostverzeichnisses. Dessen Vorgabe liegt unterhalb von `MAPTOY_STORAGE_DATA_DIR`, darf aber auf einen anderen Hostpfad zeigen. Für persistente Fachdaten oder Traffic-Logs werden weder benannte noch anonyme Docker-Volumes angelegt. Dadurch bleiben Datenbank, Tile-Archiv, Exporte, Fotovorschauen, Logs und weitere persistente Artefakte auf dem Host unmittelbar sichtbar, sicherbar und kontrollierbar. Ein Backup des Anwendungsdatenverzeichnisses umfasst Fotokatalog, Metadaten und Vorschauen, aber ausdrücklich nicht die extern referenzierten Originalfotos. Das konfigurierte Fotoverzeichnis und ein extern konfiguriertes Traffic-Log-Verzeichnis müssen bei gewünschter Erhaltung separat gesichert werden.
 
 Schema-Version 4 ist die produktive Datenbank-Baseline. Frühere, ausschließlich während der Entwicklung verwendete Schema-Versionen sind keine unterstützten Upgradequellen und existieren nicht im Produktivbetrieb. Alle neuen Datenbanken werden direkt mit Baseline 4 angelegt; künftige nummerierte SQL-Migrationen beginnen oberhalb dieser Version und müssen bestehende Baseline-4-Daten erhalten.
 
@@ -692,11 +691,11 @@ Schema-Version 4 ist die produktive Datenbank-Baseline. Frühere, ausschließlic
 - Mehrstufiger Build: Dependencies, Test/Build, minimale Runtime
 - Betrieb als nicht privilegierter Benutzer
 - genau ein veröffentlichter HTTP-Port
-- explizite Host-Bind-Mounts von `MAPTOY_STORAGE_DATA_DIR` nach `/data` sowie der beiden getrennt konfigurierbaren Traffic-Log-Verzeichnisse; weder für Fachdaten noch Traffic-Logs benannte oder anonyme Docker-Volumes
+- explizite Host-Bind-Mounts von `MAPTOY_STORAGE_DATA_DIR` nach `/data` sowie des mit `MAPTOY_LOGGING_DIR` konfigurierten gemeinsamen Traffic-Log-Verzeichnisses; weder für Fachdaten noch Traffic-Logs benannte oder anonyme Docker-Volumes
 - expliziter, ausschließlich lesbarer Host-Bind-Mount für `MAPTOY_PHOTOS_DIR`;
   der Container erhält dort keine Schreibberechtigung
 - Healthcheck gegen den Liveness-Endpunkt
-- Readiness-Prüfung für Datenbank und Schreibbarkeit des Anwendungsdatenverzeichnisses sowie beider konfigurierter Traffic-Log-Verzeichnisse
+- Readiness-Prüfung für Datenbank und Schreibbarkeit des Anwendungsdatenverzeichnisses sowie der beiden automatisch angelegten Traffic-Log-Unterverzeichnisse
 - sauberer Shutdown: keine neuen Jobs, laufende Dateischreibvorgänge abschließen, Jobstatus sichern
 - temporäre Dateien beim Start prüfen und verwaiste Dateien kontrolliert bereinigen
 - Image-Tags mindestens als Version und unveränderlicher Commit-Bezug
@@ -1333,6 +1332,7 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.3.1` | Abschluss von Phase 5 mit belastbarer Scan-Wiederaufnahme, Job-Aufbewahrung, skalierbarem Fotokatalog und gemessenen Fotolimits |
 | `0.3.2` | Cache- und Coverage-Verbesserungen sowie fokussierte Fotoverzeichnis-, Positions- und Metadatenabläufe |
 | `0.3.3` | Fotolayer-Navigation, dynamisches Marker-Clustering und verfeinerte Foto-Popups und -Dialoge |
+| `0.3.4` | Gemeinsames Traffic-Log-Verzeichnis sowie aktualisierte Setup-Dokumentation und Screenshots |
 
 ### 13.2 Weitere Releases
 
