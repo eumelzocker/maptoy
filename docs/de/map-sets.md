@@ -50,12 +50,18 @@ kein gültiger gespeicherter Wert vorhanden ist.
 
 ## Karten vergleichen
 
-Öffne in der Kartenansicht die **Display Options** und aktiviere **Compare Maps**, um
-zwei oder vier Kartenbereiche anzuzeigen. Jeder Bereich hat eine eigene Map-Set-
-Auswahl; dasselbe Map Set darf mehrfach verwendet werden. Der erste Bereich ist für
-Reset, Koordinatennavigation und Tile Calculator führend. Die normale Map-Set-Auswahl
-und Karteninformation sind im Vergleich ausgeblendet, weil jeder Bereich direkt in
-der Karte bezeichnet ist.
+Öffne **Compare Maps** über die **Display Options** oder im Kontextmenü der Karte
+unter **Tools** und wähle für jeden Bereich ein Map Set. Sobald die Auswahl kompatibel
+ist, kann der Vergleich im Dialog, über die Checkbox **Compare Maps** in den
+**Display Options** oder im Kontextmenü unter **Options** aktiviert werden. Die
+Aktivierungscheckboxen bleiben deaktiviert, bis jeder Bereich ein interaktives Map
+Set besitzt und die gewählten Map Sets einen gemeinsamen visuellen Zoombereich haben.
+
+Der Dialog konfiguriert zwei oder vier Kartenbereiche. Jeder Bereich hat eine eigene
+Map-Set-Auswahl; dasselbe Map Set darf mehrfach verwendet werden. Der erste Bereich
+ist für Reset, Koordinatennavigation und Tile Calculator führend. Die normale
+Map-Set-Auswahl und Karteninformation sind im Vergleich ausgeblendet, weil jeder
+Bereich direkt in der Karte bezeichnet ist.
 
 Es gibt zwei Darstellungsmodi:
 
@@ -73,10 +79,12 @@ unmittelbar. Das gemeinsame Zoom-Control verwendet die Schnittmenge der visuelle
 Zoombereiche und berücksichtigt automatisch die Source-Zoom-Versätze von 256- und
 512-Pixel-Tiles.
 
-Im Vergleich gibt es nur ein Zoom-Control und eine Koordinatenanzeige. Die
-Attributionen aller sichtbaren Quellen werden zusammengefasst. Custom Layers
-einschließlich Tile Grid sind vorübergehend ausgeblendet; ihre gespeicherte
-Sichtbarkeit und Konfiguration ändern sich nicht. Der Browser speichert Modus,
+Im Vergleich gibt es nur ein Zoom-Control und eine Koordinatenanzeige. Jeder
+Kartenbereich zeigt die Attribution seiner eigenen Quelle; **Show Attribution**
+steuert alle gemeinsam. Sichtbare Custom Layers erscheinen mit gemeinsamer
+Konfiguration und Sichtbarkeit auf allen Vergleichskarten. Rendererabhängige
+Dekorationen wie Tile Grid werden für jedes Map Set getrennt berechnet. Der Browser
+speichert Modus,
 Kartenanzahl, Map Sets und Splitterpositionen lokal. Die erste Oberfläche zeigt den
 aktuellen Tile-Stand. Das gespeicherte Quellenmodell ist bereits für eine spätere
 Auswahl von Snapshots und Zeitpunkten je Bereich vorbereitet.

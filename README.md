@@ -88,7 +88,7 @@ The extension has its own build and test commands and is not included in the Doc
 - This repository may contain AI slop!
 - This repository may contain human stupidity!
 - Use at your own risk! No warranties, no refunds!
-- Feature requests and issues will probably be ignored!
+- Feature requests, issues and PRs will probably be ignored!
 - The app does not support authentication or authorization; keep your installation private!
 - Respect map providers' rules!
 

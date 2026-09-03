@@ -12,6 +12,8 @@ const props = defineProps<{
   verticalSplit: number;
   horizontalSplit: number;
   labels: readonly string[];
+  attributions: readonly string[];
+  showAttribution: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -191,6 +193,23 @@ defineExpose({ getHosts });
         </span>
       </div>
 
+      <template v-if="showAttribution">
+        <div
+          v-for="index in count"
+          :key="`attribution-${index - 1}`"
+          class="map-comparison-attribution-region"
+          :style="regionStyle(index - 1)"
+          aria-label="Map attribution"
+        >
+          <!-- Attribution is trusted, administrator-authored Map Set HTML. -->
+          <span
+            v-if="attributions[index - 1]"
+            class="map-comparison-attribution"
+            v-html="attributions[index - 1]"
+          ></span>
+        </div>
+      </template>
+
       <button
         type="button"
         class="map-splitter vertical"
@@ -281,6 +300,35 @@ defineExpose({ getHosts });
   color: #fff;
   background: #315f54;
   font-size: 0.65rem;
+}
+
+.map-comparison-attribution-region {
+  position: absolute;
+  z-index: 900;
+  display: flex;
+  overflow: hidden;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0.2rem 0.3rem;
+  pointer-events: none;
+}
+
+.map-comparison-attribution {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0.12rem 0.28rem;
+  border-radius: 0.2rem;
+  color: #2f403c;
+  background: rgb(255 255 255 / 82%);
+  font-size: 0.62rem;
+  line-height: 1.25;
+  pointer-events: auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-comparison-attribution :deep(a) {
+  color: inherit;
 }
 
 .map-splitter {

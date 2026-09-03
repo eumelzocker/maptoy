@@ -18,6 +18,9 @@ interface MapContextMenuState {
   documentationPages: readonly DocumentationMenuPage[];
   toolsEnabled: boolean;
   layersEnabled: boolean;
+  comparisonOptionsAvailable: boolean;
+  comparisonActive: boolean;
+  comparisonCanActivate: boolean;
   cachedTilesOnly: boolean;
   showTitleBar: boolean;
   showMapSelector: boolean;
@@ -39,6 +42,8 @@ export const mapContextMenuIds = {
   tileCalculator: "tool-tile-calculator",
   layers: "tool-layers",
   displayOptions: "tool-display-options",
+  compareMaps: "tool-compare-maps",
+  compareMapsEnabled: "option-compare-maps",
   cachedTilesOnly: "option-cached-tiles-only",
   showTitleBar: "option-show-title-bar",
   showMapSelector: "option-show-map-selector",
@@ -159,6 +164,12 @@ export function createMapContextMenuItems(
           disabled: !state.layersEnabled,
         },
         {
+          id: mapContextMenuIds.compareMaps,
+          label: "Compare Maps",
+          icon: "mdi-compare-horizontal",
+          disabled: !state.comparisonOptionsAvailable,
+        },
+        {
           id: mapContextMenuIds.displayOptions,
           label: "Display Options",
           icon: "mdi-tune",
@@ -170,6 +181,12 @@ export function createMapContextMenuItems(
       label: "Options",
       icon: "mdi-tune",
       children: [
+        {
+          id: mapContextMenuIds.compareMapsEnabled,
+          label: "Compare Maps",
+          checked: state.comparisonActive,
+          disabled: !state.comparisonCanActivate,
+        },
         {
           id: mapContextMenuIds.cachedTilesOnly,
           label: "Cached Tiles Only",

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { MapSetListItem } from "@maptoy/contracts";
 import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
 import type {
   GeographicCoordinate,
@@ -79,7 +80,10 @@ import {
   loadMapComparisonPreferences,
   saveMapComparisonPreferences,
 } from "../mapComparisonPreferences.js";
-import { mapComparisonZoomRange } from "../mapComparisonModel.js";
+import {
+  canActivateMapComparison,
+  mapComparisonZoomRange,
+} from "../mapComparisonModel.js";
 import { applyMapCenter } from "../mapViewportActions.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
 import {
@@ -126,8 +130,11 @@ const showAttribution = ref(loadShowAttribution(browserStorage));
 const showMapSelector = ref(loadShowMapSelector(browserStorage));
 const storedShowTileGrid = ref(loadShowTileGrid(browserStorage));
 const defaultGridBusy = ref(false);
+const comparisonCanActivate = computed(() =>
+  canActivateMapComparison(comparison.value, store.items),
+);
 const comparisonActive = computed(
-  () => comparison.value.enabled && store.items.length > 0,
+  () => comparison.value.enabled && comparisonCanActivate.value,
 );
 const activeComparisonSources = computed(() =>
   comparison.value.sources.slice(0, comparison.value.count),
@@ -149,28 +156,36 @@ const comparisonLabels = computed(() =>
 );
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const comparisonAttributions = computed(() => {
-  const unique = new Map<string, { name: string; attribution: string }>();
-  for (const mapSet of comparisonMapSets.value) {
-    if (mapSet !== null && !unique.has(mapSet.attribution)) {
-      unique.set(mapSet.attribution, {
-        name: mapSet.name,
-        attribution: mapSet.attribution,
-      });
-    }
-  }
-  return [...unique.values()];
+  return comparisonMapSets.value.map((mapSet) => mapSet?.attribution ?? "");
 });
-const supportedLayerTypes = computed<readonly MapLayerType[]>(() =>
-  selected.value === null
-    ? []
-    : (factories.get(selected.value.rendererId)?.manifest.supportedLayerTypes ??
-      []),
+const displayedMapSets = computed<readonly MapSetListItem[]>(() =>
+  comparisonActive.value
+    ? comparisonMapSets.value.filter((mapSet) => mapSet !== null)
+    : selected.value === null
+      ? []
+      : [selected.value],
 );
+const layerRenderingAvailable = computed(
+  () =>
+    displayedMapSets.value.length > 0 &&
+    displayedMapSets.value.every(
+      (mapSet) => mapSet.capabilities.layerRendering,
+    ),
+);
+const supportedLayerTypes = computed<readonly MapLayerType[]>(() => {
+  const rendererTypes = displayedMapSets.value.map(
+    (mapSet) =>
+      factories.get(mapSet.rendererId)?.manifest.supportedLayerTypes ?? [],
+  );
+  const first = rendererTypes[0];
+  return first === undefined
+    ? []
+    : first.filter((type) =>
+        rendererTypes.every((types) => types.includes(type)),
+      );
+});
 const tileGridAvailable = computed(() => {
-  if (
-    comparisonActive.value ||
-    selected.value?.capabilities.layerRendering !== true
-  ) {
+  if (!layerRenderingAvailable.value) {
     return false;
   }
   const supportedTypes = new Set(supportedLayerTypes.value);
@@ -190,6 +205,8 @@ const showTileGrid = computed(() =>
 const layerPanel = ref<{ open(layerId?: string): void } | null>(null);
 const displayOptionsOpen = ref(false);
 const displayOptionsDialog = ref<{ activate(): void } | null>(null);
+const comparisonOptionsOpen = ref(false);
+const comparisonOptionsDialog = ref<{ activate(): void } | null>(null);
 const gotoCoordinatesOpen = ref(false);
 const gotoInitialCoordinate = ref<GeographicCoordinate>({
   longitude: 0,
@@ -267,19 +284,26 @@ const mapContextMenuItems = computed(() =>
       ({ requestedLanguage }) => requestedLanguage === documentationLanguage,
     ),
     toolsEnabled: selected.value !== null && zoom.value !== null,
-    layersEnabled: selected.value !== null && !comparisonActive.value,
+    layersEnabled: layerRenderingAvailable.value,
+    comparisonOptionsAvailable: store.items.length > 0,
+    comparisonActive: comparison.value.enabled,
+    comparisonCanActivate: comparisonCanActivate.value,
     cachedTilesOnly: cachedTilesOnly.value,
     showTitleBar: showTitleBar.value,
     showMapSelector: showMapSelector.value,
     mapSelectorAvailable: !comparisonActive.value,
     showCoordinates: showCoordinates.value,
     showAttribution: showAttribution.value,
-    showTileGrid: !comparisonActive.value && showTileGrid.value,
+    showTileGrid: showTileGrid.value,
     tileGridAvailable: tileGridAvailable.value && !defaultGridBusy.value,
   }),
 );
 interface ActiveRenderer {
   instance: MapRendererInstance;
+  mapSet: MapSetListItem;
+  supportedLayerTypes: ReadonlySet<MapLayerType>;
+  attachedLayerIds: Set<string>;
+  layerVisibility: Map<string, boolean>;
 }
 
 let renderer: MapRendererInstance | null = null;
@@ -288,7 +312,6 @@ let renderGeneration = 0;
 let renderOperation = Promise.resolve();
 let synchronizingViewport = false;
 const layerHandles = new Map<string, LayerPluginFrontendHandle>();
-const attachedLayerIds = new Set<string>();
 const publishedLayers = new Map<string, MapLayerDescriptor>();
 let layerOperation: Promise<void> = Promise.resolve();
 
@@ -328,7 +351,11 @@ async function destroyRenderer(): Promise<void> {
     await handle.destroy();
   }
   layerHandles.clear();
-  attachedLayerIds.clear();
+  await layerOperation;
+  for (const target of renderers) {
+    target.attachedLayerIds.clear();
+    target.layerVisibility.clear();
+  }
   publishedLayers.clear();
   layerOperation = Promise.resolve();
   if (primaryRenderer !== null) {
@@ -338,13 +365,8 @@ async function destroyRenderer(): Promise<void> {
 }
 
 async function renderPluginLayers(): Promise<void> {
-  const activeRenderer = renderer;
-  const mapSet = selected.value;
-  if (
-    activeRenderer === null ||
-    mapSet === null ||
-    !mapSet.capabilities.layerRendering
-  ) {
+  const rendererTargets = activeRenderers;
+  if (rendererTargets.length === 0 || !layerRenderingAvailable.value) {
     return;
   }
 
@@ -368,10 +390,11 @@ async function renderPluginLayers(): Promise<void> {
     if (plugin?.frontend === undefined) {
       continue;
     }
-    const supportedTypes = new Set(supportedLayerTypes.value);
     if (
-      plugin.manifest.requiredRendererLayerTypes.some(
-        (type) => !supportedTypes.has(type),
+      rendererTargets.some((target) =>
+        plugin.manifest.requiredRendererLayerTypes.some(
+          (type) => !target.supportedLayerTypes.has(type),
+        ),
       )
     ) {
       continue;
@@ -396,32 +419,43 @@ async function renderPluginLayers(): Promise<void> {
           const mapLayer: MapLayerDescriptor = {
             id: layer.id,
             type: descriptor.type,
-            visible: layerIsVisibleAtCurrentZoom(layer),
+            visible: layer.visible,
             opacity: layer.opacity,
             data: descriptor.data,
           };
           publishedLayers.set(layer.id, mapLayer);
           layerOperation = layerOperation.then(async () => {
-            if (renderer !== activeRenderer) {
+            if (activeRenderers !== rendererTargets) {
               return;
             }
-            if (attachedLayerIds.has(layer.id)) {
-              await activeRenderer.updateLayer(mapLayer);
-            } else {
-              await activeRenderer.attachLayer(mapLayer);
-              attachedLayerIds.add(layer.id);
-            }
+            await Promise.all(
+              rendererTargets.map(async (target) => {
+                const targetLayer = layerForRenderer(layer, mapLayer, target);
+                if (target.attachedLayerIds.has(layer.id)) {
+                  await target.instance.updateLayer(targetLayer);
+                } else {
+                  await target.instance.attachLayer(targetLayer);
+                  target.attachedLayerIds.add(layer.id);
+                }
+                target.layerVisibility.set(layer.id, targetLayer.visible);
+              }),
+            );
           });
         },
         clearLayer: () => {
+          publishedLayers.delete(layer.id);
           layerOperation = layerOperation.then(async () => {
-            if (
-              renderer === activeRenderer &&
-              attachedLayerIds.delete(layer.id)
-            ) {
-              await activeRenderer.removeLayer(layer.id);
-              publishedLayers.delete(layer.id);
+            if (activeRenderers !== rendererTargets) {
+              return;
             }
+            await Promise.all(
+              rendererTargets.map(async (target) => {
+                if (target.attachedLayerIds.delete(layer.id)) {
+                  target.layerVisibility.delete(layer.id);
+                  await target.instance.removeLayer(layer.id);
+                }
+              }),
+            );
           });
         },
         resolveAssetUrl: (assetId) =>
@@ -438,51 +472,62 @@ async function renderPluginLayers(): Promise<void> {
     layerHandles.set(layer.id, handle);
   }
   await layerOperation;
-  if (renderer === activeRenderer) {
-    await activeRenderer.reorderLayers(
-      layers.items
-        .filter((layer) => attachedLayerIds.has(layer.id))
-        .map(({ id }) => id),
+  if (activeRenderers === rendererTargets) {
+    await Promise.all(
+      rendererTargets.map((target) =>
+        target.instance.reorderLayers(
+          layers.items
+            .filter((layer) => target.attachedLayerIds.has(layer.id))
+            .map(({ id }) => id),
+        ),
+      ),
     );
   }
 }
 
-function layerIsVisibleAtCurrentZoom(
+function layerIsVisibleForRenderer(
   layer: (typeof layers.items)[number],
+  target: ActiveRenderer,
 ): boolean {
-  const mapSet = selected.value;
-  if (!layer.visible || zoom.value === null || mapSet === null) {
+  if (!layer.visible) {
     return false;
   }
-  const sourceZoom = zoom.value + leafletXyzZoomOptions(mapSet).zoomOffset;
+  const sourceZoom =
+    target.instance.getViewport().zoom +
+    leafletXyzZoomOptions(target.mapSet).zoomOffset;
   return (
     (layer.minimumZoom === null || sourceZoom >= layer.minimumZoom) &&
     (layer.maximumZoom === null || sourceZoom <= layer.maximumZoom)
   );
 }
 
+function layerForRenderer(
+  layer: (typeof layers.items)[number],
+  descriptor: MapLayerDescriptor,
+  target: ActiveRenderer,
+): MapLayerDescriptor {
+  return {
+    ...descriptor,
+    visible: layerIsVisibleForRenderer(layer, target),
+  };
+}
+
 async function refreshLayerZoomVisibility(): Promise<void> {
-  const activeRenderer = renderer;
-  if (activeRenderer === null) {
-    return;
-  }
   await Promise.all(
-    layers.items.map(async (layer) => {
-      const published = publishedLayers.get(layer.id);
-      if (published === undefined) {
-        return;
-      }
-      const visible = layerIsVisibleAtCurrentZoom(layer);
-      if (published.visible === visible) {
-        return;
-      }
-      const next = {
-        ...published,
-        visible,
-      };
-      publishedLayers.set(layer.id, next);
-      await activeRenderer.updateLayer(next);
-    }),
+    activeRenderers.flatMap((target) =>
+      layers.items.map(async (layer) => {
+        const published = publishedLayers.get(layer.id);
+        if (published === undefined || !target.attachedLayerIds.has(layer.id)) {
+          return;
+        }
+        const visible = layerIsVisibleForRenderer(layer, target);
+        if (target.layerVisibility.get(layer.id) === visible) {
+          return;
+        }
+        target.layerVisibility.set(layer.id, visible);
+        await target.instance.updateLayer({ ...published, visible });
+      }),
+    ),
   );
 }
 
@@ -503,9 +548,7 @@ async function synchronizeViewport(source: MapRendererInstance): Promise<void> {
         .map(({ instance }) => instance.setViewport(viewport)),
     );
     saveMapViewport(browserStorage, viewport);
-    if (!comparisonActive.value) {
-      await refreshLayerZoomVisibility();
-    }
+    await refreshLayerZoomVisibility();
   } finally {
     synchronizingViewport = false;
   }
@@ -522,9 +565,7 @@ async function applyViewportToAll(
     );
     zoom.value = viewport.zoom;
     saveMapViewport(browserStorage, viewport);
-    if (!comparisonActive.value) {
-      await refreshLayerZoomVisibility();
-    }
+    await refreshLayerZoomVisibility();
   } finally {
     synchronizingViewport = false;
   }
@@ -625,7 +666,13 @@ async function renderSelectedMaps(generation: number): Promise<void> {
           zoomControl: false,
         },
       });
-      created.push({ instance: nextRenderer });
+      created.push({
+        instance: nextRenderer,
+        mapSet: candidate,
+        supportedLayerTypes: new Set(factory.manifest.supportedLayerTypes),
+        attachedLayerIds: new Set(),
+        layerVisibility: new Map(),
+      });
       await nextRenderer.setZoomRange?.({
         minimum: commonMinimumZoom,
         maximum: commonMaximumZoom,
@@ -666,7 +713,9 @@ async function renderSelectedMaps(generation: number): Promise<void> {
       );
       await instance.resize?.();
     }
-    if (!comparisonActive.value && mapSet.capabilities.layerRendering) {
+    if (
+      resolvedMapSets.every(({ capabilities }) => capabilities.layerRendering)
+    ) {
       if (!layers.loaded) {
         await layers.load();
       }
@@ -711,7 +760,7 @@ watch(selectedId, (id) => {
 onMounted(async () => {
   try {
     await store.load();
-    repairComparisonSources();
+    reconcileComparisonSources();
     await nextTick();
     await queueSelectedMapsRender();
   } catch {
@@ -779,6 +828,13 @@ function selectMapContextMenuItem(item: MenuItem): void {
     } else {
       displayOptionsOpen.value = true;
     }
+  } else if (item.id === mapContextMenuIds.compareMaps) {
+    openComparisonOptions();
+  } else if (
+    item.id === mapContextMenuIds.compareMapsEnabled &&
+    comparisonCanActivate.value
+  ) {
+    setComparisonEnabled(!comparison.value.enabled);
   } else if (item.id === mapContextMenuIds.cachedTilesOnly) {
     cachedTilesOnly.value = !cachedTilesOnly.value;
   } else if (item.id === mapContextMenuIds.showTileGrid) {
@@ -996,6 +1052,23 @@ function openTileCalculator(): void {
   tileCalculatorOpen.value = true;
 }
 
+function openComparisonOptions(): void {
+  if (store.items.length === 0) {
+    return;
+  }
+  if (comparisonOptionsOpen.value) {
+    comparisonOptionsDialog.value?.activate();
+  } else {
+    comparisonOptionsOpen.value = true;
+  }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function openDisplayOptionsTool(openDialog: () => void): void {
+  displayOptionsOpen.value = false;
+  openDialog();
+}
+
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function selectCoordinateFormat(value: string): void {
   if (isCoordinateFormat(value)) {
@@ -1008,51 +1081,43 @@ function updateComparison(
     sources?: MapComparisonPreferences["sources"];
   },
 ): void {
-  comparison.value = { ...comparison.value, ...patch };
+  const next = { ...comparison.value, ...patch };
+  comparison.value =
+    next.enabled && !canActivateMapComparison(next, store.items)
+      ? { ...next, enabled: false }
+      : next;
 }
 
-function repairComparisonSources(
-  selectPrimary = comparison.value.enabled,
-): void {
-  if (store.items.length === 0) return;
+function reconcileComparisonSources(): void {
   const validIds = new Set(store.items.map(({ id }) => id));
-  const storedPrimary = comparison.value.sources[0]?.mapSetId;
-  const primaryId =
-    (storedPrimary !== null &&
-    storedPrimary !== undefined &&
-    validIds.has(storedPrimary)
-      ? storedPrimary
-      : null) ??
-    (selectedId.value !== null && validIds.has(selectedId.value)
-      ? selectedId.value
-      : (store.items[0]?.id ?? null));
   const sources = Array.from({ length: 4 }, (_, index) => {
     const existing = comparison.value.sources[index];
-    const fallbackId = store.items[index]?.id ?? primaryId;
     return {
       mapSetId:
         existing?.mapSetId !== null &&
         existing?.mapSetId !== undefined &&
         validIds.has(existing.mapSetId)
           ? existing.mapSetId
-          : fallbackId,
+          : null,
       tileSelection: existing?.tileSelection ?? { kind: "current" as const },
     };
   });
   updateComparison({ sources });
-  if (
-    selectPrimary &&
-    primaryId !== null &&
-    selectedId.value !== sources[0]?.mapSetId
-  ) {
-    selectedId.value = sources[0]?.mapSetId ?? primaryId;
+  const primaryId = sources[0]?.mapSetId ?? null;
+  if (comparison.value.enabled && primaryId !== null) {
+    selectedId.value = primaryId;
   }
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 function setComparisonEnabled(enabled: boolean): void {
-  if (enabled) repairComparisonSources(true);
+  if (enabled && !comparisonCanActivate.value) {
+    return;
+  }
   updateComparison({ enabled });
+  const primaryId = comparison.value.sources[0]?.mapSetId ?? null;
+  if (enabled && primaryId !== null) {
+    selectedId.value = primaryId;
+  }
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
@@ -1104,6 +1169,8 @@ function setHorizontalSplit(value: number): void {
         :vertical-split="comparison.verticalSplit"
         :horizontal-split="comparison.horizontalSplit"
         :labels="comparisonLabels"
+        :attributions="comparisonAttributions"
+        :show-attribution="showAttribution"
         @update:vertical-split="setVerticalSplit"
         @update:horizontal-split="setHorizontalSplit"
         @resize="resizeRenderers"
@@ -1159,8 +1226,8 @@ function setHorizontalSplit(value: number): void {
       <div class="map-side-controls">
         <LayerPanel
           ref="layerPanel"
-          v-if="selected && !comparisonActive"
-          :enabled="selected.capabilities.layerRendering"
+          v-if="selected"
+          :enabled="layerRenderingAvailable"
           :supported-layer-types="supportedLayerTypes"
           @changed="renderPluginLayers"
           @center-map="centerMapOnPhoto"
@@ -1180,6 +1247,7 @@ function setHorizontalSplit(value: number): void {
         :open="displayOptionsOpen"
         title="Display Options"
         :is-modal="false"
+        fit-content
         initial-position="map-controls"
         @close="displayOptionsOpen = false"
       >
@@ -1189,7 +1257,7 @@ function setHorizontalSplit(value: number): void {
               type="button"
               class="display-tool-action"
               :disabled="!selected || zoom === null"
-              @click="openGotoCoordinates"
+              @click="openDisplayOptionsTool(openGotoCoordinates)"
             >
               <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>
               <span>Goto Coordinates</span>
@@ -1198,21 +1266,31 @@ function setHorizontalSplit(value: number): void {
               type="button"
               class="display-tool-action"
               :disabled="!selected || zoom === null"
-              @click="openTileCalculator"
+              @click="openDisplayOptionsTool(openTileCalculator)"
             >
               <i class="mdi mdi-grid" aria-hidden="true"></i>
               <span>Tile Calculator</span>
             </button>
+            <div class="display-tool-option">
+              <input
+                type="checkbox"
+                :checked="comparison.enabled"
+                :disabled="!comparisonCanActivate"
+                aria-label="Enable Compare Maps"
+                title="Enable Compare Maps"
+                @change="setComparisonEnabled(($event.target as HTMLInputElement).checked)"
+              />
+              <button
+                type="button"
+                class="display-tool-action"
+                :disabled="store.items.length === 0"
+                @click="openDisplayOptionsTool(openComparisonOptions)"
+              >
+                <i class="mdi mdi-compare-horizontal" aria-hidden="true"></i>
+                <span>Compare Maps</span>
+              </button>
+            </div>
           </div>
-          <hr class="options-divider" />
-          <MapComparisonOptions
-            :value="comparison"
-            :map-sets="store.items"
-            @enabled="setComparisonEnabled"
-            @count="setComparisonCount"
-            @mode="setComparisonMode"
-            @source="updateComparisonSource"
-          />
           <hr class="options-divider" />
           <label class="check-field">
             <input v-model="cachedTilesOnly" type="checkbox" />
@@ -1251,6 +1329,26 @@ function setHorizontalSplit(value: number): void {
         </div>
       </DialogWindow>
 
+      <DialogWindow
+        ref="comparisonOptionsDialog"
+        :open="comparisonOptionsOpen"
+        title="Compare Maps"
+        :is-modal="false"
+        fit-content
+        initial-position="center"
+        @close="comparisonOptionsOpen = false"
+      >
+        <MapComparisonOptions
+          :value="comparison"
+          :map-sets="store.items"
+          :can-activate="comparisonCanActivate"
+          @enabled="setComparisonEnabled"
+          @count="setComparisonCount"
+          @mode="setComparisonMode"
+          @source="updateComparisonSource"
+        />
+      </DialogWindow>
+
       <div
         class="coordinate-format-toggle"
         :style="{
@@ -1267,18 +1365,6 @@ function setHorizontalSplit(value: number): void {
         >
           <template #selected>{{ formattedPointer }}</template>
         </AppMenuSelect>
-      </div>
-
-      <div
-        v-if="comparisonActive && showAttribution && comparisonAttributions.length > 0"
-        class="comparison-attribution"
-        aria-label="Map attributions"
-      >
-        <span v-for="item in comparisonAttributions" :key="item.attribution">
-          <strong>{{ item.name }}:</strong>
-          <!-- Attribution is trusted, administrator-authored Map Set HTML. -->
-          <span v-html="item.attribution"></span>
-        </span>
       </div>
 
       <div v-if="store.loading" class="map-overlay">Loading Map Sets…</div>
@@ -1426,28 +1512,6 @@ function setHorizontalSplit(value: number): void {
   display: inline-flex;
 }
 
-.comparison-attribution {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  z-index: 1000;
-  display: flex;
-  max-width: min(72vw, 58rem);
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.15rem 0.65rem;
-  padding: 0.2rem 0.35rem;
-  color: #2f403c;
-  background: rgb(255 255 255 / 82%);
-  font-size: 0.68rem;
-  line-height: 1.25;
-}
-
-.comparison-attribution > span {
-  display: inline-flex;
-  gap: 0.2rem;
-}
-
 .check-field {
   display: flex;
   gap: 0.4rem;
@@ -1489,12 +1553,29 @@ function setHorizontalSplit(value: number): void {
 
 .display-options {
   display: grid;
+  min-width: min(15rem, calc(100vw - 5.85rem));
   gap: 0.5rem;
 }
 
 .display-tool-actions {
   display: grid;
   gap: 0.1rem;
+}
+
+.display-tool-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.display-tool-option > input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.display-tool-option .display-tool-action {
+  padding-left: 0;
 }
 
 .display-tool-action {

@@ -11,13 +11,14 @@ import MapSetSelect from "./MapSetSelect.vue";
 defineProps<{
   value: MapComparisonPreferences;
   mapSets: readonly MapSetListItem[];
+  canActivate: boolean;
 }>();
 
 const emit = defineEmits<{
   enabled: [value: boolean];
   count: [value: MapComparisonCount];
   mode: [value: MapComparisonMode];
-  source: [index: number, mapSetId: string];
+  source: [index: number, mapSetId: string | null];
 }>();
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
@@ -48,56 +49,54 @@ function changeMode(event: Event): void {
 </script>
 
 <template>
-  <section class="comparison-options" aria-labelledby="comparison-options-title">
-    <div class="comparison-heading">
-      <strong id="comparison-options-title">Compare Maps</strong>
-      <label class="switch-field">
-        <input
-          type="checkbox"
-          :checked="value.enabled"
-          :disabled="mapSets.length === 0"
-          @change="changeEnabled"
-        />
-        <span>{{ value.enabled ? "On" : "Off" }}</span>
+  <section class="comparison-options" aria-label="Map comparison options">
+    <label class="comparison-active">
+      <input
+        type="checkbox"
+        :checked="value.enabled"
+        :disabled="!canActivate"
+        @change="changeEnabled"
+      />
+      <span>Active</span>
+    </label>
+    <div class="comparison-settings">
+      <label class="field compact-field">
+        <span>Maps</span>
+        <select :value="value.count" @change="changeCount">
+          <option value="2">2 Maps</option>
+          <option value="4">4 Maps</option>
+        </select>
+      </label>
+      <label class="field compact-field">
+        <span>Mode</span>
+        <select :value="value.mode" @change="changeMode">
+          <option value="continuous">Continuous area</option>
+          <option value="synchronized">Same center and scale</option>
+        </select>
       </label>
     </div>
-    <template v-if="value.enabled">
-      <div class="comparison-settings">
-        <label class="field compact-field">
-          <span>Maps</span>
-          <select :value="value.count" @change="changeCount">
-            <option value="2">2 Maps</option>
-            <option value="4">4 Maps</option>
-          </select>
-        </label>
-        <label class="field compact-field">
-          <span>Mode</span>
-          <select :value="value.mode" @change="changeMode">
-            <option value="continuous">Continuous area</option>
-            <option value="synchronized">Same center and scale</option>
-          </select>
-        </label>
-      </div>
-      <div class="comparison-sources">
-        <label
-          v-for="index in value.count"
-          :key="index"
-          class="comparison-source"
-        >
-          <span>Map {{ index }}{{ index === 1 ? " · Primary" : "" }}</span>
-          <MapSetSelect
-            :model-value="value.sources[index - 1]?.mapSetId ?? null"
-            :items="mapSets"
-            :aria-label="`Map ${index} Map Set`"
-            align="start"
-            @update:model-value="emit('source', index - 1, $event)"
-          />
-        </label>
-      </div>
-      <small class="comparison-note">
-        Custom Layers are hidden while comparing.
-      </small>
-    </template>
+    <div class="comparison-sources">
+      <label
+        v-for="index in value.count"
+        :key="index"
+        class="comparison-source"
+      >
+        <span>Map {{ index }}{{ index === 1 ? " · Primary" : "" }}</span>
+        <MapSetSelect
+          :model-value="value.sources[index - 1]?.mapSetId ?? null"
+          :items="mapSets"
+          :aria-label="`Map ${index} Map Set`"
+          align="start"
+          @update:model-value="emit('source', index - 1, $event)"
+        />
+      </label>
+    </div>
+    <small v-if="!canActivate" class="comparison-note unavailable">
+      Select an interactive Map Set for every area. The selected maps must share a visual zoom range.
+    </small>
+    <small class="comparison-note">
+      Visible Custom Layers are shown on every comparison map.
+    </small>
   </section>
 </template>
 
@@ -108,7 +107,6 @@ function changeMode(event: Event): void {
   gap: 0.65rem;
 }
 
-.comparison-heading,
 .comparison-settings {
   display: flex;
   gap: 0.75rem;
@@ -116,12 +114,27 @@ function changeMode(event: Event): void {
   justify-content: space-between;
 }
 
-.switch-field {
-  display: inline-flex;
-  gap: 0.35rem;
+.comparison-active {
+  display: flex;
+  gap: 0.45rem;
   align-items: center;
-  font-size: 0.78rem;
-  font-weight: 700;
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
+  border-radius: 0.4rem;
+  color: #173f37;
+  background: #eef4f0;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.comparison-active:has(input:disabled) {
+  color: #72807a;
+  cursor: not-allowed;
+}
+
+.comparison-active input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .comparison-settings > .field {
@@ -169,6 +182,13 @@ function changeMode(event: Event): void {
   max-width: 34rem;
   color: #617870;
   line-height: 1.35;
+}
+
+.comparison-note.unavailable {
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.4rem;
+  color: #6d5146;
+  background: #f8eee9;
 }
 
 @media (max-width: 700px) {

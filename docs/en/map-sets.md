@@ -46,11 +46,18 @@ default viewport is used when no valid stored value exists.
 
 ## Compare Maps
 
-Open **Display Options** in the Map view and enable **Compare Maps** to show two or
-four Map areas. Every area has its own Map Set selector; the same Map Set may be
-selected more than once. The first area is primary for reset, coordinate navigation,
-and the Tile Calculator. The normal Map Set selector and Map information control are
-hidden while comparing because every area is identified directly on the Map.
+Open **Compare Maps** from **Display Options** or the Map context menu's **Tools**
+submenu, then choose a Map Set for every area. Once the selection is compatible,
+activate the comparison in that dialog, with the **Compare Maps** checkbox in
+**Display Options**, or from the context menu's **Options** submenu. The activation
+checkboxes remain disabled until every area has an interactive Map Set and the
+selected Map Sets share a visual zoom range.
+
+The dialog configures two or four Map areas. Every area has its own Map Set selector;
+the same Map Set may be selected more than once. The first area is primary for reset,
+coordinate navigation, and the Tile Calculator. The normal Map Set selector and Map
+information control are hidden while comparing because every area is identified
+directly on the Map.
 
 Choose one of two display modes:
 
@@ -65,9 +72,11 @@ the arrow keys, **Home**, and **End**. Pan or zoom any Map to move all Maps live
 The shared Zoom control uses the intersection of the selected Map Sets' visual zoom
 ranges and accounts for 256- and 512-pixel source Zoom offsets automatically.
 
-Comparison mode keeps one Zoom control and coordinate readout and combines the
-attributions required by all visible sources. Custom Layers, including Tile Grid,
-are temporarily hidden; their stored visibility and configuration do not change.
+Comparison mode keeps one Zoom control and coordinate readout. Each Map area shows
+its own source attribution; **Show Attribution** controls them together. Visible
+Custom Layers are shown on every comparison map with their shared configuration and
+visibility. Renderer-dependent decorations such as Tile Grid are calculated
+separately for each Map Set.
 The browser stores the selected mode, Map count, Map Sets, and splitter positions.
 The initial comparison UI displays current Tile states. Its saved source model is
 prepared for a later choice of snapshots and points in time per area.

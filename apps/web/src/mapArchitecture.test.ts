@@ -54,7 +54,6 @@ describe("Map view architecture", () => {
     expect(mapView).toContain("showCoordinates && pointer");
     expect(mapView).not.toContain("Math.round(zoom)");
     expect(tileUrl).not.toContain("https://");
-    expect(mapView).not.toContain("displayOptionsOpen.value = false");
   });
 
   it("keeps layer tools inside the standard Map view", async () => {
@@ -159,6 +158,17 @@ describe("Map view architecture", () => {
     expect(mapView).toContain('title="Display Options"');
     expect(mapView).toContain(':open="displayOptionsOpen"');
     expect(mapView).toContain('initial-position="map-controls"');
+    expect(mapView).toContain("function openDisplayOptionsTool");
+    expect(mapView).toContain("displayOptionsOpen.value = false;");
+    expect(mapView).toContain(
+      '@click="openDisplayOptionsTool(openGotoCoordinates)"',
+    );
+    expect(mapView).toContain(
+      '@click="openDisplayOptionsTool(openTileCalculator)"',
+    );
+    expect(mapView).toContain(
+      '@click="openDisplayOptionsTool(openComparisonOptions)"',
+    );
     expect(mapView).not.toContain("<TogglePanel");
     expect(layerEditor).toContain(':is="pluginEditor"');
     expect(layerEditor).not.toContain("layer.pluginId ===");
@@ -338,7 +348,7 @@ describe("Map view architecture", () => {
     expect(zoomControl).toContain("{ autoCloseOnChange: false }");
   });
 
-  it("coordinates two or four renderer instances through the Display Options comparison", async () => {
+  it("coordinates two or four renderer instances through the Compare Maps dialog", async () => {
     const [
       mapView,
       comparisonLayout,
@@ -380,18 +390,29 @@ describe("Map view architecture", () => {
     ]);
 
     expect(mapView).toContain("<MapComparisonOptions");
-    expect(comparisonOptions).toContain("Compare Maps");
+    expect(mapView).toContain('title="Compare Maps"');
+    expect(mapView).toContain('initial-position="center"');
+    expect(mapView).toContain(':can-activate="comparisonCanActivate"');
+    expect(mapView).toContain('aria-label="Enable Compare Maps"');
+    expect(comparisonOptions).toContain("<span>Active</span>");
+    expect(comparisonOptions).toContain(':disabled="!canActivate"');
     expect(mapView).toContain("activeRenderers");
     expect(mapView).toContain("synchronizeViewport");
     expect(mapView).toContain(
       "renderOperation.then(() => renderSelectedMaps(generation))",
     );
-    expect(mapView).toContain('v-if="selected && !comparisonActive"');
+    expect(mapView).toContain('v-if="selected"');
+    expect(mapView).not.toContain('v-if="selected && !comparisonActive"');
     expect(mapView).toContain(
       'v-if="store.items.length > 0 && !comparisonActive"',
     );
+    expect(mapView).toContain("rendererTargets.map");
+    expect(mapView).toContain("target.instance.attachLayer");
+    expect(mapView).toContain("layerIsVisibleForRenderer");
     expect(mapView).toContain("comparisonAttributions");
+    expect(mapView).toContain(':show-attribution="showAttribution"');
     expect(comparisonLayout).toContain('role="separator"');
+    expect(comparisonLayout).toContain("map-comparison-attribution-region");
     expect(comparisonLayout).toContain("clipPath");
     expect(comparisonLayout).toContain('props.mode === "synchronized"');
     expect(comparisonPreferences).toContain(

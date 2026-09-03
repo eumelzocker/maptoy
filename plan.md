@@ -1266,14 +1266,16 @@ veröffentlicht
 - Pan und Zoom aus jeder Teilansicht live auf alle Renderer übertragen und den
   gemeinsamen visuellen Zoombereich auf die Schnittmenge der Map-Set-Grenzen
   beschränken; 256-/512-Pixel-Source-Zoom-Offsets bleiben rendererabhängig
-- genau ein Zoom-Control, ein Koordinaten-Overlay und eine zusammengefasste
-  Attribution aller verwendeten Quellen anzeigen
+- genau ein Zoom-Control und ein Koordinaten-Overlay verwenden sowie die
+  Attribution jeder verwendeten Quelle in ihrer jeweiligen Teilansicht anzeigen;
+  der vorhandene globale Sichtbarkeitsschalter steuert alle Attributionen gemeinsam
 - Map Sets je Teilansicht frei und auch mehrfach auswählbar machen; die erste
   Teilansicht bleibt führend für Reset, Koordinatennavigation und Tile Calculator;
   allgemeine Map-Set-Auswahl und Karteninformation im Vergleich ausblenden
 - Vergleichskonfiguration und Splitterpositionen lokal speichern
-- Custom Layers einschließlich Tile Grid im Vergleich ausblenden, ohne persistierte
-  Sichtbarkeit oder Konfiguration zu verändern
+- dieselben global sichtbaren Custom Layers einschließlich Tile Grid auf allen
+  Vergleichskarten darstellen; Deskriptoren und Konfiguration bleiben gemeinsam,
+  rendererabhängige Darstellung und Zoomsichtbarkeit werden je Teilansicht bestimmt
 - die Quellenkonfiguration bereits als diskriminierte Auswahl `current`, `snapshot`
   oder `asOf` modellieren; die erste Oberfläche bietet nur `current` an
 - den Adaptervertrag um Live-Viewport-Ereignisse und optionale explizite
@@ -1289,8 +1291,9 @@ veröffentlicht
   Mittelpunkt und derselben visuellen Skalierung, ohne Ereignisschleifen.
 - 256- und 512-Pixel-Map-Sets verwenden ihre korrekten Source-Zooms; Map Sets ohne
   gemeinsamen visuellen Zoombereich werden verständlich abgelehnt.
-- Doppelte Map-Set-Auswahl ist zulässig. Layer bleiben während des Vergleichs
-  ungemountet und erscheinen nach dessen Ende mit unverändertem Zustand wieder.
+- Doppelte Map-Set-Auswahl ist zulässig. Sichtbare Layer erscheinen mit gemeinsamem
+  Zustand auf allen Vergleichskarten; Tile-Matrix und Zoomsichtbarkeit werden je
+  Renderer korrekt bestimmt.
 - Die spätere Auswahl verschiedener Snapshots oder Zeitpunkte je Teilansicht
   erfordert keinen Umbau von Layout, Renderer-Verbund oder Persistenzmodell.
 
@@ -1466,7 +1469,8 @@ Zwischenstände und phasenübergreifende Verbesserungen dürfen weiterhin als ei
 - der Map View zwei oder vier auch identische Map Sets mit verschiebbaren Splittern
   als zusammenhängendes Gebiet oder synchronisierte Teilansichten vergleichen kann,
   dabei genau ein Zoom-Control und Koordinaten-Overlay verwendet, alle benötigten
-  Attributionen erhält und Custom Layers ohne Zustandsverlust vorübergehend ausblendet;
+  Attributionen je Teilansicht erhält und globale Custom Layers mit gemeinsamem
+  Zustand auf allen Vergleichskarten darstellt;
 - das allgemeine Layer-Plugin-System versionierte Manifeste, Schemas, Migrationen sowie Frontend-/Server-Hooks bereitstellt und seine Contract-Tests besteht;
 - Layerauswahl, Import, Fotoscan, Konfiguration, Reihenfolge, Sichtbarkeit und
   Diagnosen im optionalen Panel beziehungsweise in Dialogen des Standard-Map-View

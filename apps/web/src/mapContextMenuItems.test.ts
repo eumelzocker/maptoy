@@ -24,6 +24,9 @@ describe("Map context menu items", () => {
       ],
       toolsEnabled: false,
       layersEnabled: false,
+      comparisonOptionsAvailable: true,
+      comparisonActive: true,
+      comparisonCanActivate: true,
       cachedTilesOnly: true,
       showTitleBar: false,
       showMapSelector: true,
@@ -89,9 +92,15 @@ describe("Map context menu items", () => {
       { id: mapContextMenuIds.gotoCoordinates, disabled: true },
       { id: mapContextMenuIds.tileCalculator, disabled: true },
       { id: mapContextMenuIds.layers, disabled: true },
+      { id: mapContextMenuIds.compareMaps, disabled: false },
       { id: mapContextMenuIds.displayOptions },
     ]);
     expect(items[4]?.children).toMatchObject([
+      {
+        id: mapContextMenuIds.compareMapsEnabled,
+        checked: true,
+        disabled: false,
+      },
       { id: mapContextMenuIds.cachedTilesOnly, checked: true },
       { id: mapContextMenuIds.showTitleBar, checked: false },
       {
@@ -120,6 +129,9 @@ describe("Map context menu items", () => {
       documentationPages: [],
       toolsEnabled: false,
       layersEnabled: false,
+      comparisonOptionsAvailable: false,
+      comparisonActive: false,
+      comparisonCanActivate: false,
       cachedTilesOnly: false,
       showTitleBar: true,
       showMapSelector: true,
@@ -133,6 +145,19 @@ describe("Map context menu items", () => {
     expect(items[4]?.children).toContainEqual(
       expect.objectContaining({
         id: mapContextMenuIds.showMapSelector,
+        disabled: true,
+      }),
+    );
+    expect(items[3]?.children).toContainEqual(
+      expect.objectContaining({
+        id: mapContextMenuIds.compareMaps,
+        disabled: true,
+      }),
+    );
+    expect(items[4]?.children).toContainEqual(
+      expect.objectContaining({
+        id: mapContextMenuIds.compareMapsEnabled,
+        checked: false,
         disabled: true,
       }),
     );

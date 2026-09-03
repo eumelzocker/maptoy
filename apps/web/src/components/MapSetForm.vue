@@ -132,9 +132,17 @@ function submit(): void {
   <form class="map-set-form" @submit.prevent="submit">
     <fieldset>
       <legend>Identity and provider</legend>
-      <label>
+      <label class="wide-field name-field">
         <span>Name</span>
-        <input v-model.trim="draft.name" required maxlength="120" />
+        <input
+          v-model.trim="draft.name"
+          required
+          maxlength="120"
+          aria-describedby="map-set-name-group-note"
+        />
+        <small id="map-set-name-group-note">
+          Use “/” to group Map Sets by the first name segment, for example “MapBox/Dark-v11/webp”.
+        </small>
       </label>
       <label class="wide-field">
         <span>XYZ URL template</span>
@@ -178,7 +186,7 @@ function submit(): void {
       </label>
       <label class="wide-field">
         <span>Notes</span>
-        <textarea v-model="draft.notes" rows="3" maxlength="10000"></textarea>
+        <textarea v-model="draft.notes" rows="10" maxlength="10000"></textarea>
       </label>
     </fieldset>
 
@@ -415,6 +423,10 @@ label {
   grid-column: 1 / -1;
 }
 
+.name-field input {
+  width: calc(50% - 0.45rem);
+}
+
 .check-field {
   display: flex;
   align-items: center;
@@ -482,6 +494,10 @@ button:disabled {
 @media (max-width: 700px) {
   fieldset {
     grid-template-columns: 1fr;
+  }
+
+  .name-field input {
+    width: 100%;
   }
 }
 </style>

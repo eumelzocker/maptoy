@@ -4,6 +4,20 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added Thai documentation for Layers, Map Sets, and the Tile Cache.
+
+### Changed
+
+- Moved Compare Maps configuration into its own centered dialog while keeping a
+  compact, aligned activation checkbox beside its Display Options tool action.
+  Display Options now closes after launching Goto Coordinates, Tile Calculator,
+  or Compare Maps.
+- Show each Map Set's attribution inside its own comparison area, controlled by
+  the existing global attribution option, and render visible Custom Layers on
+  every comparison map with renderer-specific zoom visibility and Tile Grids.
+
 ## [0.4.1] - 2026-09-02
 
 ### Added

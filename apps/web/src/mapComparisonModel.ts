@@ -1,4 +1,5 @@
 import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
+import type { MapComparisonPreferences } from "./mapComparisonPreferences.js";
 
 export interface MapComparisonZoomSource {
   minZoom: number;
@@ -11,6 +12,13 @@ export interface MapComparisonZoomRange {
   maximum: number;
 }
 
+interface MapComparisonActivationSource extends MapComparisonZoomSource {
+  id: string;
+  capabilities: {
+    interactive: boolean;
+  };
+}
+
 export function mapComparisonZoomRange(
   sources: readonly MapComparisonZoomSource[],
 ): MapComparisonZoomRange | null {
@@ -20,4 +28,28 @@ export function mapComparisonZoomRange(
     minimum: Math.max(...ranges.map(({ minZoom }) => minZoom)),
     maximum: Math.min(...ranges.map(({ maxZoom }) => maxZoom)),
   };
+}
+
+export function canActivateMapComparison(
+  preferences: Pick<MapComparisonPreferences, "count" | "sources">,
+  mapSets: readonly MapComparisonActivationSource[],
+): boolean {
+  const mapSetsById = new Map(mapSets.map((mapSet) => [mapSet.id, mapSet]));
+  const sources = preferences.sources
+    .slice(0, preferences.count)
+    .map(({ mapSetId }) =>
+      mapSetId === null ? null : (mapSetsById.get(mapSetId) ?? null),
+    );
+  if (
+    sources.length !== preferences.count ||
+    sources.some((source) => source === null)
+  ) {
+    return false;
+  }
+  const resolvedSources = sources.filter((source) => source !== null);
+  if (resolvedSources.some(({ capabilities }) => !capabilities.interactive)) {
+    return false;
+  }
+  const zoomRange = mapComparisonZoomRange(resolvedSources);
+  return zoomRange !== null && zoomRange.minimum <= zoomRange.maximum;
 }
