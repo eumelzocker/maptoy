@@ -77,7 +77,7 @@ location /tools/maptoy/ {
 
 ## Firefox extension
 
-This repository also contains the independently versioned [*maptoy* Firefox extension](./extensions/firefox/README.md). It can forward matching browser responses unchanged to configurable HTTP endpoints, including *maptoy*'s Tile seeding API. This allows *maptoy* to cache map tiles from your normal browser sessions.
+This repository also contains the independently versioned [*maptoy* Firefox extension](./extensions/firefox/README.md). It can forward matching browser responses unchanged to configurable HTTP endpoints, including *maptoy*'s Tile seeding API, and optionally map selected source response headers to target request headers. This allows *maptoy* to cache map tiles and their upstream validators from your normal browser sessions.
 
 The extension can also be easily reconfigured to feed other caching APIs.
 

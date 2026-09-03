@@ -243,6 +243,67 @@ describe("TileArchiveService", () => {
     });
   });
 
+  it("uses trusted upstream validators supplied with a Tile upload", async () => {
+    let now = new Date("2026-09-03T08:00:00.000Z");
+    const { mapSet, repository, service } = await fixture(() => now);
+    const tile = { zoom: 3, x: 4, y: 2 };
+    const body = png("forwarded-validator");
+    const uploaded = await service.upload(mapSet, tile, {
+      body,
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+      etag: 'W/"source-v1"',
+      lastModified: "Wed, 02 Sep 2026 08:00:00 GMT",
+    });
+    expect(repository.revisionById(uploaded.revisionId)).toMatchObject({
+      origin: "upload",
+      etag: 'W/"source-v1"',
+      lastModified: "Wed, 02 Sep 2026 08:00:00 GMT",
+    });
+
+    const repeated = await service.upload(mapSet, tile, {
+      body,
+      contentType: "image/png",
+      maximumTileBytes: 1024,
+      etag: '"source-v1b"',
+    });
+    expect(repeated).toEqual({
+      revisionId: uploaded.revisionId,
+      created: false,
+    });
+    expect(repository.revisionById(uploaded.revisionId)).toMatchObject({
+      origin: "upload",
+      etag: '"source-v1b"',
+      lastModified: "Wed, 02 Sep 2026 08:00:00 GMT",
+    });
+
+    now = new Date("2026-09-03T08:00:20.000Z");
+    const requestProvider = vi.fn(async () => ({
+      statusCode: 304,
+      headers: {},
+      body: Buffer.alloc(0),
+    }));
+    const validated = await service.tile(
+      mapSet,
+      tile,
+      { refresh: "auto", selection: { kind: "current" } },
+      requestProvider,
+    );
+
+    expect(validated.body).toEqual(body);
+    expect(validated.cacheStatus).toBe("validated");
+    expect(requestProvider).toHaveBeenCalledWith({
+      "If-None-Match": '"source-v1b"',
+      "If-Modified-Since": "Wed, 02 Sep 2026 08:00:00 GMT",
+    });
+    expect(repository.revisionById(uploaded.revisionId)).toMatchObject({
+      lastValidatedAt: "2026-09-03T08:00:20.000Z",
+      origin: "upload",
+      etag: '"source-v1b"',
+      lastModified: "Wed, 02 Sep 2026 08:00:00 GMT",
+    });
+  });
+
   it("serializes provider writes and uploads for the same logical tile", async () => {
     const now = new Date("2026-08-24T09:00:00.000Z");
     const { mapSet, service } = await fixture(() => now);

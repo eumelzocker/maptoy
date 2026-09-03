@@ -42,6 +42,7 @@ export class TileArchiveError extends Error {
       | "TILE_NOT_CACHED"
       | "TILE_CONTENT_INVALID"
       | "TILE_MEDIA_TYPE_INVALID"
+      | "TILE_VALIDATOR_INVALID"
       | "TILE_ARCHIVE_DISABLED"
       | "TILE_BODY_TOO_LARGE"
       | "TILE_STORAGE_LIMIT"
@@ -92,6 +93,47 @@ function normalizedContentType(response: ProviderResponse): string | null {
 
 function normalizeContentType(value: string | null | undefined): string | null {
   return value?.split(";", 1)[0]?.trim().toLowerCase() || null;
+}
+
+function invalidUploadValidator(message: string): never {
+  throw new TileArchiveError("TILE_VALIDATOR_INVALID", message, 400);
+}
+
+function validatedUploadEtag(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const opaqueTag = value.startsWith("W/") ? value.slice(2) : value;
+  if (
+    value.length > 1_024 ||
+    opaqueTag.length < 2 ||
+    !opaqueTag.startsWith('"') ||
+    !opaqueTag.endsWith('"') ||
+    opaqueTag.slice(1, -1).includes('"') ||
+    [...opaqueTag.slice(1, -1)].some((character) => {
+      const code = character.codePointAt(0) ?? 0;
+      return code <= 0x20 || code === 0x7f || code > 0xff;
+    })
+  ) {
+    invalidUploadValidator(
+      "X-Maptoy-Upstream-ETag must contain one valid HTTP entity tag.",
+    );
+  }
+  return value;
+}
+
+function validatedUploadLastModified(
+  value: string | null | undefined,
+): string | null {
+  if (value === null || value === undefined) return null;
+  if (
+    value.length > 128 ||
+    value.trim() !== value ||
+    Number.isNaN(Date.parse(value))
+  ) {
+    invalidUploadValidator(
+      "X-Maptoy-Upstream-Last-Modified must contain one valid HTTP date.",
+    );
+  }
+  return value;
 }
 
 function hasExpectedSignature(
@@ -295,6 +337,8 @@ export class TileArchiveService {
       body: Buffer;
       contentType: string | undefined;
       maximumTileBytes: number;
+      etag?: string | null | undefined;
+      lastModified?: string | null | undefined;
     },
   ): Promise<TileUploadResponse> {
     if (!mapSet.cachePolicy.enabled || !mapSet.capabilities.tileArchive) {
@@ -320,6 +364,8 @@ export class TileArchiveService {
       );
     }
     await validateImageContent(mapSet, input.body, "upload body", 400);
+    const etag = validatedUploadEtag(input.etag);
+    const lastModified = validatedUploadLastModified(input.lastModified);
 
     const key = this.coordinateKey(mapSet.id, tile);
     return this.withCoordinateLock(key, async () => {
@@ -327,8 +373,8 @@ export class TileArchiveService {
         body: input.body,
         contentType,
         origin: "upload",
-        etag: null,
-        lastModified: null,
+        etag,
+        lastModified,
       });
       return {
         revisionId: recorded.revision.id,

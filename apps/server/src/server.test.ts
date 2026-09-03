@@ -1616,9 +1616,9 @@ describe("maptoy server", () => {
     const config = await testConfig();
     config.tiles.maximumBytes = 1024;
     const requestProvider = vi.fn(async () => ({
-      statusCode: 200,
-      headers: { "content-type": "image/png" },
-      body: Buffer.concat([validPng, Buffer.from("provider")]),
+      statusCode: 304,
+      headers: {},
+      body: Buffer.alloc(0),
     }));
     const server = await buildServer({
       config,
@@ -1639,7 +1639,11 @@ describe("maptoy server", () => {
     const seeded = await server.inject({
       method: "POST",
       url: tileUrl,
-      headers: { "content-type": "image/png" },
+      headers: {
+        "content-type": "image/png",
+        "x-maptoy-upstream-etag": '"browser-v1"',
+        "x-maptoy-upstream-last-modified": "Wed, 02 Sep 2026 08:00:00 GMT",
+      },
       payload: validPng,
     });
     expect(seeded.statusCode).toBe(201);
@@ -1669,6 +1673,17 @@ describe("maptoy server", () => {
     expect(cacheOnlyRead.rawPayload).toEqual(validPng);
     expect(requestProvider).not.toHaveBeenCalled();
 
+    const validatedRead = await server.inject({
+      method: "GET",
+      url: `${tileUrl}?refresh=force`,
+    });
+    expect(validatedRead.rawPayload).toEqual(validPng);
+    expect(validatedRead.headers["x-maptoy-cache"]).toBe("validated");
+    expect(requestProvider.mock.calls[0]?.[1]).toMatchObject({
+      "If-None-Match": '"browser-v1"',
+      "If-Modified-Since": "Wed, 02 Sep 2026 08:00:00 GMT",
+    });
+
     const identical = await server.inject({
       method: "POST",
       url: tileUrl,
@@ -1679,6 +1694,20 @@ describe("maptoy server", () => {
     expect(identical.json()).toEqual({
       revisionId: seeded.json().revisionId,
       created: false,
+    });
+
+    const invalidValidator = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tiles/2/2/2`,
+      headers: {
+        "content-type": "image/png",
+        "x-maptoy-upstream-etag": "not-an-etag",
+      },
+      payload: validPng,
+    });
+    expect(invalidValidator).toMatchObject({ statusCode: 400 });
+    expect(invalidValidator.json()).toMatchObject({
+      error: { code: "TILE_VALIDATOR_INVALID" },
     });
 
     const wrongMediaType = await server.inject({

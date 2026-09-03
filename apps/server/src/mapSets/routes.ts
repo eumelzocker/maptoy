@@ -100,6 +100,12 @@ function tileSelection(query: {
   return { kind: "current" };
 }
 
+function requestHeaderValue(
+  value: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(value) ? value.join(", ") : value;
+}
+
 export function registerMapSetRoutes(
   server: FastifyInstance,
   service: MapSetService,
@@ -348,6 +354,12 @@ export function registerMapSetRoutes(
         },
         body,
         contentType,
+        {
+          etag: requestHeaderValue(request.headers["x-maptoy-upstream-etag"]),
+          lastModified: requestHeaderValue(
+            request.headers["x-maptoy-upstream-last-modified"],
+          ),
+        },
       );
       return reply
         .code(result.created ? 201 : 200)

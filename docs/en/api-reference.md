@@ -29,6 +29,12 @@ provider request. Set `Content-Type` to the Map Set's configured `image/png`,
 must be decodable, its actual format must match the configured format, and its
 width and height must both equal the Map Set's configured Tile size.
 
+Trusted clients may also send `X-Maptoy-Upstream-ETag` and
+`X-Maptoy-Upstream-Last-Modified` when those values were observed on the exact
+upstream representation being uploaded. The values become conditional validators
+for maptoy's next provider request; they do not change the revision's `upload`
+origin. Omit them unless the source URL and representation match the Map Set.
+
 The binary request schema is bounded by `MAPTOY_TILES_MAX_BYTES`. A successful JSON
 response follows this contract:
 
@@ -48,6 +54,7 @@ return `200` and `created: false`. Both include the same revision ID in
 | --- | --- | --- |
 | `400` | `MAP_SET_INVALID` | Coordinate or Zoom is outside the Map Set bounds. |
 | `400` | `TILE_CONTENT_INVALID` | Image cannot be decoded or its actual format or dimensions do not match the Map Set. |
+| `400` | `TILE_VALIDATOR_INVALID` | An optional upstream ETag or Last-Modified value is malformed or too long. |
 | `404` | `MAP_SET_NOT_FOUND` | The Map Set does not exist. |
 | `409` | `TILE_ARCHIVE_DISABLED` | Cache policy or Tile Archive capability is disabled. |
 | `413` | `TILE_BODY_TOO_LARGE` | Raw body exceeds `MAPTOY_TILES_MAX_BYTES`. |

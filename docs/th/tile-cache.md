@@ -39,6 +39,8 @@ API รับโหมดผ่าน `?refresh=auto`, `?refresh=force` หร�
 ```sh
 curl --request POST \
   --header 'Content-Type: image/png' \
+  --header 'X-Maptoy-Upstream-ETag: "tile-v1"' \
+  --header 'X-Maptoy-Upstream-Last-Modified: Wed, 02 Sep 2026 08:00:00 GMT' \
   --data-binary '@tile.png' \
   "$MAPTOY_SERVER_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
 ```
@@ -49,6 +51,13 @@ multipart encoding ไฟล์ต้องถอดรหัสได้สำ�
 พิกัดต้องอยู่ภายในช่วง zoom และขอบเขต XYZ ของชุดแผนที่ ต้องเปิดความสามารถ Tile Archive
 และนโยบายแคช และต้องไม่เกินทั้ง `MAPTOY_TILES_MAX_BYTES` กับขีดจำกัดพื้นที่จัดเก็บ
 ของชุดแผนที่
+
+ไคลเอนต์ที่เชื่อถือได้สามารถส่ง `ETag` และ `Last-Modified` ที่ตรวจพบจาก
+upstream representation เดียวกันทุกประการผ่าน `X-Maptoy-Upstream-ETag` และ
+`X-Maptoy-Upstream-Last-Modified` ได้ maptoy จะจัดเก็บ validator เหล่านี้และใช้กับ
+คำขอแบบมีเงื่อนไขครั้งถัดไปไปยังผู้ให้บริการ ห้ามส่ง validator จาก URL, รูปแบบ
+request header หรือ representation อื่น เพราะ validator ที่ไม่ตรงกันอาจทำให้
+คำตอบ `304` ของผู้ให้บริการยืนยันไบต์ที่อัปโหลดผิดรายการ
 
 revision ใหม่ที่แก้ไขไม่ได้จะส่งคืน `201` และ
 `{ "revisionId": "...", "created": true }` หากอัปโหลดไบต์เหมือน revision ปัจจุบัน
@@ -63,6 +72,8 @@ revision ยังใหม่อยู่
   ชุดแผนที่
 - `400 TILE_CONTENT_INVALID` เมื่อถอดรหัสภาพไม่ได้ หรือรูปแบบจริงหรือขนาดภาพ
   ไม่ตรงกับชุดแผนที่
+- `400 TILE_VALIDATOR_INVALID` เมื่อค่า upstream ETag หรือ Last-Modified ที่ระบุ
+  ไม่ถูกต้องหรือยาวเกินขีดจำกัด
 - `409 TILE_ARCHIVE_DISABLED` เมื่อปิดความสามารถ archive หรือนโยบายแคช
 - `413 TILE_BODY_TOO_LARGE` เมื่อเกินขีดจำกัด `MAPTOY_TILES_MAX_BYTES`
   ซึ่งใช้เฉพาะ route นี้
@@ -71,8 +82,9 @@ revision ยังใหม่อยู่
 *maptoy* v1 ไม่มีระบบยืนยันตัวตนในแอปพลิเคชัน endpoint สำหรับเขียนนี้มีไว้สำหรับ
 ไคลเอนต์ private ที่เชื่อถือได้เท่านั้น หากเข้าถึง *maptoy* ได้จากเครือข่ายที่
 ไม่น่าเชื่อถือ reverse proxy ต้องยืนยันตัวตนและตรวจสอบสิทธิ์ ห้ามเผยแพร่ route
-สำหรับอัปโหลดโดยไม่มีการป้องกันดังกล่าว ผู้ดูแลระบบยังคงมีหน้าที่ตรวจสอบว่าไบต์
-ที่เพิ่มเข้ามาเป็นของแหล่งข้อมูลที่กำหนดและได้รับอนุญาตให้จัดเก็บตามกฎหมาย
+สำหรับอัปโหลดโดยไม่มีการป้องกันดังกล่าว ผู้ดูแลระบบยังคงมีหน้าที่ตรวจสอบว่าไบต์และ
+validator ที่เพิ่มเข้ามาเป็นของแหล่งข้อมูลและ representation ที่กำหนด และได้รับ
+อนุญาตให้จัดเก็บตามกฎหมาย
 
 ## Revision ที่แก้ไขไม่ได้
 

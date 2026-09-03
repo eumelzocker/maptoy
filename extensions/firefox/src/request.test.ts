@@ -36,4 +36,5 @@ test("waits for stored configuration before matching a wake-up request", async (
 
   const configured = await request;
   assert.equal(configured?.targetUrl, "http://localhost:4004/tiles/3/4/5");
+  assert.deepEqual(configured?.responseHeaderMapping, {});
 });

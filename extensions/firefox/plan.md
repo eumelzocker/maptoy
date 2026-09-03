@@ -14,7 +14,7 @@ Private, lokal genutzte und serverunabhängige Firefox-Extension. Sie liest Resp
 4. **Mehrere Matches** → Fehler (wird geloggt), die Response wird trotzdem unverändert an den Browser durchgereicht — Browsing wird nie blockiert oder beeinträchtigt.
 5. Zielwerte aus den named groups + Lookup-Tables, Ziel-URL und Größenlimit werden vor der Filterregistrierung geprüft.
 6. Response-Chunks werden unverändert sofort an den Browser geschrieben und nur bis zum konfigurierten Größenlimit für den POST gesammelt.
-7. Nach vollständigem Body-Empfang: Statusprüfung und ggf. `fetch()`-POST. Nur erfolgreiche Zielantworten bleiben für die Sitzung dedupliziert; Fehler erlauben einen neuen Versuch, wenn der Browser dieselbe Quelle später erneut abruft.
+7. Nach vollständigem Body-Empfang: Statusprüfung und ggf. `fetch()`-POST. Explizit pro Regel konfigurierte Response-Header werden dabei unter frei konfigurierbaren Request-Header-Namen an das Ziel weitergegeben; ohne Mapping werden keine Response-Metadaten gesendet. Nur erfolgreiche Zielantworten bleiben für die Sitzung dedupliziert; Fehler erlauben einen neuen Versuch, wenn der Browser dieselbe Quelle später erneut abruft.
 
 Design-Invariante: Jeder Fehler in Regel-Auswertung, Lookup oder POST wird geloggt und bricht nur den POST-Vorgang ab. Die Weiterleitung der Original-Daten an den Browser (`write()`) ist davon nie betroffen.
 
@@ -23,6 +23,7 @@ Design-Invariante: Jeder Fehler in Regel-Auswertung, Lookup oder POST wird gelog
 - Pro Regel: **Regex mit named groups** als Match-Pattern.
 - Ziel-Template: String mit Platzhaltern (`${name}`), referenziert die named groups.
 - **Lookup-Table pro named group** (optional): bildet den erfassten Rohwert auf einen anderen Wert ab (z.B. `mapname` → `mpi-id`). Groups ohne Lookup-Table werden 1:1 (Passthrough) ins Ziel-Template eingesetzt.
+- **Response-Header-Mapping** (optional): `forwardResponseHeaders` bildet Namen ausgewählter Source-Response-Header auf frei wählbare Target-Request-Header ab. Namen werden ohne maptoy-spezifische Semantik konfiguriert; fehlende Source-Header werden ausgelassen und standardmäßig wird nichts weitergegeben.
 - Ist für eine group eine Lookup-Table definiert, der erfasste Wert aber nicht darin enthalten → Fehler (kein stiller Passthrough), POST wird verworfen.
 - **Matchen mehrere Regeln dieselbe URL** → Fehler, kein POST, keine Priorisierung.
 
@@ -34,6 +35,10 @@ Design-Invariante: Jeder Fehler in Regel-Auswertung, Lookup oder POST wird gelog
   "enabled": true,
   "match": "^https://tiles\\.server\\.local/(?<mapname>[^/]+)/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.(?<ext>\\w+)$",
   "target": "http://localhost:4004/api/map-sets/${mapname}/tiles/${z}/${x}/${y}",
+  "forwardResponseHeaders": {
+    "etag": "X-Maptoy-Upstream-ETag",
+    "last-modified": "X-Maptoy-Upstream-Last-Modified"
+  },
   "lookups": {
     "mapname": { "World": "4711-0815-abc" }
   }
@@ -54,7 +59,7 @@ Design-Invariante: Jeder Fehler in Regel-Auswertung, Lookup oder POST wird gelog
 ## 5. POST-Weiterleitung
 
 - Body 1:1 (rohe Bytes), `Content-Type`-Header vom Original übernommen.
-- Keine zusätzlichen Metadaten (keine Original-URL, kein Zeitstempel etc.) — Zielinformationen stecken bereits vollständig in der Ziel-URL.
+- Keine impliziten zusätzlichen Metadaten wie Original-URL oder Zeitstempel. Ausschließlich explizit in `forwardResponseHeaders` gewählte Response-Header dürfen unter konfigurierten Zielnamen mitgesendet werden.
 - Erfolgreiche Quellantworten (`2xx`) werden standardmäßig weitergeleitet; pro Regel kann eine andere exakte Statusliste konfiguriert werden.
 - Der Body einer Zielantwort wird nicht ausgewertet. Ihr HTTP-Erfolgsstatus entscheidet nur, ob die Ziel-URL dedupliziert bleibt.
 - Bei Netzwerkfehler, nicht erreichbarem Ziel oder abgewiesenem POST: keine eigene Wiederholung und keine Queue. Ein späterer erneuter Browserabruf darf jedoch einen neuen POST auslösen.
@@ -85,7 +90,7 @@ Design-Invariante: Jeder Fehler in Regel-Auswertung, Lookup oder POST wird gelog
 
 ## 10. Tech-Stack
 
-- Eigenständig versioniertes pnpm-Workspace-Paket `1.0.0`, das nicht in den maptoy-Docker-Build oder das Runtime-Image gelangt.
+- Eigenständig versioniertes pnpm-Workspace-Paket `1.1.0`, das nicht in den maptoy-Docker-Build oder das Runtime-Image gelangt.
 - TypeScript, kompiliert nur mit `tsc` (kein Bundler wie esbuild/vite — nicht nötig ohne npm-Runtime-Deps oder Multi-File-Bundling).
 - Tests für die Matching-Logik: Regex-Matching, Lookup-Table-Anwendung (inkl. Fehlerfälle: unmapped value, mehrere Regel-Matches).
 - Separate Build-, Typprüfungs-, `node:test`- und `web-ext lint`-Skripte.

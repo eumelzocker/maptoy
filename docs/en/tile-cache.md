@@ -39,6 +39,8 @@ provider:
 ```sh
 curl --request POST \
   --header 'Content-Type: image/png' \
+  --header 'X-Maptoy-Upstream-ETag: "tile-v1"' \
+  --header 'X-Maptoy-Upstream-Last-Modified: Wed, 02 Sep 2026 08:00:00 GMT' \
   --data-binary '@tile.png' \
   "$MAPTOY_SERVER_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
 ```
@@ -49,6 +51,13 @@ actual image format must match the Map Set's configured Tile format, and its wid
 and height must equal the configured Tile size. Coordinates must be inside the Map Set's zoom and XYZ
 bounds, its Tile Archive capability and cache policy must be enabled, and both
 `MAPTOY_TILES_MAX_BYTES` and the Map Set storage limit apply.
+
+Trusted clients may supply an `ETag` and `Last-Modified` value observed on the
+exact upstream representation as `X-Maptoy-Upstream-ETag` and
+`X-Maptoy-Upstream-Last-Modified`. maptoy stores these optional validators and can
+use them for its next conditional provider request. Do not forward validators from
+a different URL, request-header variant, or representation: a misleading validator
+can cause the provider's `304` response to validate the wrong uploaded bytes.
 
 A new immutable revision returns `201` and
 `{ "revisionId": "...", "created": true }`. Uploading bytes equal to the current
@@ -63,6 +72,8 @@ Upload errors use these contracts:
   Content-Type.
 - `400 TILE_CONTENT_INVALID` when the image cannot be decoded or its actual format
   or dimensions do not match the Map Set.
+- `400 TILE_VALIDATOR_INVALID` when an optional upstream ETag or Last-Modified
+  value is malformed or exceeds its limit.
 - `409 TILE_ARCHIVE_DISABLED` when archival capability or cache policy is disabled.
 - `413 TILE_BODY_TOO_LARGE` when the route-specific `MAPTOY_TILES_MAX_BYTES` limit is
   exceeded.
@@ -72,7 +83,8 @@ Upload errors use these contracts:
 for trusted private clients. If *maptoy* is reachable over an untrusted network, the
 reverse proxy must authenticate and authorize access; do not publish the upload
 route without such protection. The operator remains responsible for ensuring that
-seeded bytes belong to the configured source and may lawfully be stored.
+seeded bytes and validators belong to the configured source and representation and
+may lawfully be stored.
 
 ## Immutable revisions
 

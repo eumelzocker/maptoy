@@ -12,6 +12,8 @@ export interface RuleConfig {
   maxResponseBytes?: number | null;
   /** Source response codes to forward. Defaults to every 2xx status. */
   responseStatusCodes?: number[];
+  /** Maps source response header names to request header names sent to the target. */
+  forwardResponseHeaders?: Record<string, string>;
 }
 
 export interface ExtensionConfig {

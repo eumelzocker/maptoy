@@ -216,6 +216,10 @@ export class MapSetService {
     tile: { zoom: number; x: number; y: number },
     body: Buffer,
     contentType: string | undefined,
+    validators: {
+      etag?: string | undefined;
+      lastModified?: string | undefined;
+    } = {},
   ): Promise<TileUploadResponse> {
     const mapSet = this.get(id);
     this.validateTileCoordinate(mapSet, tile);
@@ -223,6 +227,8 @@ export class MapSetService {
       body,
       contentType,
       maximumTileBytes: this.options.maximumTileBytes,
+      etag: validators.etag,
+      lastModified: validators.lastModified,
     });
   }
 

@@ -8,6 +8,10 @@
       "enabled": true,
       "match": "^https://api\\.maptiler\\.com/maps/(?<mapset>[^/]+)/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.png(?:\\?.*)?$",
       "target": "http://localhost:4004/api/map-sets/${mapset}/tiles/${z}/${x}/${y}",
+      "forwardResponseHeaders": {
+        "etag": "X-Maptoy-Upstream-ETag",
+        "last-modified": "X-Maptoy-Upstream-Last-Modified"
+      },
       "lookups": {
         "mapset": {
           "base-v4": "b82a4011-1a37-40a9-94da-55a06b8dd617",
@@ -19,7 +23,11 @@
       "id": "OpenTopoMap",
       "enabled": true,
       "match": "^https://.*tile\\.opentopomap\\.org/(?<z>\\d+)/(?<x>\\d+)/(?<y>\\d+)\\.(?<ext>\\w+)(?:\\?.*)?$",
-      "target": "http://localhost:4004/api/map-sets/5593630f-4af2-44e4-a6bb-c1db36d5a625/tiles/${z}/${x}/${y}"
+      "target": "http://localhost:4004/api/map-sets/5593630f-4af2-44e4-a6bb-c1db36d5a625/tiles/${z}/${x}/${y}",
+      "forwardResponseHeaders": {
+        "etag": "X-Maptoy-Upstream-ETag",
+        "last-modified": "X-Maptoy-Upstream-Last-Modified"
+      }
     }
   ]
 }

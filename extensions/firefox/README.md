@@ -47,6 +47,16 @@ import/export the config. Each rule:
 - `maxResponseBytes` (optional per-rule override; `null` disables the limit)
 - `responseStatusCodes` (optional exact allowlist; successful `2xx` responses are
   forwarded by default)
+- `forwardResponseHeaders` (optional): maps source response header names to request
+  header names sent to the target; header matching is case-insensitive and missing
+  source headers are omitted
+
+Response headers are never forwarded implicitly. This keeps the extension
+server-agnostic and avoids disclosing response metadata to a target that did not ask
+for it. Configure only headers whose meaning the target server understands and
+trusts. `Content-Type` is handled separately and cannot be a mapped target header.
+The bundled maptoy example maps upstream `ETag` and `Last-Modified` values to
+maptoy's optional Tile-upload validator headers.
 
 The top-level `maxResponseBytes` defaults to 10 MiB and can also be set to `null`.
 Responses beyond the effective limit continue to the browser unchanged but are not
@@ -62,12 +72,13 @@ entry for the matched value, the request is logged as an error and no POST is
 sent — the original response to the browser is never affected either way.
 
 The options page ships a working maptoy-oriented example (MapTiler + OpenTopoMap
-tiles), importable via its "Import" button. Other HTTP servers can be targeted with
-the same rule format.
+tiles), including optional upstream cache-validator forwarding, importable via its
+"Import" button. Other HTTP servers can use different target header names or omit
+header forwarding with the same generic rule format.
 
 ## Packaging boundary
 
-The extension is independently versioned as `1.0.0`. Its package and Firefox
+The extension is independently versioned as `1.1.0`. Its package and Firefox
 manifest versions must match. It is intentionally excluded from maptoy's Docker
 build context and runtime image.
 

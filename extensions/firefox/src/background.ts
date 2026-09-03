@@ -1,5 +1,9 @@
 import { PostHistory } from "./dedupe.js";
-import { acceptsResponseStatus, ResponseBodyCollector } from "./response.js";
+import {
+  acceptsResponseStatus,
+  mappedResponseHeaders,
+  ResponseBodyCollector,
+} from "./response.js";
 import { resolveConfiguredRequest, type ConfiguredRequest } from "./request.js";
 import { DEFAULT_CONFIG, loadConfig } from "./storage.js";
 import type { ExtensionConfig, RuleConfig } from "./types.js";
@@ -12,6 +16,8 @@ interface PendingRequest {
   collector: ResponseBodyCollector;
   contentType: string;
   postHistory: PostHistory;
+  responseHeaderMapping: Readonly<Record<string, string>>;
+  targetHeaders: Readonly<Record<string, string>>;
   statusCode?: number;
 }
 
@@ -61,6 +67,10 @@ browser.webRequest.onHeadersReceived.addListener(
       (candidate) => candidate.name.toLowerCase() === "content-type",
     );
     pending.contentType = header?.value ?? "application/octet-stream";
+    pending.targetHeaders = mappedResponseHeaders(
+      details.responseHeaders ?? [],
+      pending.responseHeaderMapping,
+    );
     pending.statusCode = details.statusCode;
     return {};
   },
@@ -88,7 +98,8 @@ browser.webRequest.onBeforeRequest.addListener(
     }
     if (configuredRequest === undefined) return {};
 
-    const { maximumBytes, rule, targetUrl } = configuredRequest;
+    const { maximumBytes, responseHeaderMapping, rule, targetUrl } =
+      configuredRequest;
 
     if (!postHistory.tryStart(targetUrl)) {
       log("skip (already posted or in flight)", targetUrl);
@@ -115,6 +126,8 @@ browser.webRequest.onBeforeRequest.addListener(
       collector: new ResponseBodyCollector(maximumBytes),
       contentType: "application/octet-stream",
       postHistory,
+      responseHeaderMapping,
+      targetHeaders: {},
     };
     pendingRequests.set(details.requestId, pending);
 
@@ -193,6 +206,7 @@ async function finishRequest(
     pending.targetUrl,
     body,
     pending.contentType,
+    pending.targetHeaders,
   );
 }
 
@@ -201,12 +215,13 @@ async function forward(
   targetUrl: string,
   body: ArrayBuffer,
   contentType: string,
+  targetHeaders: Readonly<Record<string, string>>,
 ): Promise<void> {
   log("POST", targetUrl);
   try {
     const response = await fetch(targetUrl, {
       method: "POST",
-      headers: { "Content-Type": contentType },
+      headers: { ...targetHeaders, "Content-Type": contentType },
       body,
     });
     if (!response.ok) {

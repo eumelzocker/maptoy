@@ -1,6 +1,75 @@
 import type { ExtensionConfig, RuleConfig } from "./types.js";
 
 export const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+const HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+export interface ResponseHeader {
+  name: string;
+  value?: string | undefined;
+}
+
+export function responseHeaderMapping(
+  rule: RuleConfig,
+): Readonly<Record<string, string>> {
+  const configured = rule.forwardResponseHeaders;
+  if (configured === undefined) return {};
+  if (
+    configured === null ||
+    typeof configured !== "object" ||
+    Array.isArray(configured)
+  ) {
+    throw new Error("forwardResponseHeaders must be an object");
+  }
+  const mapping: Array<readonly [string, string]> = [];
+  const sourceNames = new Set<string>();
+  const targetNames = new Set<string>();
+  for (const [sourceName, targetName] of Object.entries(configured)) {
+    if (!HEADER_NAME_PATTERN.test(sourceName)) {
+      throw new Error(`Invalid source response header name: ${sourceName}`);
+    }
+    if (
+      typeof targetName !== "string" ||
+      !HEADER_NAME_PATTERN.test(targetName)
+    ) {
+      throw new Error(`Invalid target request header name: ${targetName}`);
+    }
+    const normalizedSource = sourceName.toLowerCase();
+    const normalizedTarget = targetName.toLowerCase();
+    if (sourceNames.has(normalizedSource)) {
+      throw new Error(
+        `Source response header is mapped more than once: ${sourceName}`,
+      );
+    }
+    if (targetNames.has(normalizedTarget)) {
+      throw new Error(
+        `Target request header is mapped more than once: ${targetName}`,
+      );
+    }
+    if (normalizedTarget === "content-type") {
+      throw new Error(
+        "Content-Type is forwarded automatically and cannot be a mapped target header",
+      );
+    }
+    mapping.push([normalizedSource, targetName]);
+    sourceNames.add(normalizedSource);
+    targetNames.add(normalizedTarget);
+  }
+  return Object.fromEntries(mapping);
+}
+
+export function mappedResponseHeaders(
+  headers: readonly ResponseHeader[],
+  mapping: Readonly<Record<string, string>>,
+): Readonly<Record<string, string>> {
+  const forwarded = new Map<string, readonly [string, string]>();
+  for (const header of headers) {
+    const targetName = mapping[header.name.toLowerCase()];
+    if (targetName !== undefined && header.value !== undefined) {
+      forwarded.set(targetName.toLowerCase(), [targetName, header.value]);
+    }
+  }
+  return Object.fromEntries(forwarded.values());
+}
 
 export function maximumResponseBytes(
   config: ExtensionConfig,

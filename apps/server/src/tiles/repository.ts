@@ -329,15 +329,24 @@ export class TileArchiveRepository {
               current.id,
             );
         } else {
-          // An identical upload observes the existing revision; it must not
-          // rewrite that revision's creation origin or provider validators.
+          // An identical upload observes the existing revision without changing
+          // its creation origin. Explicit upstream validators augment it; omitted
+          // validators preserve metadata already learned from the provider.
           this.database
             .prepare(
               `UPDATE tile_revisions
-                  SET last_seen_at = ?, last_validated_at = ?
+                  SET last_seen_at = ?, last_validated_at = ?,
+                      etag = COALESCE(?, etag),
+                      last_modified = COALESCE(?, last_modified)
                 WHERE id = ?`,
             )
-            .run(input.timestamp, input.timestamp, current.id);
+            .run(
+              input.timestamp,
+              input.timestamp,
+              input.etag,
+              input.lastModified,
+              current.id,
+            );
         }
         this.database.exec("COMMIT;");
         const updated = this.revisionById(current.id);

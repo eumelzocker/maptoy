@@ -41,6 +41,8 @@ konfigurierten Provider zu kontaktieren:
 ```sh
 curl --request POST \
   --header 'Content-Type: image/png' \
+  --header 'X-Maptoy-Upstream-ETag: "tile-v1"' \
+  --header 'X-Maptoy-Upstream-Last-Modified: Wed, 02 Sep 2026 08:00:00 GMT' \
   --data-binary '@tile.png' \
   "$MAPTOY_SERVER_URL/api/map-sets/$MAP_SET_ID/tiles/10/550/335"
 ```
@@ -52,6 +54,14 @@ passen und Breite sowie Höhe müssen der konfigurierten Tile-Größe entspreche
 Koordinaten müssen innerhalb der Zoom- und
 XYZ-Grenzen liegen, Tile-Archiv-Capability und Cache-Policy müssen aktiv sein und
 sowohl `MAPTOY_TILES_MAX_BYTES` als auch das Speicherlimit des Map Sets gelten.
+
+Vertrauenswürdige Clients dürfen einen an exakt derselben Upstream-Repräsentation
+beobachteten `ETag` und `Last-Modified` als `X-Maptoy-Upstream-ETag` und
+`X-Maptoy-Upstream-Last-Modified` mitgeben. maptoy speichert diese optionalen
+Validatoren und kann sie bei der nächsten bedingten Provideranfrage verwenden.
+Validatoren einer anderen URL, Request-Header-Variante oder Repräsentation dürfen
+nicht weitergegeben werden: Ein unpassender Validator kann dazu führen, dass eine
+Providerantwort `304` die falschen hochgeladenen Bytes bestätigt.
 
 Eine neue unveränderliche Revision antwortet mit `201` und
 `{ "revisionId": "...", "created": true }`. Entsprechen die Bytes der aktuellen
@@ -66,6 +76,8 @@ Für Uploadfehler gelten folgende Verträge:
   Map Set passendem Content-Type.
 - `400 TILE_CONTENT_INVALID`, wenn das Bild nicht dekodiert werden kann oder sein
   tatsächliches Format beziehungsweise seine Abmessungen nicht zum Map Set passen.
+- `400 TILE_VALIDATOR_INVALID`, wenn ein optionaler Upstream-ETag oder
+  Last-Modified-Wert ungültig oder zu lang ist.
 - `409 TILE_ARCHIVE_DISABLED`, wenn Archiv-Capability oder Cache-Policy deaktiviert
   ist.
 - `413 TILE_BODY_TOO_LARGE` beim Überschreiten des routenspezifischen Limits
@@ -76,8 +88,8 @@ Für Uploadfehler gelten folgende Verträge:
 nur für vertrauenswürdige private Clients vorgesehen. Ist *maptoy* über ein nicht
 vertrauenswürdiges Netz erreichbar, muss der Reverse Proxy den Zugriff authentifizieren
 und autorisieren; veröffentliche die Uploadroute nicht ungeschützt. Der Betreiber ist
-selbst dafür verantwortlich, dass die eingespielten Bytes zur konfigurierten Quelle
-gehören und gespeichert werden dürfen.
+selbst dafür verantwortlich, dass die eingespielten Bytes und Validatoren zur
+konfigurierten Quelle und Repräsentation gehören und gespeichert werden dürfen.
 
 ## Unveränderliche Revisionen
 

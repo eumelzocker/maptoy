@@ -7,6 +7,9 @@ All notable changes to maptoy are documented in this file.
 ### Added
 
 - Added Thai documentation for Layers, Map Sets, and the Tile Cache.
+- Added generic, opt-in response-header forwarding to `maptoy-ff-ext` 1.1.0 and
+  optional upstream ETag and Last-Modified ingestion to maptoy's Tile upload API,
+  allowing seeded Tiles to use conditional provider validation.
 
 ### Changed
 

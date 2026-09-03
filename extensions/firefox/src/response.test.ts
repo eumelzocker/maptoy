@@ -3,7 +3,9 @@ import { test } from "node:test";
 import {
   acceptsResponseStatus,
   DEFAULT_MAX_RESPONSE_BYTES,
+  mappedResponseHeaders,
   maximumResponseBytes,
+  responseHeaderMapping,
   ResponseBodyCollector,
 } from "./response.js";
 import type { ExtensionConfig, RuleConfig } from "./types.js";
@@ -46,6 +48,64 @@ test("accepts successful source responses by default and configured statuses exp
   assert.throws(
     () => acceptsResponseStatus(200, { ...rule, responseStatusCodes: [99] }),
     /valid HTTP status/,
+  );
+});
+
+test("maps configured source response headers case-insensitively", () => {
+  const mapping = responseHeaderMapping({
+    ...rule,
+    forwardResponseHeaders: {
+      ETag: "X-Archive-ETag",
+      "last-modified": "X-Archive-Last-Modified",
+    },
+  });
+  assert.deepEqual(mapping, {
+    etag: "X-Archive-ETag",
+    "last-modified": "X-Archive-Last-Modified",
+  });
+  assert.deepEqual(
+    mappedResponseHeaders(
+      [
+        { name: "etag", value: 'W/"tile-2"' },
+        { name: "Last-Modified", value: "Wed, 03 Sep 2026 10:00:00 GMT" },
+        { name: "Cache-Control", value: "public" },
+      ],
+      mapping,
+    ),
+    {
+      "X-Archive-ETag": 'W/"tile-2"',
+      "X-Archive-Last-Modified": "Wed, 03 Sep 2026 10:00:00 GMT",
+    },
+  );
+});
+
+test("rejects invalid or ambiguous response header mappings", () => {
+  assert.throws(
+    () =>
+      responseHeaderMapping({
+        ...rule,
+        forwardResponseHeaders: { "bad header": "X-Archive" },
+      }),
+    /Invalid source response header name/,
+  );
+  assert.throws(
+    () =>
+      responseHeaderMapping({
+        ...rule,
+        forwardResponseHeaders: { ETag: "Content-Type" },
+      }),
+    /forwarded automatically/,
+  );
+  assert.throws(
+    () =>
+      responseHeaderMapping({
+        ...rule,
+        forwardResponseHeaders: {
+          ETag: "X-Archive-Validator",
+          "Last-Modified": "x-archive-validator",
+        },
+      }),
+    /Target request header is mapped more than once/,
   );
 });
 

@@ -29,6 +29,17 @@
         color: crimson;
         white-space: pre-wrap;
       }
+      .rules-help {
+        margin: 1rem 0 0.6rem;
+        padding: 0.75rem;
+        border-left: 4px solid #47796f;
+        background: #f2f7f5;
+        line-height: 1.45;
+      }
+      .rules-help code {
+        background: #e5eeea;
+        padding: 0 0.2rem;
+      }
       .example {
         margin-top: 2rem;
         border-top: 1px solid #ccc;
@@ -59,6 +70,14 @@
         <input id="max-response-bytes" type="number" min="1" step="1" />
       </label>
     </div>
+    <div class="rules-help">
+      <strong>Optional response header forwarding</strong><br />
+      Rules remain independent of the target server. A rule's
+      <code>forwardResponseHeaders</code> object maps source response header names
+      to request header names sent with the POST. No response headers are forwarded
+      unless they are explicitly mapped. Only map headers whose meaning the target
+      server understands and trusts.
+    </div>
     <div><b>Rules:</b></div>
     <textarea id="rules" spellcheck="false"></textarea>
     <div class="row">
@@ -84,6 +103,7 @@
         <li><code>match</code>: regex with named groups, e.g. <code>(?&lt;mapset&gt;...)</code>.</li>
         <li><code>target</code>: target URL template, references named groups as <code>${name}</code>.</li>
         <li><code>lookups</code>: optional, per rule and per named group. Maps the captured value to another value. Groups (or whole rules) without a lookup table are passed through as-is.</li>
+        <li><code>forwardResponseHeaders</code>: optional source-response to target-request header-name mapping. Missing source headers are omitted.</li>
         <li><code>maxResponseBytes</code> and <code>responseStatusCodes</code> can override response handling per rule.</li>
         <li>If multiple rules match the same URL, or a lookup entry is missing &rarr; error, no POST.</li>
       </ul>

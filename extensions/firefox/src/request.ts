@@ -1,4 +1,4 @@
-import { maximumResponseBytes } from "./response.js";
+import { maximumResponseBytes, responseHeaderMapping } from "./response.js";
 import { buildTargetUrl, findMatchingRule } from "./rules.js";
 import type { ExtensionConfig, RuleConfig } from "./types.js";
 
@@ -6,6 +6,7 @@ export interface ConfiguredRequest {
   maximumBytes: number | null;
   rule: RuleConfig;
   targetUrl: string;
+  responseHeaderMapping: Readonly<Record<string, string>>;
 }
 
 export async function resolveConfiguredRequest(
@@ -21,5 +22,6 @@ export async function resolveConfiguredRequest(
     maximumBytes: maximumResponseBytes(config, rule),
     rule,
     targetUrl: buildTargetUrl(sourceUrl, rule),
+    responseHeaderMapping: responseHeaderMapping(rule),
   };
 }
