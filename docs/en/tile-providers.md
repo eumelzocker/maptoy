@@ -6,7 +6,7 @@ language: en
 
 # Tile Providers
 
-Last content review: **2026-08-24**.
+Last content review: **2026-09-04**.
 
 This page is a technical orientation, not a recommendation, legal review, or
 guarantee that a provider permits a particular use. Provider terms, plans, URLs,
@@ -34,7 +34,7 @@ the examples below use `${MAPTOY_*}` references rather than real secrets.
 | [Stadia Maps](https://stadiamaps.com/) | Direct | Standard terms prohibit server-side proxying/caching and general bulk download. |
 | [Thunderforest](https://www.thunderforest.com/maps/) | Direct | Standard terms allow limited client/device caching but prohibit caching proxies and redistribution. |
 | [ArcGIS Location](https://location.arcgis.com/) | Direct with `{z}/{y}/{x}` path order | Account-, service-, and agreement-dependent; no general archival permission is implied. |
-| [Google Maps](https://maps.google.com/) | Not directly | Session creation, dynamic attribution, and caching restrictions conflict with *maptoy*'s current static Map Set and archive model. |
+| [Google Maps](https://maps.google.com/) | Manual and limited for 2D tiles | An externally created session can be used, but *maptoy* does not create or renew sessions or retrieve viewport attribution. Google's caching restrictions limit archive features. |
 
 ## OpenStreetMap Standard
 
@@ -254,21 +254,29 @@ and [Esri legal overview](https://www.esri.com/en-us/legal/overview).
 **Variants:** Roadmap, satellite, terrain, Street View, and Photorealistic 3D. Only
 the 2D roadmap, satellite, and terrain responses resemble raster XYZ tiles.
 
-**Reference tile URL:**
-`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session={sessionToken}&key=${MAPTOY_GOOGLE_MAPS_API_KEY}`
+**Manual Map Set URL template:**
+`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${MAPTOY_GOOGLE_MAPS_SESSION_TOKEN}&key=${MAPTOY_GOOGLE_MAPS_API_KEY}`
 
 **Parameters and workflow:** An API key and a short-lived session token are required.
-The token must first be created with a POST request containing `mapType`, `language`,
-and `region`, plus optional scale, layer, and style settings. A viewport request is
-also needed to obtain current coverage and attribution for the displayed area.
+*maptoy* can read both from its server environment and use an existing, currently
+valid token for ordinary 2D tile requests. It does not create or renew that token.
+The token must be created externally with a POST request containing `mapType`,
+`language`, and `region`, plus optional scale, layer, and style settings. Google
+currently documents a lifetime of about two weeks, subject to change. Replace the
+environment value and restart or recreate the *maptoy* process when the token
+expires. A viewport request is also needed to obtain current coverage and
+attribution for the displayed area; *maptoy* does not perform that request.
 
 **Policy and compatibility notes:** *maptoy* v1.0 intentionally has no Google Maps
-adapter. A static XYZ Map Set cannot create or renew sessions or maintain the
-required viewport-dependent attribution. Google also restricts prefetching,
-caching, storage, non-visualization analysis, and offline use. For these technical
-and policy reasons, do not configure the reference URL as a *maptoy* v1 Map Set. A
-future dedicated adapter would still need to disable incompatible archive features
-and implement Google's complete session and attribution workflow.
+adapter. Nevertheless, the generic Leaflet/XYZ adapter can technically request and
+display 2D tiles when a valid session token is supplied as shown above. This is
+limited manual compatibility, not a complete Google Maps Platform integration:
+*maptoy* cannot maintain the required viewport-dependent attribution. Google also
+restricts prefetching, caching, storage, non-visualization analysis, and offline
+use. Unless the agreement applicable to the account explicitly permits them, keep
+Tile Archive, cache, batch download, and server export disabled. A future dedicated
+adapter would still need to implement Google's complete session and attribution
+workflow and disable incompatible archive features.
 
 **Official information:** [Map Tiles API overview](https://developers.google.com/maps/documentation/tile/overview),
 [session tokens](https://developers.google.com/maps/documentation/tile/session_tokens),

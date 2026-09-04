@@ -6,7 +6,7 @@ language: de
 
 # Tile-Provider
 
-Letzte inhaltliche Prüfung: **2026-08-24**.
+Letzte inhaltliche Prüfung: **2026-09-04**.
 
 Diese Seite dient der technischen Orientierung. Sie ist weder Empfehlung noch
 Rechtsprüfung oder Garantie dafür, dass ein Provider eine bestimmte Nutzung erlaubt.
@@ -36,7 +36,7 @@ Secrets.
 | [Stadia Maps](https://stadiamaps.com/) | Direkt | Standardbedingungen verbieten serverseitigen Proxy/Cache und allgemeinen Bulk-Download. |
 | [Thunderforest](https://www.thunderforest.com/maps/) | Direkt | Standardbedingungen erlauben begrenztes Client-/Geräte-Caching, verbieten jedoch Caching-Proxys und Weitergabe. |
 | [ArcGIS Location](https://location.arcgis.com/) | Direkt mit Pfadreihenfolge `{z}/{y}/{x}` | Konto-, Dienst- und vertragsabhängig; keine allgemeine Archiverlaubnis. |
-| [Google Maps](https://maps.google.com/) | Nicht direkt | Session-Erzeugung, dynamische Attribution und Cache-Beschränkungen widersprechen dem aktuellen statischen Map-Set- und Archivmodell. |
+| [Google Maps](https://maps.google.com/) | Manuell und eingeschränkt für 2D-Tiles | Eine extern erzeugte Session kann verwendet werden; *maptoy* erzeugt oder erneuert Sessions jedoch nicht und ruft keine Viewport-Attribution ab. Googles Cache-Beschränkungen begrenzen die Archivfunktionen. |
 
 ## OpenStreetMap Standard
 
@@ -265,22 +265,31 @@ und [Esri-Rechtsübersicht](https://www.esri.com/en-us/legal/overview).
 **Varianten:** Roadmap, Satellite, Terrain, Street View und Photorealistic 3D. Nur
 die 2D-Antworten für Roadmap, Satellite und Terrain ähneln Raster-XYZ-Tiles.
 
-**Referenz-URL:**
-`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session={sessionToken}&key=${MAPTOY_GOOGLE_MAPS_API_KEY}`
+**Manuelles Map-Set-URL-Template:**
+`https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${MAPTOY_GOOGLE_MAPS_SESSION_TOKEN}&key=${MAPTOY_GOOGLE_MAPS_API_KEY}`
 
 **Parameter und Ablauf:** API-Schlüssel und kurzlebiges Session-Token sind Pflicht.
-Das Token muss zuerst per POST mit `mapType`, `language` und `region` sowie optionalen
-Skalierungs-, Layer- und Stilwerten erzeugt werden. Zusätzlich wird eine
-Viewport-Abfrage benötigt, um aktuelle Abdeckung und Attribution des sichtbaren
-Gebiets zu erhalten.
+*maptoy* kann beides aus seiner Serverumgebung lesen und ein vorhandenes, noch
+gültiges Token für gewöhnliche 2D-Tile-Anfragen verwenden. Es erzeugt oder erneuert
+dieses Token jedoch nicht. Das Token muss extern per POST mit `mapType`, `language`
+und `region` sowie optionalen Skalierungs-, Layer- und Stilwerten erzeugt werden.
+Google dokumentiert derzeit eine Gültigkeitsdauer von ungefähr zwei Wochen, die sich
+ändern kann. Ersetze nach Ablauf den Environment-Wert und starte beziehungsweise
+erzeuge den *maptoy*-Prozess neu. Zusätzlich wird eine Viewport-Abfrage benötigt, um
+aktuelle Abdeckung und Attribution des sichtbaren Gebiets zu erhalten; *maptoy* führt
+diese Abfrage nicht aus.
 
 **Policy und Kompatibilität:** *maptoy* v1.0 enthält bewusst keinen Google-Maps-Adapter.
-Ein statisches XYZ-Map-Set kann weder Sessions erzeugen und erneuern noch die
-erforderliche viewportabhängige Attribution pflegen. Google beschränkt außerdem
-Prefetch, Caching, Speicherung, nicht visuelle Analyse und Offline-Nutzung. Daher darf
-die Referenz-URL nicht als *maptoy*-v1-Map-Set konfiguriert werden. Auch ein künftiger
-dedizierter Adapter müsste inkompatible Archivfunktionen deaktivieren und den
-vollständigen Session- und Attributionsablauf implementieren.
+Der allgemeine Leaflet-/XYZ-Adapter kann 2D-Tiles dennoch technisch abrufen und
+anzeigen, wenn wie oben ein gültiges Session-Token bereitgestellt wird. Das ist eine
+eingeschränkte manuelle Kompatibilität und keine vollständige Integration der Google
+Maps Platform: *maptoy* kann die erforderliche viewportabhängige Attribution nicht
+pflegen. Google beschränkt außerdem Prefetch, Caching, Speicherung, nicht visuelle
+Analyse und Offline-Nutzung. Solange die für das Konto geltende Vereinbarung dies
+nicht ausdrücklich erlaubt, müssen Tile Archive, Cache, Batch-Download und
+Serverexport deaktiviert bleiben. Auch ein künftiger dedizierter Adapter müsste den
+vollständigen Session- und Attributionsablauf implementieren und inkompatible
+Archivfunktionen deaktivieren.
 
 **Offizielle Informationen:** [Map Tiles API](https://developers.google.com/maps/documentation/tile/overview),
 [Session-Tokens](https://developers.google.com/maps/documentation/tile/session_tokens),

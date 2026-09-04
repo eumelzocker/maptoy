@@ -29,13 +29,27 @@ mkdir -p .data/logs
 docker compose up --build --detach
 ```
 
+<details>
+<summary>Troubleshooting</summary>
+
+If the container repeatedly exits with an `EACCES` error for `/data` or `/logs`, make the local data directories writable and start it again:
+
+```sh
+chmod a+rwx .data .data/logs
+docker compose up --detach
+```
+
+This may be necessary on NTFS or network drives. If `chmod` has no effect there, place the persistent data on a Linux filesystem or adjust the drive's mount options.
+
+</details>
+
 Open <http://localhost:4004>.
 
 When the server starts with an empty Map Set table, *maptoy* creates an **OpenTopoMap** Map Set automatically. It uses no provider secret and includes the OpenTopoMap CC-BY-SA and OpenStreetMap contributor attribution. Existing Map Sets are never changed or supplemented; if all Map Sets are deleted, the default is created again on the next server start. Review the linked provider information before using the service beyond low-volume exploration.
 
 Compose bind-mounts the host directories configured by `MAPTOY_STORAGE_DATA_DIR` and `MAPTOY_LOGGING_DIR`. They must exist and be writable by the container user. The defaults created above keep everything below `.data`.
 
-Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](./docs/en/getting-started.md)** and **[Map Sets](./docs/en/map-sets.md)** documentation.
+Edit `.env` to change the port, data paths, logging, provider limits, or provider secrets like API-keys. Available settings are listed in [`.env.example`](./.env.example) and explained in the integrated **[Getting started](./docs/en/getting-started.md)** and **[Map Sets](./docs/en/map-sets.md)** documentation.
 
 To scan an existing photo directory without copying originals into *maptoy*, set the host path in `.env`:
 
@@ -77,7 +91,7 @@ location /tools/maptoy/ {
 
 ## Firefox extension
 
-This repository also contains the independently versioned [*maptoy* Firefox extension](./extensions/firefox/README.md). It can forward matching browser responses unchanged to configurable HTTP endpoints, including *maptoy*'s Tile seeding API, and optionally map selected source response headers to target request headers. This allows *maptoy* to cache map tiles and their upstream validators from your normal browser sessions.
+This repository also contains the independently versioned [*maptoy* Firefox extension](./extensions/firefox/README.md). It can forward matching browser responses unchanged to configurable HTTP endpoints, including *maptoy*'s Tile seeding API, and optionally map selected source response headers to target request headers. This allows *maptoy* to cache map tiles from your normal browser sessions.
 
 The extension can also be easily reconfigured to feed other caching APIs.
 

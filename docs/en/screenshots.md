@@ -32,6 +32,8 @@ These examples show a Photo Layer with clustered markers, an open preview popup,
 
 ## Compare Maps
 
-Compare Maps displays two or four Map areas with synchronized pan and zoom. This example compares street and satellite Map Sets side by side in continuous-area mode.
+Compare Maps displays two or four Map areas with synchronized pan and zoom. The first example compares street and satellite Map Sets side by side in continuous-area mode. The second shows four Map Sets sharing the same center and scale, with the Compare Maps settings open.
 
 <img src="../assets/screenshot4.webp" alt="maptoy Compare Maps view showing street and satellite Map Sets side by side">
+
+<img src="../assets/screenshot5.webp" alt="maptoy Compare Maps view showing four Map Sets with the same center and scale and the settings dialog open">
