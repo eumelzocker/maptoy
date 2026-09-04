@@ -12,7 +12,7 @@ export interface MapComparisonZoomRange {
   maximum: number;
 }
 
-interface MapComparisonActivationSource extends MapComparisonZoomSource {
+export interface MapComparisonActivationSource extends MapComparisonZoomSource {
   id: string;
   capabilities: {
     interactive: boolean;
@@ -28,6 +28,15 @@ export function mapComparisonZoomRange(
     minimum: Math.max(...ranges.map(({ minZoom }) => minZoom)),
     maximum: Math.min(...ranges.map(({ maxZoom }) => maxZoom)),
   };
+}
+
+export function constrainedMapComparisonZoom(
+  requestedZoom: number,
+  sources: readonly MapComparisonZoomSource[],
+): number | null {
+  const range = mapComparisonZoomRange(sources);
+  if (range === null || range.minimum > range.maximum) return null;
+  return Math.min(range.maximum, Math.max(range.minimum, requestedZoom));
 }
 
 export function canActivateMapComparison(
@@ -52,4 +61,18 @@ export function canActivateMapComparison(
   }
   const zoomRange = mapComparisonZoomRange(resolvedSources);
   return zoomRange !== null && zoomRange.minimum <= zoomRange.maximum;
+}
+
+export function resolvedMapComparisonPreferences(
+  current: MapComparisonPreferences,
+  next: MapComparisonPreferences,
+  mapSets: readonly MapComparisonActivationSource[],
+): MapComparisonPreferences {
+  const enabled = next.enabled && canActivateMapComparison(next, mapSets);
+  const deactivating = current.enabled && !enabled;
+  return {
+    ...next,
+    enabled,
+    ...(deactivating ? { verticalSplit: 50, horizontalSplit: 50 } : {}),
+  };
 }

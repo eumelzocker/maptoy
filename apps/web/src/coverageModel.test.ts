@@ -6,6 +6,7 @@ import {
   constrainedCoveragePreviewViewport,
   coverageGridCellTileCapacity,
   coverageGridZoom,
+  coveragePreviewGridZoomRange,
   coverageCellIsColored,
   coverageLayer,
   coveragePreviewZoomRange,
@@ -14,6 +15,7 @@ import {
   downloadCoordinatePrecision,
   freshCoverageColor,
   hasCoveragePreviewZoomRange,
+  intersectedCoveragePreviewZoomRange,
   screenRectangleBounds,
   roundedDownloadBounds,
   staleCoverageColor,
@@ -52,6 +54,19 @@ describe("Coverage view model", () => {
     });
     expect(coverageGridZoom(8, -1)).toBe(7);
     expect(coverageViewportZoom(7, -1)).toBe(8);
+  });
+
+  it("intersects Coverage preview Zooms with the Preview Map Set range", () => {
+    expect(coveragePreviewGridZoomRange(10, 3, 5, 7)).toEqual({
+      minimum: 5,
+      maximum: 7,
+    });
+    expect(intersectedCoveragePreviewZoomRange(10, 3, 5, 7, -1)).toEqual({
+      minimum: 6,
+      maximum: 8,
+    });
+    expect(coveragePreviewGridZoomRange(12, 11, 0, 5)).toBeNull();
+    expect(intersectedCoveragePreviewZoomRange(12, 11, 0, 5, 0)).toBeNull();
   });
 
   it("calculates the source Tiles represented by one grid cell", () => {

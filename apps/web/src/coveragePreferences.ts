@@ -6,6 +6,7 @@ type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 
 export interface CoveragePagePreferences {
   selectedMapSetId: string | null;
+  previewMapSetId: string | null;
   previewViewport: CoveragePreviewViewport | null;
   sourceZoom: number;
   selectionMode: CoverageSelection["kind"];
@@ -17,6 +18,23 @@ export interface CoveragePagePreferences {
 }
 
 const storageKey = "maptoy:coverage";
+
+export function resolvedCoverageMapSetIds(
+  requestedMapSetId: string | null,
+  storedMapSetId: string | null,
+  storedPreviewMapSetId: string | null,
+  fallbackMapSetId: string | null,
+): { mapSetId: string | null; previewMapSetId: string | null } {
+  const mapSetId = requestedMapSetId ?? storedMapSetId ?? fallbackMapSetId;
+  const routeChangesStoredSelection =
+    requestedMapSetId !== null && requestedMapSetId !== storedMapSetId;
+  return {
+    mapSetId,
+    previewMapSetId: routeChangesStoredSelection
+      ? requestedMapSetId
+      : (storedPreviewMapSetId ?? mapSetId),
+  };
+}
 
 function isSelectionKind(value: unknown): value is CoverageSelection["kind"] {
   return value === "current" || value === "snapshot" || value === "asOf";
@@ -65,12 +83,18 @@ export function loadCoveragePagePreferences(
 ): CoveragePagePreferences {
   const stored = storedObject(getItem(storageKey, storage));
   if (stored === null) return { ...fallback };
+  const selectedMapSetId =
+    stored.selectedMapSetId === null ||
+    typeof stored.selectedMapSetId === "string"
+      ? stored.selectedMapSetId
+      : fallback.selectedMapSetId;
   return {
-    selectedMapSetId:
-      stored.selectedMapSetId === null ||
-      typeof stored.selectedMapSetId === "string"
-        ? stored.selectedMapSetId
-        : fallback.selectedMapSetId,
+    selectedMapSetId,
+    previewMapSetId:
+      stored.previewMapSetId === null ||
+      typeof stored.previewMapSetId === "string"
+        ? stored.previewMapSetId
+        : selectedMapSetId,
     previewViewport: isPreviewViewport(stored.previewViewport)
       ? stored.previewViewport
       : fallback.previewViewport,

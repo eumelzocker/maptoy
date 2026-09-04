@@ -33,6 +33,7 @@ import MapZoomControl from "../components/MapZoomControl.vue";
 import {
   type CoveragePagePreferences,
   loadCoveragePagePreferences,
+  resolvedCoverageMapSetIds,
   saveCoveragePagePreferences,
 } from "../coveragePreferences.js";
 import {
@@ -47,11 +48,12 @@ import {
   coverageGridCellTileCapacity,
   coverageGridZoom,
   coverageLayer,
+  coveragePreviewGridZoomRange,
   tileDownloadLayer,
-  coveragePreviewZoomRange,
   coverageSelection,
   coverageViewportZoom,
   hasCoveragePreviewZoomRange,
+  intersectedCoveragePreviewZoomRange,
   screenRectangleBounds,
   visibleCoverageBounds,
 } from "../coverageModel.js";
@@ -77,6 +79,11 @@ const browserStorage = availableLocalStorage();
 const selectedId = ref<string | null>(null);
 const selected = computed(
   () => store.items.find((mapSet) => mapSet.id === selectedId.value) ?? null,
+);
+const previewMapSetId = ref<string | null>(null);
+const previewMapSet = computed(
+  () =>
+    store.items.find((mapSet) => mapSet.id === previewMapSetId.value) ?? null,
 );
 const mapHost = ref<HTMLElement | null>(null);
 const downloadAreaSurface = ref<HTMLElement | null>(null);
@@ -122,9 +129,22 @@ const selectionReady = computed(
     (selectionMode.value !== "asOf" ||
       validTimestampInput(selectionTimestamp.value)),
 );
+const previewGridZoomRange = computed(() => {
+  const coverageMapSet = selected.value;
+  const mapSet = previewMapSet.value;
+  return coverageMapSet === null || mapSet === null
+    ? null
+    : coveragePreviewGridZoomRange(
+        sourceZoom.value,
+        coverageMapSet.minZoom + 1,
+        mapSet.minZoom,
+        mapSet.maxZoom,
+      );
+});
 const canQuery = computed(
   () =>
     selected.value?.capabilities.tileArchive &&
+    previewGridZoomRange.value !== null &&
     rendererReady.value &&
     selectionReady.value,
 );
@@ -207,6 +227,7 @@ function defaultCoveragePreferences(
   const minimumSourceZoom = (mapSet?.minZoom ?? 0) + 1;
   return {
     selectedMapSetId: mapSet?.id ?? null,
+    previewMapSetId: mapSet?.id ?? null,
     previewViewport: null,
     sourceZoom:
       mapSet === null
@@ -251,6 +272,7 @@ function saveCurrentCoveragePreferences(): void {
   saveCoveragePagePreferences(
     {
       selectedMapSetId: selectedId.value,
+      previewMapSetId: previewMapSetId.value,
       previewViewport: previewViewport.value,
       sourceZoom: sourceZoom.value,
       selectionMode: selectionMode.value,
@@ -511,25 +533,38 @@ async function renderMapGeneration(generation: number): Promise<void> {
   selectedCell.value = null;
   error.value = null;
   await nextTick();
-  const mapSet = selected.value;
+  const mapSet = previewMapSet.value;
+  const coverageMapSet = selected.value;
   if (
     generation !== renderGeneration ||
     mapSet === null ||
+    coverageMapSet === null ||
     mapHost.value === null
   ) {
     return;
   }
-  if (!mapSet.capabilities.interactive || !mapSet.capabilities.tileArchive) {
-    error.value =
-      "Coverage requires interactive display and Tile Archive capabilities.";
+  if (!coverageMapSet.capabilities.tileArchive) {
+    error.value = "Coverage requires a Map Set with Tile Archive capability.";
     return;
   }
-  if (!hasCoveragePreviewZoomRange(mapSet.minZoom, mapSet.maxZoom)) {
+  if (!mapSet.capabilities.interactive) {
+    error.value = "The Preview Map Set does not support interactive display.";
+    return;
+  }
+  if (
+    !hasCoveragePreviewZoomRange(coverageMapSet.minZoom, coverageMapSet.maxZoom)
+  ) {
     error.value =
       "Coverage requires a Map Set with at least two configured source zoom levels.";
     return;
   }
-  constrainCoveragePreferences(mapSet);
+  constrainCoveragePreferences(coverageMapSet);
+  const gridZoomRange = previewGridZoomRange.value;
+  if (gridZoomRange === null) {
+    error.value =
+      "The Coverage and Preview Map Sets do not share a usable preview zoom range.";
+    return;
+  }
   const factory = factories.get(mapSet.rendererId);
   if (factory === undefined) {
     error.value = `Renderer adapter ${mapSet.rendererId} is unavailable.`;
@@ -537,14 +572,13 @@ async function renderMapGeneration(generation: number): Promise<void> {
   }
   try {
     const zoomOptions = leafletXyzZoomOptions(mapSet);
-    const minimumSourceZoom = mapSet.minZoom + 1;
     const initialViewport = constrainedCoveragePreviewViewport(
       previewViewport.value ?? {
         center: mapSet.defaultCenter,
         gridZoom: mapSet.defaultZoom,
       },
-      minimumSourceZoom - 1,
-      sourceZoom.value - 1,
+      gridZoomRange.minimum,
+      gridZoomRange.maximum,
     );
     previewViewport.value = initialViewport;
     const nextRenderer = await factory.create({
@@ -620,7 +654,7 @@ function clearCoverageResult(): void {
 }
 
 function onViewportChanged(): void {
-  const mapSet = selected.value;
+  const mapSet = previewMapSet.value;
   if (renderer !== null && mapSet !== null) {
     const gridZoom = updatePreviewViewport(renderer, mapSet);
     if (!adjustingPreviewZoom && gridZoom > sourceZoom.value - 1) {
@@ -633,12 +667,26 @@ function onViewportChanged(): void {
   refreshTimer = window.setTimeout(() => void queryVisibleCoverage(), 250);
 }
 
-async function applyPreviewZoomRange(value: number): Promise<void> {
+async function applyPreviewZoomRange(value: number): Promise<boolean> {
   const activeRenderer = renderer;
-  const mapSet = selected.value;
-  if (activeRenderer === null || mapSet === null) return;
+  const mapSet = previewMapSet.value;
+  const coverageMapSet = selected.value;
+  if (activeRenderer === null || mapSet === null || coverageMapSet === null) {
+    return false;
+  }
   const zoomOffset = leafletXyzZoomOptions(mapSet).zoomOffset;
-  const range = coveragePreviewZoomRange(value, mapSet.minZoom + 1, zoomOffset);
+  const range = intersectedCoveragePreviewZoomRange(
+    value,
+    coverageMapSet.minZoom + 1,
+    mapSet.minZoom,
+    mapSet.maxZoom,
+    zoomOffset,
+  );
+  if (range === null) {
+    error.value =
+      "The Coverage and Preview Map Sets do not share a usable preview zoom range.";
+    return false;
+  }
   adjustingPreviewZoom = true;
   try {
     await activeRenderer.setZoomRange?.(range);
@@ -659,12 +707,13 @@ async function applyPreviewZoomRange(value: number): Promise<void> {
   } finally {
     adjustingPreviewZoom = false;
   }
+  return true;
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 async function applyPreviewMapZoom(gridZoom: number): Promise<void> {
   const activeRenderer = renderer;
-  const mapSet = selected.value;
+  const mapSet = previewMapSet.value;
   if (activeRenderer === null || mapSet === null) return;
   const viewport = activeRenderer.getViewport();
   const zoomOffset = leafletXyzZoomOptions(mapSet).zoomOffset;
@@ -749,7 +798,7 @@ async function onSourceZoomChanged(value: number): Promise<void> {
     refreshTimer = null;
   }
   clearCoverageResult();
-  await applyPreviewZoomRange(value);
+  if (!(await applyPreviewZoomRange(value))) return;
   await queryVisibleCoverage();
 }
 
@@ -757,6 +806,7 @@ async function onMapSetChanged(): Promise<void> {
   cancelDownloadAreaSelection();
   drawnDownloadBounds.value = null;
   if (!mounted) return;
+  previewMapSetId.value = selectedId.value;
   mapSetChangesInFlight += 1;
   const id = selectedId.value;
   try {
@@ -769,6 +819,14 @@ async function onMapSetChanged(): Promise<void> {
   } finally {
     mapSetChangesInFlight -= 1;
   }
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+async function onPreviewMapSetChanged(id: string): Promise<void> {
+  if (previewMapSetId.value === id) return;
+  previewMapSetId.value = id;
+  if (!mounted) return;
+  await renderMap();
 }
 
 function onSelectionChanged(): void {
@@ -805,6 +863,7 @@ watch(
 watch(
   [
     selectedId,
+    previewMapSetId,
     sourceZoom,
     previewViewport,
     selectionMode,
@@ -860,8 +919,19 @@ onMounted(async () => {
     )
       ? stored.selectedMapSetId
       : null;
-    selectedId.value =
-      requestedMapSetId ?? storedMapSetId ?? fallbackMapSet?.id ?? null;
+    const storedPreviewMapSetId = store.items.some(
+      ({ id }) => id === stored.previewMapSetId,
+    )
+      ? stored.previewMapSetId
+      : null;
+    const resolvedMapSetIds = resolvedCoverageMapSetIds(
+      requestedMapSetId,
+      storedMapSetId,
+      storedPreviewMapSetId,
+      fallbackMapSet?.id ?? null,
+    );
+    selectedId.value = resolvedMapSetIds.mapSetId;
+    previewMapSetId.value = resolvedMapSetIds.previewMapSetId;
     applyCoveragePreferences(stored);
     if (!(await loadSnapshots())) return;
     await renderMap();
@@ -1083,13 +1153,23 @@ onBeforeUnmount(async () => {
         ></span>
       </div>
       <MapZoomControl
-        v-if="selected"
+        v-if="previewGridZoomRange"
         :zoom="previewZoom"
-        :minimum="selected.minZoom"
-        :maximum="sourceZoom - 1"
+        :minimum="previewGridZoomRange.minimum"
+        :maximum="previewGridZoomRange.maximum"
         auto-close-on-change
         @change="applyPreviewMapZoom"
       />
+      <div v-if="store.items.length > 0" class="map-controls">
+        <MapSetSelect
+          class="preview-map-set-picker"
+          :model-value="previewMapSetId"
+          :items="store.items"
+          variant="plain"
+          aria-label="Preview Map Set"
+          @update:model-value="onPreviewMapSetChanged"
+        />
+      </div>
       <div v-if="store.loading" class="map-message">Loading Map Sets…</div>
       <div v-else-if="store.loaded && store.items.length === 0" class="map-message">Create a Map Set to inspect Coverage.</div>
     </section>
@@ -1135,6 +1215,8 @@ dt { color: #617870; } dd { margin: 0; font-weight: 750; text-align: right; }
 .error-message { padding: 0.65rem; border-left: 0.2rem solid #b64030; color: #812d25; background: #ffe9e5; }
 .coverage-map { position: relative; min-width: 0; min-height: 0; background: #a6c4b5; }
 .map-host { width: 100%; height: 100%; }
+.map-controls { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 1000; display: flex; align-items: center; padding: 0.35rem; border: 1px solid rgb(103 125 116 / 45%); border-radius: 0.55rem; background: rgb(255 255 255 / 92%); box-shadow: 0 0.35rem 1rem rgb(24 54 45 / 18%); backdrop-filter: blur(0.3rem); }
+.preview-map-set-picker { width: min(18rem, 58vw); }
 .download-area-selector { position: absolute; inset: 0; z-index: 1100; overflow: hidden; cursor: crosshair; touch-action: none; }
 .download-area-instruction { position: absolute; top: 1rem; left: 50%; z-index: 1; padding: 0.5rem 0.7rem; border-radius: 0.4rem; color: white; background: rgb(49 31 89 / 88%); box-shadow: 0 0.3rem 1rem rgb(24 14 48 / 25%); font-size: 0.78rem; font-weight: 800; pointer-events: none; transform: translateX(-50%); }
 .download-area-draft { position: absolute; border: 4px solid #6d00d9; background: rgb(180 76 255 / 25%); box-shadow: 0 0 0 2px white, 0 0 1rem rgb(70 0 130 / 35%); pointer-events: none; }

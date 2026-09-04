@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   canActivateMapComparison,
+  constrainedMapComparisonZoom,
   mapComparisonZoomRange,
+  resolvedMapComparisonPreferences,
 } from "./mapComparisonModel.js";
 
 function mapSet(
@@ -43,6 +45,18 @@ describe("Map comparison model", () => {
 
   it("has no range without a source", () => {
     expect(mapComparisonZoomRange([])).toBeNull();
+  });
+
+  it("keeps a reset Zoom inside the range shared by every comparison Map", () => {
+    const sources = [
+      { minZoom: 2, maxZoom: 18, tileSize: 256 as const },
+      { minZoom: 4, maxZoom: 12, tileSize: 512 as const },
+    ];
+
+    expect(constrainedMapComparisonZoom(8, sources)).toBe(8);
+    expect(constrainedMapComparisonZoom(2, sources)).toBe(5);
+    expect(constrainedMapComparisonZoom(20, sources)).toBe(13);
+    expect(constrainedMapComparisonZoom(8, [])).toBeNull();
   });
 
   it("only activates a fully configured compatible comparison", () => {
@@ -89,5 +103,33 @@ describe("Map comparison model", () => {
         mapSet("right", { minZoom: 2, tileSize: 512 }),
       ]),
     ).toBe(false);
+  });
+
+  it("centers splitters whenever an active comparison becomes invalid", () => {
+    const current = {
+      enabled: true,
+      count: 2 as const,
+      mode: "continuous" as const,
+      sources: [
+        { mapSetId: "left", tileSelection: { kind: "current" as const } },
+        { mapSetId: "right", tileSelection: { kind: "current" as const } },
+        { mapSetId: null, tileSelection: { kind: "current" as const } },
+        { mapSetId: null, tileSelection: { kind: "current" as const } },
+      ],
+      verticalSplit: 35,
+      horizontalSplit: 65,
+    };
+    const next = { ...current, count: 4 as const };
+
+    expect(
+      resolvedMapComparisonPreferences(current, next, [
+        mapSet("left"),
+        mapSet("right"),
+      ]),
+    ).toMatchObject({
+      enabled: false,
+      verticalSplit: 50,
+      horizontalSplit: 50,
+    });
   });
 });

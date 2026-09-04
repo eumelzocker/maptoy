@@ -142,19 +142,6 @@ export class TileDownloadService implements JobController {
     if (estimate.blockedReasons.length > 0) {
       throw new JobStateError(estimate.blockedReasons[0] as string);
     }
-    const hasActiveJob = this.jobs
-      .list()
-      .some(
-        (job) =>
-          job.type === this.type &&
-          job.input.mapSetId === mapSetId &&
-          ["queued", "running", "paused"].includes(job.status),
-      );
-    if (hasActiveJob) {
-      throw new JobStateError(
-        "This Map Set already has an active Tile Download Job.",
-      );
-    }
     const timestamp = new Date().toISOString();
     const job: Job = {
       id: randomUUID(),

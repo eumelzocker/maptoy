@@ -101,6 +101,38 @@ export function coveragePreviewZoomRange(
   };
 }
 
+export function coveragePreviewGridZoomRange(
+  sourceZoom: number,
+  minimumSourceZoom: number,
+  previewMinimumSourceZoom: number,
+  previewMaximumSourceZoom: number,
+): { minimum: number; maximum: number } | null {
+  const minimum = Math.max(minimumSourceZoom - 1, previewMinimumSourceZoom);
+  const maximum = Math.min(sourceZoom - 1, previewMaximumSourceZoom);
+  return minimum <= maximum ? { minimum, maximum } : null;
+}
+
+export function intersectedCoveragePreviewZoomRange(
+  sourceZoom: number,
+  minimumSourceZoom: number,
+  previewMinimumSourceZoom: number,
+  previewMaximumSourceZoom: number,
+  zoomOffset: number,
+): { minimum: number; maximum: number } | null {
+  const range = coveragePreviewGridZoomRange(
+    sourceZoom,
+    minimumSourceZoom,
+    previewMinimumSourceZoom,
+    previewMaximumSourceZoom,
+  );
+  return range === null
+    ? null
+    : {
+        minimum: coverageViewportZoom(range.minimum, zoomOffset),
+        maximum: coverageViewportZoom(range.maximum, zoomOffset),
+      };
+}
+
 export function coverageGridCellTileCapacity(
   sourceZoom: number,
   gridZoom: number,

@@ -365,6 +365,98 @@ describe("maptoy server", () => {
     await server.close();
   });
 
+  it("queues overlapping Tile Downloads and skips Tiles cached by an earlier Job", async () => {
+    let releaseFirstRequest = () => undefined;
+    let reportFirstRequestStarted = () => undefined;
+    const firstRequestGate = new Promise<void>((resolve) => {
+      releaseFirstRequest = resolve;
+    });
+    const firstRequestStarted = new Promise<void>((resolve) => {
+      reportFirstRequestStarted = resolve;
+    });
+    const requestProvider = vi.fn<ProviderClient["request"]>(async () => {
+      if (requestProvider.mock.calls.length === 1) {
+        reportFirstRequestStarted();
+        await firstRequestGate;
+      }
+      return {
+        statusCode: 200,
+        headers: { "content-type": "image/png" },
+        body: validPng,
+      };
+    });
+    const server = await buildServer({
+      config: await testConfig(),
+      providerClient: { request: requestProvider },
+      serveWeb: false,
+    });
+    const created = await server.inject({
+      method: "POST",
+      url: "/api/map-sets",
+      payload: {
+        ...createDefaultMapSetInput(),
+        downloadPolicy: {
+          requestsPerSecond: 1000,
+          concurrency: 1,
+          retryLimit: 0,
+          dailyRequestLimit: null,
+        },
+      },
+    });
+    const mapSetId = created.json().id as string;
+    const firstTileBounds = xyzTileBounds({ zoom: 3, x: 4, y: 2 });
+    const adjacentTileBounds = xyzTileBounds({ zoom: 3, x: 5, y: 2 });
+    const first = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-download-jobs`,
+      payload: {
+        bounds: firstTileBounds,
+        minimumZoom: 3,
+        maximumZoom: 3,
+        refreshMode: "missing",
+      },
+    });
+    expect(first.statusCode, first.body).toBe(201);
+    await firstRequestStarted;
+
+    const second = await server.inject({
+      method: "POST",
+      url: `/api/map-sets/${mapSetId}/tile-download-jobs`,
+      payload: {
+        bounds: {
+          west: firstTileBounds.west,
+          south: firstTileBounds.south,
+          east: adjacentTileBounds.east,
+          north: firstTileBounds.north,
+        },
+        minimumZoom: 3,
+        maximumZoom: 3,
+        refreshMode: "missing",
+      },
+    });
+    expect(second.statusCode, second.body).toBe(201);
+    expect(second.json()).toMatchObject({ status: "queued", total: 2 });
+    const secondJobId = second.json().id as string;
+
+    releaseFirstRequest();
+    await vi.waitFor(async () => {
+      const response = await server.inject({
+        method: "GET",
+        url: `/api/jobs/${secondJobId}`,
+      });
+      expect(response.json()).toMatchObject({
+        status: "completed",
+        total: 2,
+        completed: 1,
+        skipped: 1,
+        failed: 0,
+        summary: { requested: 1, downloaded: 1, cached: 1 },
+      });
+    });
+    expect(requestProvider).toHaveBeenCalledTimes(2);
+    await server.close();
+  });
+
   it("enforces the daily provider request limit during Tile retries", async () => {
     const requestProvider = vi.fn<ProviderClient["request"]>(async () => ({
       statusCode: 429,

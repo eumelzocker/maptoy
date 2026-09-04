@@ -113,7 +113,6 @@ const canStart = computed(
     estimate.value !== null &&
     estimate.value.requestTiles > 0 &&
     estimate.value.blockedReasons.length === 0 &&
-    activeJobs.value.length === 0 &&
     !busy.value,
 );
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
@@ -445,8 +444,21 @@ watch(
     if (mapSet === null) return;
     draft.value.maximumZoom = Math.min(
       mapSet.maxZoom,
-      Math.max(draft.value.minimumZoom, value),
+      Math.max(mapSet.minZoom, value),
     );
+  },
+);
+
+watch(
+  () => draft.value.maximumZoom,
+  (value) => {
+    if (
+      Number.isInteger(value) &&
+      Number.isInteger(draft.value.minimumZoom) &&
+      value < draft.value.minimumZoom
+    ) {
+      draft.value.minimumZoom = value;
+    }
   },
 );
 
@@ -531,7 +543,7 @@ onBeforeUnmount(() => {
         </label>
         <label>
           <span>Maximum zoom</span>
-          <input v-model.number="draft.maximumZoom" type="number" :min="draft.minimumZoom" :max="mapSet?.maxZoom" />
+          <input v-model.number="draft.maximumZoom" type="number" :min="mapSet?.minZoom" :max="mapSet?.maxZoom" />
         </label>
       </div>
 
@@ -621,7 +633,7 @@ onBeforeUnmount(() => {
                 <button v-if="job.status === 'queued' || job.status === 'running'" type="button" :disabled="busy" @click="control(job, 'pause')">Pause</button>
                 <button v-if="job.status === 'paused'" type="button" :disabled="busy" @click="control(job, 'resume')">Resume</button>
                 <button v-if="job.status === 'queued' || job.status === 'running' || job.status === 'paused'" type="button" :disabled="busy" @click="control(job, 'cancel')">Cancel</button>
-                <button v-if="job.status === 'failed' || job.status === 'cancelled' || (job.status === 'completed' && job.failed > 0)" type="button" :disabled="busy || activeJobs.length > 0" @click="control(job, 'retry')">Retry</button>
+                <button v-if="job.status === 'failed' || job.status === 'cancelled' || (job.status === 'completed' && job.failed > 0)" type="button" :disabled="busy" @click="control(job, 'retry')">Retry</button>
               </div>
               <details v-if="job.failed > 0" class="job-errors" @toggle="($event.currentTarget as HTMLDetailsElement).open && loadErrors(job)">
                 <summary>Errors</summary>

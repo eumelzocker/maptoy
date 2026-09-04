@@ -147,6 +147,16 @@ function closeAll(): void {
   background: #dfe9e3;
 }
 
+.pinned .tooltip-trigger:not(.unstyled) {
+  color: white;
+  background: #17453c;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 35%);
+}
+
+.pinned .tooltip-trigger:not(.unstyled):hover {
+  background: #205f50;
+}
+
 .tooltip-trigger.unstyled {
   width: auto;
   height: auto;

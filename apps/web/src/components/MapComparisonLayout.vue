@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import type { MapSetListItem } from "@maptoy/contracts";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type {
   MapComparisonCount,
   MapComparisonMode,
 } from "../mapComparisonPreferences.js";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import HtmlTooltip from "./HtmlTooltip.vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import MapSetSelect from "./MapSetSelect.vue";
 
 const props = defineProps<{
   active: boolean;
@@ -11,7 +16,8 @@ const props = defineProps<{
   mode: MapComparisonMode;
   verticalSplit: number;
   horizontalSplit: number;
-  labels: readonly string[];
+  mapSets: readonly MapSetListItem[];
+  selectedMapSetIds: readonly (string | null)[];
   attributions: readonly string[];
   showAttribution: boolean;
 }>();
@@ -19,6 +25,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:verticalSplit": [value: number];
   "update:horizontalSplit": [value: number];
+  source: [index: number, mapSetId: string | null];
+  reset: [index: number];
   resize: [];
 }>();
 
@@ -27,6 +35,12 @@ const hosts: Array<HTMLElement | null> = [];
 const activeOrientation = ref<"vertical" | "horizontal" | null>(null);
 let resizeObserver: ResizeObserver | null = null;
 const paneCount = computed(() => (props.active ? props.count : 1));
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+const selectedMapSets = computed(() =>
+  props.selectedMapSetIds.map(
+    (id) => props.mapSets.find((mapSet) => mapSet.id === id) ?? null,
+  ),
+);
 const minimumSplit = 15;
 const maximumSplit = 85;
 
@@ -183,13 +197,60 @@ defineExpose({ getHosts });
       <div
         v-for="index in count"
         :key="`label-${index - 1}`"
-        class="map-comparison-label-region"
-        :class="{ primary: index === 1 }"
+        class="map-comparison-control-region"
+        :class="{ 'offset-left-controls': index % 2 === 1 }"
         :style="regionStyle(index - 1)"
       >
-        <span class="map-comparison-label">
+        <span class="map-comparison-controls">
           <span class="map-comparison-number">{{ index }}</span>
-          {{ labels[index - 1] }}
+          <MapSetSelect
+            class="mini-map-set-selector"
+            :model-value="selectedMapSetIds[index - 1] ?? null"
+            :items="mapSets"
+            variant="plain"
+            :align="index % 2 === 0 ? 'end' : 'start'"
+            :aria-label="`Map ${index} Map Set`"
+            @update:model-value="emit('source', index - 1, $event)"
+          />
+          <HtmlTooltip
+            v-if="selectedMapSets[index - 1]"
+            class="map-comparison-info"
+            :label="`Map ${index} Map Set information`"
+            :align="index % 2 === 0 ? 'end' : 'start'"
+            fixed
+          >
+            <template #trigger>
+              <i class="mdi mdi-information-outline" aria-hidden="true"></i>
+            </template>
+            <article class="map-comparison-info-card">
+              <strong>{{ selectedMapSets[index - 1]?.name }}</strong>
+              <dl>
+                <div><dt>Renderer</dt><dd>{{ selectedMapSets[index - 1]?.rendererId }}</dd></div>
+                <div><dt>Projection</dt><dd>{{ selectedMapSets[index - 1]?.sourceProjection }}</dd></div>
+                <div><dt>Source zoom</dt><dd>{{ selectedMapSets[index - 1]?.minZoom }}–{{ selectedMapSets[index - 1]?.maxZoom }}</dd></div>
+                <div><dt>Tiles</dt><dd>{{ selectedMapSets[index - 1]?.tileSize }} · {{ selectedMapSets[index - 1]?.tileFormat.toUpperCase() }}</dd></div>
+              </dl>
+              <button
+                type="button"
+                class="map-comparison-reset"
+                @click="emit('reset', index - 1)"
+              >
+                <i class="mdi mdi-crosshairs-gps" aria-hidden="true"></i>
+                Reset to initial view
+              </button>
+              <!-- Attribution is trusted, administrator-authored Map Set HTML. -->
+              <div class="map-comparison-info-attribution" v-html="selectedMapSets[index - 1]?.attribution"></div>
+              <a
+                v-if="selectedMapSets[index - 1]?.termsUrl"
+                :href="selectedMapSets[index - 1]?.termsUrl ?? undefined"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Provider terms
+                <i class="mdi mdi-open-in-new" aria-hidden="true"></i>
+              </a>
+            </article>
+          </HtmlTooltip>
         </span>
       </div>
 
@@ -260,46 +321,134 @@ defineExpose({ getHosts });
   background: #a6c4b5;
 }
 
-.map-comparison-label-region {
+.map-comparison-control-region {
   position: absolute;
   z-index: 900;
   overflow: hidden;
-  padding: 0.55rem;
+  padding: 0.3rem 0.55rem;
   pointer-events: none;
 }
 
-.map-comparison-label-region.primary {
+.map-comparison-control-region.offset-left-controls {
   padding-left: 3.25rem;
 }
 
-.map-comparison-label {
+.map-comparison-controls {
   display: inline-flex;
   max-width: calc(100% - 0.5rem);
-  gap: 0.35rem;
+  gap: 0.12rem;
   align-items: center;
-  overflow: hidden;
-  padding: 0.25rem 0.45rem;
+  padding: 0.05rem 0.15rem;
+  border: 1px solid rgb(103 125 116 / 35%);
   border-radius: 0.35rem;
   color: #173b33;
-  background: rgb(255 255 255 / 88%);
+  background: rgb(255 255 255 / 92%);
   box-shadow: 0 0.15rem 0.4rem rgb(24 54 45 / 18%);
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   backdrop-filter: blur(0.25rem);
+  pointer-events: auto;
 }
 
 .map-comparison-number {
   display: inline-grid;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1rem;
+  height: 1rem;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
   color: #fff;
   background: #315f54;
-  font-size: 0.65rem;
+  font-size: 0.58rem;
+}
+
+.mini-map-set-selector {
+  min-width: 0;
+  max-width: 22rem;
+  flex: 0 1 auto;
+}
+
+.mini-map-set-selector :deep(.select-trigger) {
+  grid-template-columns: minmax(0, 1fr) 0.7rem;
+  min-height: 1.3rem;
+  gap: 0.12rem;
+  padding: 0.05rem 0.18rem;
+  border-radius: 0.25rem;
+  font-size: 0.66rem;
+}
+
+.mini-map-set-selector :deep(.select-icon) {
+  display: none;
+}
+
+.map-comparison-info {
+  flex: 0 0 auto;
+}
+
+.map-comparison-info :deep(.tooltip-trigger) {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.map-comparison-info-card > strong {
+  display: block;
+  margin-bottom: 0.65rem;
+  font-size: 0.9rem;
+}
+
+.map-comparison-info-card dl {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.map-comparison-info-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.map-comparison-info-card dt {
+  color: #617870;
+}
+
+.map-comparison-info-card dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.map-comparison-info-attribution {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #d7e0db;
+  color: #536b64;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.map-comparison-reset {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.6rem;
+  padding: 0;
+  border: 0;
+  color: #17453c;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.map-comparison-info-card > a {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.6rem;
+  color: #17453c;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .map-comparison-attribution-region {

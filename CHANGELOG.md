@@ -4,6 +4,27 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Let Coverage use a separately selectable Preview Map Set while keeping Coverage
+  queries and downloads tied to the Map Set selected in the sidebar. Changing the
+  sidebar selection still synchronizes the Preview Map Set, which can then be
+  changed independently and is restored across reloads. Preview Zoom is limited
+  to the range shared by both Map Sets, with incompatible previews rejected.
+- Allow additional Tile Download Jobs to be queued while another download is
+  active, including retries. Jobs remain serialized and recheck the cache before
+  each Tile so overlapping areas do not cause duplicate provider downloads.
+- Let Tile Download maximum Zoom be reduced below the current minimum Zoom by
+  automatically lowering the minimum to match.
+- Give pinned information tooltips a distinct pressed appearance so the Map Set
+  information button no longer looks the same when merely hovered.
+- Turn each Compare Maps pane label into a compact Map Set selector with its own
+  information button and initial-view reset whose Zoom is constrained to the
+  range shared by all visible Maps. Changing Map 1 also changes the Map Set
+  retained by the normal Map view after comparison is disabled.
+- Reset Compare Maps splitters to their centered positions whenever comparison is
+  disabled instead of restoring the previous layout on the next activation.
+
 ## [0.4.2] - 2026-09-04
 
 ### Added

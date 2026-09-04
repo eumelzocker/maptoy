@@ -87,7 +87,9 @@ import {
 } from "../mapComparisonPreferences.js";
 import {
   canActivateMapComparison,
+  constrainedMapComparisonZoom,
   mapComparisonZoomRange,
+  resolvedMapComparisonPreferences,
 } from "../mapComparisonModel.js";
 import { applyMapCenter } from "../mapViewportActions.js";
 import { loadMapViewport, saveMapViewport } from "../mapViewportStorage.js";
@@ -150,14 +152,8 @@ const comparisonMapSets = computed(() =>
   ),
 );
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-const comparisonLabels = computed(() =>
-  comparisonMapSets.value.map((mapSet, index) => {
-    if (mapSet === null) return `Map ${index + 1}`;
-    const selection = activeComparisonSources.value[index]?.tileSelection;
-    if (selection?.kind === "snapshot") return `${mapSet.name} · Snapshot`;
-    if (selection?.kind === "asOf") return `${mapSet.name} · Point in time`;
-    return mapSet.name;
-  }),
+const comparisonMapSetIds = computed(() =>
+  activeComparisonSources.value.map(({ mapSetId }) => mapSetId),
 );
 // biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
 const comparisonAttributions = computed(() => {
@@ -1011,23 +1007,33 @@ async function fitPhotoLayer(layerId: string): Promise<void> {
   }
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
-function resetToInitialViewport(): void {
-  const mapSet = selected.value;
+function resetMapSetToInitialViewport(mapSet: MapSetListItem | null): void {
   if (mapSet === null || renderer === null) {
     return;
   }
   const zoomOptions = leafletXyzZoomOptions(mapSet);
   const defaultDisplayZoom = mapSet.defaultZoom - zoomOptions.zoomOffset;
+  const targetZoom = comparisonActive.value
+    ? constrainedMapComparisonZoom(
+        defaultDisplayZoom,
+        comparisonMapSets.value.filter((candidate) => candidate !== null),
+      )
+    : defaultDisplayZoom;
+  if (targetZoom === null) return;
   void applyViewportToAll({
     center: mapSet.defaultCenter,
-    zoom: comparisonActive.value
-      ? Math.min(
-          controlMaximumZoom.value,
-          Math.max(controlMinimumZoom.value, defaultDisplayZoom),
-        )
-      : defaultDisplayZoom,
+    zoom: targetZoom,
   });
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function resetToInitialViewport(): void {
+  resetMapSetToInitialViewport(selected.value);
+}
+
+// biome-ignore lint/correctness/noUnusedVariables: referenced by the Vue template
+function resetComparisonMapToInitialViewport(index: number): void {
+  resetMapSetToInitialViewport(comparisonMapSets.value[index] ?? null);
 }
 
 function openGotoCoordinates(): void {
@@ -1128,10 +1134,11 @@ function updateComparison(
   },
 ): void {
   const next = { ...comparison.value, ...patch };
-  comparison.value =
-    next.enabled && !canActivateMapComparison(next, store.items)
-      ? { ...next, enabled: false }
-      : next;
+  comparison.value = resolvedMapComparisonPreferences(
+    comparison.value,
+    next,
+    store.items,
+  );
 }
 
 function reconcileComparisonSources(): void {
@@ -1214,9 +1221,12 @@ function setHorizontalSplit(value: number): void {
         :mode="comparison.mode"
         :vertical-split="comparison.verticalSplit"
         :horizontal-split="comparison.horizontalSplit"
-        :labels="comparisonLabels"
+        :map-sets="store.items"
+        :selected-map-set-ids="comparisonMapSetIds"
         :attributions="comparisonAttributions"
         :show-attribution="showAttribution"
+        @source="updateComparisonSource"
+        @reset="resetComparisonMapToInitialViewport"
         @update:vertical-split="setVerticalSplit"
         @update:horizontal-split="setHorizontalSplit"
         @resize="resizeRenderers"

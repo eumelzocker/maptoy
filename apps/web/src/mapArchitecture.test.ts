@@ -57,6 +57,24 @@ describe("Map view architecture", () => {
     expect(tileUrl).not.toContain("https://");
   });
 
+  it("distinguishes pinned information tooltips from their hover state", async () => {
+    const [mapView, htmlTooltip] = await Promise.all([
+      readFile(
+        fileURLToPath(new URL("./views/MapView.vue", import.meta.url)),
+        "utf8",
+      ),
+      readFile(
+        fileURLToPath(new URL("./components/HtmlTooltip.vue", import.meta.url)),
+        "utf8",
+      ),
+    ]);
+
+    expect(mapView).toContain('label="Map Set information"');
+    expect(htmlTooltip).toContain(':aria-pressed="pinned"');
+    expect(htmlTooltip).toContain(".pinned .tooltip-trigger:not(.unstyled)");
+    expect(htmlTooltip).toContain("background: #17453c");
+  });
+
   it("keeps layer tools inside the standard Map view", async () => {
     const [
       mapView,
@@ -243,6 +261,9 @@ describe("Map view architecture", () => {
     );
     expect(coverageView).toContain("watch(sourceZoom");
     expect(coverageView).toContain("coverageGridZoom(");
+    expect(coverageView).toContain("coveragePreviewGridZoomRange(");
+    expect(coverageView).toContain("intersectedCoveragePreviewZoomRange(");
+    expect(coverageView).toContain("resolvedCoverageMapSetIds(");
     expect(coverageView).toContain("applyPreviewZoomRange(sourceZoom.value)");
     expect(coverageView).toContain("rendererTransition.then");
     expect(coverageView).toContain("MapZoomControl");
@@ -304,6 +325,31 @@ describe("Map view architecture", () => {
     expect(coverageModel).toContain('type: "rectangle-grid"');
     expect(coverageView).not.toMatch(/from ["']leaflet["']/);
     expect(coverageModel).not.toMatch(/from ["']leaflet["']/);
+  });
+
+  it("selects the Coverage and Preview Map Sets independently", async () => {
+    const coverageView = await readFile(
+      fileURLToPath(new URL("./views/CoverageView.vue", import.meta.url)),
+      "utf8",
+    );
+    const mapSetHandler = coverageView.slice(
+      coverageView.indexOf("async function onMapSetChanged"),
+      coverageView.indexOf("function onSelectionChanged"),
+    );
+    const previewHandler = coverageView.slice(
+      coverageView.indexOf("async function onPreviewMapSetChanged"),
+      coverageView.indexOf("function onSelectionChanged"),
+    );
+
+    expect(coverageView).toContain(
+      "const previewMapSetId = ref<string | null>(null)",
+    );
+    expect(coverageView).toContain("const mapSet = previewMapSet.value");
+    expect(coverageView).toContain('aria-label="Preview Map Set"');
+    expect(coverageView).toContain(':model-value="previewMapSetId"');
+    expect(mapSetHandler).toContain("previewMapSetId.value = selectedId.value");
+    expect(previewHandler).toContain("previewMapSetId.value = id");
+    expect(previewHandler).toContain("await renderMap()");
   });
 
   it("shares a deferred-apply zoom slider between map views", async () => {
@@ -416,6 +462,25 @@ describe("Map view architecture", () => {
     expect(mapView).toContain(':show-attribution="showAttribution"');
     expect(comparisonLayout).toContain('role="separator"');
     expect(comparisonLayout).toContain("map-comparison-attribution-region");
+    expect(comparisonLayout).toContain("<MapSetSelect");
+    expect(comparisonLayout).toContain('class="mini-map-set-selector"');
+    expect(comparisonLayout).toContain("<HtmlTooltip");
+    expect(comparisonLayout).toContain('class="map-comparison-info"');
+    expect(comparisonLayout).toContain("Reset to initial view");
+    expect(comparisonLayout).toContain("emit('reset', index - 1)");
+    expect(comparisonLayout).toContain("emit('source', index - 1, $event)");
+    expect(mapView).toContain('@source="updateComparisonSource"');
+    expect(mapView).toContain('@reset="resetComparisonMapToInitialViewport"');
+    expect(mapView).toContain("constrainedMapComparisonZoom(");
+    const sourceHandler = mapView.slice(
+      mapView.indexOf("function updateComparisonSource"),
+      mapView.indexOf("function setVerticalSplit"),
+    );
+    expect(sourceHandler).toContain(
+      "index === 0 && mapSetId !== null && selectedId.value !== mapSetId",
+    );
+    expect(sourceHandler).toContain("selectedId.value = mapSetId");
+    expect(mapView).toContain("resolvedMapComparisonPreferences(");
     expect(comparisonLayout).toContain("clipPath");
     expect(comparisonLayout).toContain('props.mode === "synchronized"');
     expect(comparisonPreferences).toContain(
@@ -508,6 +573,20 @@ describe("Map view architecture", () => {
       downloadPanel.indexOf("async function control"),
     );
     expect(startHandler).not.toContain("acceptedResponsibility.value = false");
+    const canStart = downloadPanel.slice(
+      downloadPanel.indexOf("const canStart = computed"),
+      downloadPanel.indexOf("const coordinateStep = computed"),
+    );
+    expect(canStart).not.toContain("activeJobs");
+    expect(downloadPanel).not.toContain("busy || activeJobs.length > 0");
+    expect(downloadPanel).toContain(
+      'v-model.number="draft.maximumZoom" type="number" :min="mapSet?.minZoom"',
+    );
+    const maximumZoomWatcher = downloadPanel.slice(
+      downloadPanel.indexOf("() => draft.value.maximumZoom"),
+      downloadPanel.indexOf("watch(\n  draft,"),
+    );
+    expect(maximumZoomWatcher).toContain("draft.value.minimumZoom = value");
     expect(mapSetsView).toContain("openTileDownload");
     expect(mapSetsView).toContain('query: { download: "open" }');
     expect(main).not.toMatch(/path:\s*["']\/(?:downloads|jobs)/);
