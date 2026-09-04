@@ -48,6 +48,7 @@ describe("Map view architecture", () => {
     expect(mapView).not.toContain("formatLeafletZoomLevel(zoom.value)");
     expect(mapView).not.toContain("Zoom {{ displayedZoom }}");
     expect(mapView).toContain('aria-label="Map coordinates"');
+    expect(mapView).toContain('title="Click to configure coordinate format"');
     expect(mapView).not.toContain(
       'v-if="pointer"\n          class="viewport-status"',
     );
@@ -408,6 +409,8 @@ describe("Map view architecture", () => {
     );
     expect(mapView).toContain("rendererTargets.map");
     expect(mapView).toContain("target.instance.attachLayer");
+    expect(mapView).toContain("layerDisplayGeneration += 1");
+    expect(mapView).toContain("displayGeneration: layerDisplayGeneration");
     expect(mapView).toContain("layerIsVisibleForRenderer");
     expect(mapView).toContain("comparisonAttributions");
     expect(mapView).toContain(':show-attribution="showAttribution"');

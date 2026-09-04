@@ -27,8 +27,9 @@ Sichtbarkeit, ohne die Editorauswahl zu wechseln. Wird das Layer-Werkzeug ohne
 explizites Ziel geöffnet, verwendet es den zuletzt lokal gespeicherten Layer oder,
 falls diese Auswahl fehlt, den ersten sichtbaren Layer. Der allgemeine Regler
 **Opacity** gilt für den gesamten Layer in interaktiver Karte und Export. Alle Layer bilden
-einen globalen, von Map Sets unabhängigen Overlay-Stack. Beim Wechsel des Map Sets
-wird nur die Basiskarte ersetzt; dieselben Overlays werden mit ihrer Reihenfolge,
+einen globalen Overlay-Stack. Daten- und Dekorationslayer bleiben von Map Sets
+unabhängig; ein Map-Set-Layer referenziert dagegen ausdrücklich ein Map Set als
+gekacheltes Raster-Overlay. Beim Wechsel der Basiskarte werden dieselben Overlays mit ihrer Reihenfolge,
 Sichtbarkeit, Deckkraft, Zoombegrenzung und Konfiguration wieder angehängt. Fehlende
 oder inkompatible, beim Build registrierte Plugins werden diagnostiziert;
 Plugin-Code kann weder im Browser noch über die API installiert werden.
@@ -39,6 +40,30 @@ Die erste Hierarchieebene stammt aus der Plugin-Kategorie, beispielsweise
 diesen Pfad; separate Ordnerdatensätze werden nicht angelegt. Kategorien und jede
 daraus erzeugte Ordnerebene lassen sich unabhängig einklappen. Diese
 Darstellungspräferenzen bleiben lokal im Browser erhalten.
+
+## Map Sets als Raster-Overlay
+
+Ein Layer der Kategorie **Map Sets** stellt ein vorhandenes Map Set über der
+Basiskarte dar. Der Layer speichert nur die Map-Set-Referenz und seine Zugriffsoption;
+URL-Template, Header, Cache-Regel, Tile-Format und Providerinformationen verbleiben
+im referenzierten Map Set. PNG- und WebP-Tiles behalten ihre Transparenz. Auch
+JPEG-Tiles werden unterstützt; mit dem allgemeinen Regler **Opacity** bleibt die
+Basiskarte darunter sichtbar.
+
+**Load missing Tiles from provider** ist standardmäßig ausgeschaltet. Der Layer
+liest dann nur vorhandene Revisionen aus dem Tile-Archiv, kontaktiert den Provider
+nicht als Nebeneffekt der Kartenanzeige und stellt Cache-Lücken transparent dar.
+Wird die Option eingeschaltet, sind die normalen bedarfsgesteuerten Providerabrufe
+erlaubt. Die globale Anzeigeoption **Cached Tiles only** hat stets Vorrang und
+unterbindet auch für diesen Layer Providerabrufe. Explizite Tile-Uploads und
+Download-Jobs bleiben davon unabhängig möglich.
+
+Der Layer-Editor zeigt Tile-Format, Attribution und den Link zu den
+Anbieterbedingungen des referenzierten Map Sets. Die Overlay-Attribution wird nicht
+in die Attributionsanzeige der Karte übernommen; die aktuellen Anforderungen des
+Providers müssen vor der Nutzung geprüft werden. Wird das referenzierte Map Set
+später gelöscht, bleibt der Layer gespeichert, wird aber mit einer Diagnose
+deaktiviert, bis ein anderes Map Set ausgewählt ist.
 
 ## Tracks importieren
 

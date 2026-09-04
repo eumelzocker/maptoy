@@ -12,6 +12,7 @@ export interface GenerateErrorTileOptions {
 
 const errorTileCache = new Map<string, Promise<Buffer>>();
 const maximumCachedErrorTiles = 512;
+const transparentTileCache = new Map<256 | 512, Promise<Buffer>>();
 
 function errorTileSvg({
   type,
@@ -73,5 +74,25 @@ export function generateErrorTile(
     }
   }
   generated.catch(() => errorTileCache.delete(cacheKey));
+  return generated;
+}
+
+export function generateTransparentTile(tileSize: 256 | 512): Promise<Buffer> {
+  const cached = transparentTileCache.get(tileSize);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const generated = sharp({
+    create: {
+      width: tileSize,
+      height: tileSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .png()
+    .toBuffer();
+  transparentTileCache.set(tileSize, generated);
+  generated.catch(() => transparentTileCache.delete(tileSize));
   return generated;
 }

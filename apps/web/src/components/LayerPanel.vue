@@ -7,6 +7,10 @@ import type {
   MapLayerType,
 } from "@maptoy/map-adapter-sdk";
 import {
+  MAP_SET_LAYER_PLUGIN_ID,
+  validateMapSetLayerConfiguration,
+} from "@maptoy/map-set-layer";
+import {
   computed,
   inject,
   nextTick,
@@ -40,6 +44,7 @@ import { photoMetadataRows } from "../photoMetadataPresentation.js";
 import { layerTypePresentation } from "../layerEditorRegistry.js";
 import { LAYER_PLUGIN_REGISTRY_KEY } from "../registries.js";
 import { useLayersStore } from "../stores/layers.js";
+import { useMapSetsStore } from "../stores/mapSets.js";
 import DialogWindow from "./DialogWindow.vue";
 import LayerEditor from "./LayerEditor.vue";
 import MapSideControlButton from "./MapSideControlButton.vue";
@@ -60,6 +65,7 @@ const emit = defineEmits<{
   fitPhotoLayer: [layerId: string];
 }>();
 const store = useLayersStore();
+const mapSets = useMapSetsStore();
 const injectedLayerPlugins = inject(LAYER_PLUGIN_REGISTRY_KEY);
 if (injectedLayerPlugins === undefined) {
   throw new Error("Layer plugin registry is not available.");
@@ -75,6 +81,7 @@ const addDialogOpen = ref(false);
 const addDialogError = ref<string | null>(null);
 const newLayerName = ref("");
 const newLayerPluginId = ref("track-layer");
+const newLayerMapSetId = ref("");
 const assetSearch = ref("");
 const scanDirectories = reactive<Record<string, string>>({});
 const recursiveScans = reactive<Record<string, boolean>>({});
@@ -254,6 +261,18 @@ const selectedLayer = computed(
 );
 
 function compatibilityDiagnostic(layer: Layer): string | null {
+  if (layer.pluginId === MAP_SET_LAYER_PLUGIN_ID) {
+    try {
+      const configuration = validateMapSetLayerConfiguration(
+        layer.configuration,
+      );
+      if (!mapSets.items.some(({ id }) => id === configuration.mapSetId)) {
+        return "The referenced Map Set is unavailable.";
+      }
+    } catch {
+      return "The Map Set layer configuration is invalid.";
+    }
+  }
   const plugin = layerPlugins.get(layer.pluginId);
   if (plugin === undefined) {
     return null;
@@ -481,10 +500,23 @@ function add(): void {
   }
   const name = segments.join("/");
   const pluginId = newLayerPluginId.value;
+  if (pluginId === MAP_SET_LAYER_PLUGIN_ID && newLayerMapSetId.value === "") {
+    addDialogError.value = "Choose a Map Set.";
+    return;
+  }
   busy.value = true;
   addDialogError.value = null;
   void store
-    .create(pluginId, name)
+    .create(
+      pluginId,
+      name,
+      pluginId === MAP_SET_LAYER_PLUGIN_ID
+        ? {
+            mapSetId: newLayerMapSetId.value,
+            allowProviderRequests: false,
+          }
+        : {},
+    )
     .then(async (layer) => {
       addDialogOpen.value = false;
       if (pluginId === "photo-layer") {
@@ -519,6 +551,7 @@ function add(): void {
 function openAddDialog(): void {
   newLayerName.value = "";
   newLayerPluginId.value = "track-layer";
+  newLayerMapSetId.value = mapSets.items[0]?.id ?? "";
   addDialogError.value = null;
   addDialogOpen.value = true;
 }
@@ -911,6 +944,15 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </fieldset>
+      <label v-if="newLayerPluginId === MAP_SET_LAYER_PLUGIN_ID">
+        <span>Source Map Set</span>
+        <select v-model="newLayerMapSetId" :disabled="busy">
+          <option disabled value="">Choose a Map Set</option>
+          <option v-for="mapSet in mapSets.items" :key="mapSet.id" :value="mapSet.id">
+            {{ mapSet.name }}
+          </option>
+        </select>
+      </label>
       <label>
         <span>Name or folder/name (optional)</span>
         <input
@@ -922,7 +964,10 @@ onBeforeUnmount(() => {
       </label>
       <small>Leave blank for {{ suggestedLayerName }}. Use / to create additional hierarchy levels.</small>
       <p v-if="addDialogError" class="layer-error" role="alert">{{ addDialogError }}</p>
-      <button type="submit" :disabled="busy">
+      <button
+        type="submit"
+        :disabled="busy || (newLayerPluginId === MAP_SET_LAYER_PLUGIN_ID && newLayerMapSetId === '')"
+      >
         <i class="mdi mdi-plus" aria-hidden="true"></i>Add layer
       </button>
     </form>

@@ -1,6 +1,6 @@
 {
   "name": "@maptoy/server",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "@maptoy/photo-layer": "workspace:*",
     "@maptoy/layer-plugin-sdk": "workspace:*",
     "@maptoy/leaflet-xyz": "workspace:*",
+    "@maptoy/map-set-layer": "workspace:*",
     "@maptoy/map-adapter-sdk": "workspace:*",
     "@maptoy/map-core": "workspace:*",
     "@maptoy/tile-grid-layer": "workspace:*",

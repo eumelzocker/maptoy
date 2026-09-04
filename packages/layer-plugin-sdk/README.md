@@ -31,6 +31,9 @@ that must preserve appearance while changing configuration can use `migrateLayer
 to migrate configuration, data, and opacity atomically; data-only migrations keep
 using `migrate`. SDK 2.0 removes Photo bounds and raster-overlay drawing from the
 shared Asset and rendering contracts.
+SDK 2.1 adds the `xyz-tile-layer` descriptor used by the built-in Map Set Layer;
+the application resolves its stored Map Set reference without exposing Map Set
+stores or provider configuration to plugins.
 
 The reference packages `plugins/track-layer`, `plugins/photo-layer`, and
 `plugins/tile-grid-layer` demonstrate line, point, and asset-free

@@ -1,4 +1,5 @@
 import type { Component } from "vue";
+import MapSetLayerEditor from "./components/MapSetLayerEditor.vue";
 import PhotoLayerPluginEditor from "./components/PhotoLayerPluginEditor.vue";
 import SchemaLayerEditor from "./components/SchemaLayerEditor.vue";
 import TrackLayerPluginEditor from "./components/TrackLayerPluginEditor.vue";
@@ -10,6 +11,14 @@ interface LayerTypePresentation {
 }
 
 const presentations = new Map<string, LayerTypePresentation>([
+  [
+    "map-set-layer",
+    {
+      icon: "mdi-layers-outline",
+      defaultName: "Map Set",
+      editor: MapSetLayerEditor,
+    },
+  ],
   [
     "track-layer",
     {

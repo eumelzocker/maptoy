@@ -1,4 +1,4 @@
-export const LAYER_PLUGIN_SDK_VERSION = "2.0.0";
+export const LAYER_PLUGIN_SDK_VERSION = "2.1.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 export type JsonObject = Readonly<Record<string, unknown>>;
@@ -207,6 +207,7 @@ export type InteractiveLayerType =
   | "point-collection"
   | "line-collection"
   | "area-collection"
+  | "xyz-tile-layer"
   | "xyz-tile-grid"
   | "composite";
 

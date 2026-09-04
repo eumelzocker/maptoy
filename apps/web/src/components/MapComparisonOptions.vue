@@ -94,9 +94,6 @@ function changeMode(event: Event): void {
     <small v-if="!canActivate" class="comparison-note unavailable">
       Select an interactive Map Set for every area. The selected maps must share a visual zoom range.
     </small>
-    <small class="comparison-note">
-      Visible Custom Layers are shown on every comparison map.
-    </small>
   </section>
 </template>
 

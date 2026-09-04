@@ -26,4 +26,19 @@ describe("Map Set form feedback", () => {
     expect(view).toContain("saveError.value =");
     expect(view).toContain(':error="saveError"');
   });
+
+  it("shows the maximum cache age as a formatted duration", async () => {
+    const form = await readFile(
+      fileURLToPath(new URL("./components/MapSetForm.vue", import.meta.url)),
+      "utf8",
+    );
+
+    expect(form).toContain(
+      'import { formatDurationMinutes } from "../durationFormat.js"',
+    );
+    expect(form).toContain('aria-describedby="maximum-cache-age-duration"');
+    expect(form).toContain(
+      "formatDurationMinutes(Math.round(draft.cachePolicy.maximumAgeSeconds / 60))",
+    );
+  });
 });

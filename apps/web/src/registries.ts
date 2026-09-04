@@ -4,6 +4,7 @@ import {
   type LayerPluginRegistry,
 } from "@maptoy/layer-plugin-sdk";
 import { leafletXyzFactory, leafletXyzManifest } from "@maptoy/leaflet-xyz";
+import { mapSetLayerPlugin } from "@maptoy/map-set-layer";
 import {
   createMapRendererFactoryRegistry,
   createMapRendererManifestRegistry,
@@ -26,6 +27,7 @@ export const layerPluginRegistry = createLayerPluginRegistry([
   trackLayerPlugin,
   photoLayerPlugin,
   tileGridLayerPlugin,
+  mapSetLayerPlugin,
 ]);
 
 export const MAP_RENDERER_REGISTRY_KEY: InjectionKey<MapRendererManifestRegistry> =

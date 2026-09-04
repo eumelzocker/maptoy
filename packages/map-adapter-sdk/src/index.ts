@@ -1,4 +1,4 @@
-export const MAP_ADAPTER_SDK_VERSION = "2.2.0";
+export const MAP_ADAPTER_SDK_VERSION = "2.3.0";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -45,6 +45,7 @@ export type MapLayerType =
   | "point-collection"
   | "line-collection"
   | "area-collection"
+  | "xyz-tile-layer"
   | "xyz-tile-grid"
   | "composite";
 
@@ -159,11 +160,20 @@ export interface MapXyzTileGridLayerData {
   scaleWidthPercent: number;
 }
 
+export interface MapXyzTileLayerData {
+  kind: "xyz-tile-layer";
+  tileUrl: string;
+  minZoom: number;
+  maxZoom: number;
+  tileSize: 256 | 512;
+}
+
 export type MapPrimitiveLayerData =
   | MapRectangleLayerData
   | MapPointLayerData
   | MapLineLayerData
   | MapAreaLayerData
+  | MapXyzTileLayerData
   | MapXyzTileGridLayerData;
 
 export interface MapCompositeLayerData {
@@ -204,6 +214,29 @@ export function isMapLineLayerData(value: unknown): value is MapLineLayerData {
 
 export function isMapAreaLayerData(value: unknown): value is MapAreaLayerData {
   return hasKind(value, "area-collection");
+}
+
+export function isMapXyzTileLayerData(
+  value: unknown,
+): value is MapXyzTileLayerData {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    value.kind === "xyz-tile-layer" &&
+    "tileUrl" in value &&
+    typeof value.tileUrl === "string" &&
+    "minZoom" in value &&
+    typeof value.minZoom === "number" &&
+    Number.isFinite(value.minZoom) &&
+    value.minZoom >= 0 &&
+    "maxZoom" in value &&
+    typeof value.maxZoom === "number" &&
+    Number.isFinite(value.maxZoom) &&
+    value.maxZoom >= value.minZoom &&
+    "tileSize" in value &&
+    (value.tileSize === 256 || value.tileSize === 512)
+  );
 }
 
 export function isMapXyzTileGridLayerData(
@@ -335,6 +368,7 @@ export function createFakeMapRendererFactory(): MapRendererFactory {
         "point-collection",
         "line-collection",
         "area-collection",
+        "xyz-tile-layer",
         "xyz-tile-grid",
         "composite",
       ],
@@ -526,6 +560,13 @@ export async function exerciseMapRendererContract(
     { kind: "point-collection", features: [] },
     { kind: "line-collection", features: [] },
     { kind: "area-collection", features: [] },
+    {
+      kind: "xyz-tile-layer",
+      tileUrl: "api/map-sets/labels/tiles/{z}/{x}/{y}",
+      minZoom: 0,
+      maxZoom: 18,
+      tileSize: 256,
+    },
     {
       kind: "xyz-tile-grid",
       lineColor: "#000000",

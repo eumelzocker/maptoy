@@ -161,11 +161,15 @@ export const useLayersStore = defineStore("layers", {
       );
     },
 
-    async create(pluginId: string, name: string): Promise<Layer> {
+    async create(
+      pluginId: string,
+      name: string,
+      configuration: Record<string, unknown> = {},
+    ): Promise<Layer> {
       const input: LayerInput = {
         name,
         pluginId,
-        configuration: {},
+        configuration,
         data: pluginId === "track-layer" ? { features: [] } : {},
         visible: true,
         displayOrder: this.items.length,

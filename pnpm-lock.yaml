@@ -55,9 +55,6 @@ importers:
       '@maptoy/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@maptoy/photo-layer':
-        specifier: workspace:*
-        version: link:../../plugins/photo-layer
       '@maptoy/layer-plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/layer-plugin-sdk
@@ -70,6 +67,12 @@ importers:
       '@maptoy/map-core':
         specifier: workspace:*
         version: link:../../packages/map-core
+      '@maptoy/map-set-layer':
+        specifier: workspace:*
+        version: link:../../plugins/map-set-layer
+      '@maptoy/photo-layer':
+        specifier: workspace:*
+        version: link:../../plugins/photo-layer
       '@maptoy/tile-grid-layer':
         specifier: workspace:*
         version: link:../../plugins/tile-grid-layer
@@ -95,9 +98,6 @@ importers:
       '@maptoy/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@maptoy/photo-layer':
-        specifier: workspace:*
-        version: link:../../plugins/photo-layer
       '@maptoy/layer-plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/layer-plugin-sdk
@@ -110,6 +110,12 @@ importers:
       '@maptoy/map-core':
         specifier: workspace:*
         version: link:../../packages/map-core
+      '@maptoy/map-set-layer':
+        specifier: workspace:*
+        version: link:../../plugins/map-set-layer
+      '@maptoy/photo-layer':
+        specifier: workspace:*
+        version: link:../../plugins/photo-layer
       '@maptoy/tile-grid-layer':
         specifier: workspace:*
         version: link:../../plugins/tile-grid-layer
@@ -180,6 +186,12 @@ importers:
   packages/map-adapter-sdk: {}
 
   packages/map-core: {}
+
+  plugins/map-set-layer:
+    dependencies:
+      '@maptoy/layer-plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/layer-plugin-sdk
 
   plugins/photo-layer:
     dependencies:

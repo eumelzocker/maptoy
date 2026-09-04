@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { MapSetListItem } from "@maptoy/contracts";
 import { leafletXyzZoomOptions } from "@maptoy/leaflet-xyz";
+import {
+  MAP_SET_LAYER_PLUGIN_ID,
+  validateMapSetLayerConfiguration,
+} from "@maptoy/map-set-layer";
 import type {
   GeographicCoordinate,
   MapLayerDescriptor,
@@ -73,6 +77,7 @@ import {
 } from "../mapContextMenuItems.js";
 import type { MenuItem } from "../menuModels.js";
 import { mapTileUrl } from "../mapTileUrl.js";
+import { resolvedMapSetLayerData } from "../mapSetLayerModel.js";
 import { availableLocalStorage } from "../localStorage.js";
 import {
   type MapComparisonMode,
@@ -309,6 +314,7 @@ interface ActiveRenderer {
 let renderer: MapRendererInstance | null = null;
 let activeRenderers: ActiveRenderer[] = [];
 let renderGeneration = 0;
+let layerDisplayGeneration = 0;
 let renderOperation = Promise.resolve();
 let synchronizingViewport = false;
 const layerHandles = new Map<string, LayerPluginFrontendHandle>();
@@ -369,6 +375,7 @@ async function renderPluginLayers(): Promise<void> {
   if (rendererTargets.length === 0 || !layerRenderingAvailable.value) {
     return;
   }
+  layerDisplayGeneration += 1;
 
   await Promise.all(
     layers.items
@@ -431,6 +438,13 @@ async function renderPluginLayers(): Promise<void> {
             await Promise.all(
               rendererTargets.map(async (target) => {
                 const targetLayer = layerForRenderer(layer, mapLayer, target);
+                if (targetLayer === null) {
+                  if (target.attachedLayerIds.delete(layer.id)) {
+                    target.layerVisibility.delete(layer.id);
+                    await target.instance.removeLayer(layer.id);
+                  }
+                  return;
+                }
                 if (target.attachedLayerIds.has(layer.id)) {
                   await target.instance.updateLayer(targetLayer);
                 } else {
@@ -505,7 +519,32 @@ function layerForRenderer(
   layer: (typeof layers.items)[number],
   descriptor: MapLayerDescriptor,
   target: ActiveRenderer,
-): MapLayerDescriptor {
+): MapLayerDescriptor | null {
+  if (
+    layer.pluginId === MAP_SET_LAYER_PLUGIN_ID &&
+    descriptor.type === "xyz-tile-layer"
+  ) {
+    let configuration: ReturnType<typeof validateMapSetLayerConfiguration>;
+    try {
+      configuration = validateMapSetLayerConfiguration(layer.configuration);
+    } catch {
+      return null;
+    }
+    const mapSet = store.items.find(({ id }) => id === configuration.mapSetId);
+    if (mapSet === undefined || !mapSet.capabilities.interactive) {
+      return null;
+    }
+    return {
+      ...descriptor,
+      visible: layerIsVisibleForRenderer(layer, target),
+      data: resolvedMapSetLayerData({
+        mapSet,
+        allowProviderRequests: configuration.allowProviderRequests,
+        cachedTilesOnly: cachedTilesOnly.value,
+        displayGeneration: layerDisplayGeneration,
+      }),
+    };
+  }
   return {
     ...descriptor,
     visible: layerIsVisibleForRenderer(layer, target),
@@ -525,7 +564,14 @@ async function refreshLayerZoomVisibility(): Promise<void> {
           return;
         }
         target.layerVisibility.set(layer.id, visible);
-        await target.instance.updateLayer({ ...published, visible });
+        const targetLayer = layerForRenderer(layer, published, target);
+        if (targetLayer === null) {
+          target.attachedLayerIds.delete(layer.id);
+          target.layerVisibility.delete(layer.id);
+          await target.instance.removeLayer(layer.id);
+          return;
+        }
+        await target.instance.updateLayer(targetLayer);
       }),
     ),
   );
@@ -1351,6 +1397,7 @@ function setHorizontalSplit(value: number): void {
 
       <div
         class="coordinate-format-toggle"
+        title="Click to configure coordinate format"
         :style="{
           visibility: showCoordinates && pointer ? 'visible' : 'hidden',
         }"

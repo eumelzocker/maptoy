@@ -4,8 +4,16 @@ All notable changes to maptoy are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-04
+
 ### Added
 
+- Added persistent Map Set Layers that stack cached tiles over the
+  active base map with Layer visibility and opacity controls. Provider requests
+  are opt-in per Layer and cache misses remain transparent by default; source
+  attribution stay available in the Layer configuration.
+- Extended Layer Plugin SDK 2.1 and Map Adapter SDK 2.3 with an adapter-neutral
+  `xyz-tile-layer` descriptor for tiled raster overlays.
 - Added Thai documentation for Layers, Map Sets, and the Tile Cache.
 - Added generic, opt-in response-header forwarding to `maptoy-ff-ext` 1.1.0 and
   optional upstream ETag and Last-Modified ingestion to maptoy's Tile upload API,
@@ -13,6 +21,10 @@ All notable changes to maptoy are documented in this file.
 
 ### Changed
 
+- Added a hint to the Map Set editor showing the maximum cache age seconds in a
+  human readable format.
+- Added a tooltip to the coordinate overlay indicating that its display format
+  can be configured by clicking it.
 - Moved Compare Maps configuration into its own centered dialog while keeping a
   compact, aligned activation checkbox beside its Display Options tool action.
   Display Options now closes after launching Goto Coordinates, Tile Calculator,

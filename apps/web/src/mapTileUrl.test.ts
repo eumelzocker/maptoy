@@ -49,4 +49,17 @@ describe("map Tile URL", () => {
       }),
     ).toContain("asOf=2026-09-02T10%3A00%3A00.000Z");
   });
+
+  it("requests transparent misses for cache-only overlay Tiles", () => {
+    expect(
+      mapTileUrl({
+        mapSetId: "labels",
+        cachedTilesOnly: true,
+        displayGeneration: 7,
+        missingTile: "transparent",
+      }),
+    ).toBe(
+      "api/map-sets/labels/tiles/{z}/{x}/{y}?refresh=cache-only&displayGeneration=7&missing=transparent",
+    );
+  });
 });

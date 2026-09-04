@@ -1,5 +1,5 @@
 {
-  "name": "@maptoy/tile-grid-layer",
+  "name": "@maptoy/map-set-layer",
   "version": "0.4.2",
   "private": true,
   "type": "module",

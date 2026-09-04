@@ -19,7 +19,10 @@ may be supplied as `snapshot`, `asOf`, or `revision`. Successful archived respon
 include `X-Maptoy-Tile-Revision` and `X-Maptoy-Cache` headers. An unavailable
 `cache-only` Tile returns a generated `no_cache` PNG with `X-Maptoy-Cache: miss` and
 `Cache-Control: no-store`. The image identifies the missing Tile by its `z`, `x`,
-and `y` coordinates and never causes a provider request.
+and `y` coordinates and never causes a provider request. With
+`missing=transparent`, the same cache miss returns a fully transparent PNG instead;
+Map Set Layers use this variant so an absent overlay Tile does not cover the base
+map.
 
 ## Tile upload
 
@@ -96,8 +99,9 @@ the remaining batch.
 
 ## Layers and assets
 
-`GET api/layers` lists the global overlay stack. Layer instances are independent of
-Map Sets. `POST api/layers`, `GET api/layers/:id`, `PATCH api/layers/:id`, and
+`GET api/layers` lists the global overlay stack. Data and decoration Layer instances
+are independent of Map Sets; the built-in Map Set Layer stores an explicit Map Set
+reference and provider-access option in its validated configuration. `POST api/layers`, `GET api/layers/:id`, `PATCH api/layers/:id`, and
 `DELETE api/layers/:id` provide generic CRUD using the registered plugin's
 validation. `name` is required and uses non-empty `/`-separated segments as the
 hierarchy below the plugin category.

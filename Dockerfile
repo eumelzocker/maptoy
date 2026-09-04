@@ -24,6 +24,7 @@ COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/layer-plugin-sdk/package.json packages/layer-plugin-sdk/package.json
 COPY packages/map-adapter-sdk/package.json packages/map-adapter-sdk/package.json
 COPY packages/map-core/package.json packages/map-core/package.json
+COPY plugins/map-set-layer/package.json plugins/map-set-layer/package.json
 COPY plugins/photo-layer/package.json plugins/photo-layer/package.json
 COPY plugins/tile-grid-layer/package.json plugins/tile-grid-layer/package.json
 COPY plugins/track-layer/package.json plugins/track-layer/package.json

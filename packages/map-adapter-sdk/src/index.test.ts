@@ -8,6 +8,7 @@ import {
   isMapLineLayerData,
   isMapPointLayerData,
   isMapRectangleLayerData,
+  isMapXyzTileLayerData,
   isMapXyzTileGridLayerData,
 } from "./index.js";
 
@@ -84,6 +85,24 @@ describe("map renderer contract", () => {
         scaleWidthPercent: 75,
       }),
     ).toBe(true);
+  });
+
+  it("recognizes resolved XYZ Tile Layer data", () => {
+    expect(
+      isMapXyzTileLayerData({
+        kind: "xyz-tile-layer",
+        tileUrl: "api/map-sets/labels/tiles/{z}/{x}/{y}",
+        minZoom: 0,
+        maxZoom: 18,
+        tileSize: 256,
+      }),
+    ).toBe(true);
+    expect(
+      isMapXyzTileLayerData({
+        kind: "xyz-tile-layer",
+        mapSetId: "unresolved",
+      }),
+    ).toBe(false);
   });
 
   it("lets renderers constrain their viewport zoom without changing the SDK version", async () => {

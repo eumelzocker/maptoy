@@ -19,7 +19,7 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
   einem ausdrücklich konfigurierten, nur lesbar eingebundenen Fotoverzeichnis.
 - Auswahl und Nutzung einer Kartenquelle erfolgen in Eigenverantwortung des Nutzers. maptoy verlinkt Nutzungsbedingungen und dokumentiert konfigurierbare technische Limits, bewertet oder erzwingt aber nicht, ob Caching, Batch-Abrufe oder Exporte rechtlich beziehungsweise vertraglich zulässig sind.
 - Anbieterbedingungen können sich ändern. Der Nutzer muss sie eigenständig prüfen und Map Sets, Limits sowie Nutzung entsprechend anpassen; die mitgelieferte Dokumentation ist keine Rechtsberatung und keine Garantie für Zulässigkeit.
-- Eine `Map Set`-Konfiguration beschreibt Kartenquelle, Renderer-Adapter, Darstellung und Cache-Regeln. Zusatzlayer bilden einen davon unabhängigen globalen Overlay-Stack; echte Server-Secrets werden nur per Environment referenziert und nicht im Klartext in Map Sets gespeichert.
+- Eine `Map Set`-Konfiguration beschreibt Kartenquelle, Renderer-Adapter, Darstellung und Cache-Regeln. Zusatzlayer bilden einen globalen Overlay-Stack. Daten- und Dekorationslayer bleiben von Map Sets unabhängig; ein vom Kern bereitgestellter Map-Set-Layer darf dagegen ein vorhandenes Map Set als gekachelte Rasterquelle referenzieren. Echte Server-Secrets werden nur per Environment referenziert und nicht im Klartext in Map Sets gespeichert.
 - Die erste Version konzentriert sich auf Raster-Tiles nach dem XYZ-Schema. Vector Tiles und WMTS-Sonderfälle sind mögliche spätere Erweiterungen.
 - Die Kartenansicht verwendet eine Frontend-Adapter-Schnittstelle. v1.0 implementiert ausschließlich den Leaflet-/XYZ-Adapter; ein späterer Adapter für die Google Maps JavaScript API und weitere Karten-APIs ist architektonisch vorgesehen, aber ausdrücklich nicht Bestandteil von v1.0.
 - Provider- und Renderer-Fähigkeiten wie interaktive Anzeige, Tile-Cache, Batch-Download, Export und Layer-Unterstützung werden getrennt ausgewiesen und nicht für jeden Adapter vorausgesetzt.
@@ -54,6 +54,8 @@ Die Codebasis, technische Bezeichner und Benutzeroberfläche sind englischsprach
 - Cache-Abdeckung für ein Gebiet und Zoomstufen sichtbar machen
 - Batch-Downloads für Gebiet und Zoomstufen planen, starten, beobachten, pausieren beziehungsweise abbrechen und erneut versuchen
 - vertrauenswürdige Layer-Plugins registrieren, konfigurieren und im XYZ-Renderer sowie im Export verwenden
+- vorhandene Map Sets als geordnete Raster-Layer mit Deckkraft und standardmäßig
+  reinem Tile-Archiv-Zugriff über Basiskarten legen
 - Track- und Fotolayer als vollständige Referenz-Plugins einschließlich
   GPS-getaggter Fotos und inkrementell scanbarer externer Fotoverzeichnisse
   bereitstellen
@@ -202,6 +204,17 @@ veröffentlicht nur die deklarative Konfiguration; der Renderer aktualisiert die
 Darstellung bei Pan, Zoom und Basiskartenwechsel selbstständig. Plugins erhalten
 dafür weder Zugriff auf Leaflet noch auf Map-Set- oder globale UI-Stores.
 
+Ein eingebauter Map-Set-Layer speichert ausschließlich die stabile ID eines Map
+Sets und ob fehlende Tiles ausdrücklich vom Provider nachgeladen werden dürfen.
+Diese Option ist standardmäßig deaktiviert. Die Vue-Anwendung löst die Referenz
+kontrolliert in eine relative Tile-Proxy-URL und einen adapterneutralen
+`xyz-tile-layer`-Deskriptor auf; das Plugin erhält dadurch weiterhin keinen Zugriff
+auf Map-Set- oder globale UI-Stores. Sichtbarkeit, Reihenfolge, Deckkraft und
+Zoomgrenzen verwenden den allgemeinen Layer-Lebenszyklus. Bei reinem Cachezugriff
+werden fehlende Tiles transparent dargestellt. Die Attribution und der Link zu den
+Anbieterbedingungen des referenzierten Map Sets erscheinen im Layer-Editor, werden
+aber nicht als Kartenattribution eingeblendet.
+
 Einfache Plugin-Konfigurationen werden aus validiertem Konfigurationsschema und
 typisierten UI-Hinweisen in einem gemeinsamen Editor dargestellt. Plugins mit
 Import-, Scan- oder vergleichbaren Spezialabläufen dürfen einen bei der
@@ -220,6 +233,10 @@ Die Referenz-Plugins definieren die Mindestqualität der Schnittstelle:
   Bilddetails und Export
 - `tile-grid-layer`: assetfreie, zustandsabgeleitete Darstellung sichtbarer
   XYZ-Tile-Grenzen und `z/x/y`-Koordinaten sowie einer metrischen Maßstabsleiste
+- `map-set-layer`: gekachelte Rasterdarstellung eines vorhandenen Map Sets mit
+  allgemeiner Layer-Deckkraft und standardmäßig deaktiviertem Provider-Nachladen;
+  transparente PNG-/WebP-Tiles und deckende JPEG-Tiles werden gleichermaßen
+  unterstützt
 
 Die Plugin-Schnittstelle wird für v1 semantisch versioniert und durch Contract-Tests abgesichert. Eine öffentliche Plugin-Distribution, dynamische Codeinstallation oder langfristige Binärkompatibilitätsgarantie ist damit noch nicht verbunden.
 
@@ -407,6 +424,12 @@ Ein Exportauftrag enthält:
 - ausgewählte Layer-Instanzen mit Reihenfolge, Deckkraft und exportbezogener Konfiguration
 
 Der XYZ-Renderer bestimmt die benötigten Tiles, lädt sie bevorzugt aus dem gewählten Cache, setzt sie in der Quellprojektion zusammen, transformiert bei Bedarf und ruft danach die Server-Rendering-Hooks der ausgewählten Layer-Plugins auf. Attribution bleibt Bestandteil des Kernrenderers und muss im Ergebnis optional sichtbar sowie in den Exportmetadaten nachvollziehbar sein. Eine Maßstabsleiste wird dagegen ausschließlich als ausgewählter dekorativer Layer dargestellt und exportiert, damit Konfiguration und Sichtbarkeit demselben Layer-Lebenszyklus wie in der interaktiven Karte folgen. Adapter ohne Capability `serverExport` dürfen keinen solchen Exportauftrag starten.
+
+Ausgewählte Map-Set-Layer werden dabei vom Kern als zusätzliche geordnete
+XYZ-Rasterquellen zusammengesetzt. Ihr Providerzugriffsmodus gilt auch im Export;
+bei reinem Cachezugriff bleiben fehlende Overlay-Tiles transparent. Ihre Attribution
+wird in den Exportmetadaten dokumentiert, aber nicht automatisch in das Kartenbild
+gezeichnet.
 
 ## 6. API-Entwurf
 
@@ -1051,9 +1074,13 @@ Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten
   Plugin-, Import-, Scan- und Assetdialoge in den bestehenden Map View integrieren;
   generische Baum-, Dropdown- und Editorbausteine als wiederverwendbare
   Vue-Komponenten auslagern; keine eigene Layer-Route oder Hauptansicht anlegen
-- Layer-Instanzen als globalen Overlay-Stack unabhängig von Map Sets persistieren
-  und beim Wechsel der Basiskarte mit Sichtbarkeit, Reihenfolge und Konfiguration
-  wieder an den neu erzeugten Renderer anhängen
+- Layer-Instanzen als globalen Overlay-Stack persistieren; Daten- und
+  Dekorationslayer bleiben unabhängig von Map Sets und werden beim Wechsel der
+  Basiskarte mit Sichtbarkeit, Reihenfolge und Konfiguration wieder an den neu
+  erzeugten Renderer angehängt
+- einen eingebauten Map-Set-Layer ergänzen, der nur Map-Set-ID und optional erlaubten
+  Providerzugriff persistiert, im Editor Attribution und Anbieterbedingungen zeigt
+  und bei reinem Archivzugriff fehlende Tiles transparent lässt
 - Plugin-Kategorie und `/`-segmentierte Layernamen als erweiterbare Hierarchie im
   Layer-Panel darstellen; neue Layer dürfen einen expliziten Namen erhalten oder
   verwenden bei leerem Feld einen freien, je Kategorie nummerierten Standardnamen
@@ -1091,6 +1118,9 @@ Version `0.3.0` konsolidiert; verbleibende Job-, Skalierungs- und Limit-Arbeiten
 - Beim Wechsel des Map Sets bleiben dieselben globalen Overlay-Layer mit ihrer
   Sichtbarkeit, Reihenfolge und Konfiguration erhalten und werden am neuen Renderer
   dargestellt, sofern dieser Layer-Rendering unterstützt.
+- PNG-, WebP- und JPEG-Map-Sets lassen sich als Raster-Layer über die Basiskarte
+  legen; Deckkraft wirkt auf das gesamte Raster, Providerzugriff ist standardmäßig
+  aus und fehlende archivierte Tiles verdecken die Basiskarte nicht.
 - Layer erscheinen unter ihrer Plugin-Kategorie und lassen sich über Namen wie
   `Reisen/2026/Alpen` ohne zusätzliche Ordnerdatensätze weiter strukturieren.
 - Kategorien und sämtliche aus Namenssegmenten entstehenden Ordnerebenen sind im
@@ -1404,10 +1434,12 @@ Jeder zusammenhängende, getestete Entwicklungsstand kann die Patchversion erhö
 | `0.3.4` | Gemeinsames Traffic-Log-Verzeichnis sowie aktualisierte Setup-Dokumentation und Screenshots |
 | `0.4.0` | Phase 6: kontrollierte Batch-Downloads, Provider-Limits und Erweiterung des gemeinsamen Job-Systems |
 | `0.4.1` | Phase 6a: interaktiver Vergleich von zwei oder vier Map Sets |
+| `0.4.2` | Map-Set-Rasterlayer, Vergleichsverbesserungen und optionale Validator-Übernahme beim Tile-Seeding |
 
 ### 13.2 Weitere Releases
 
-Mit `0.4.1` ist Phase 6a vollständig veröffentlicht. Phase 5a ist bereits seit
+Mit `0.4.2` sind Map-Set-Rasterlayer und weitere phasenübergreifende Verbesserungen
+veröffentlicht. Phase 6a ist seit `0.4.1` vollständig veröffentlicht, Phase 5a seit
 Version `0.2.3` vollständig veröffentlicht; ihre für Phase 7 vorgesehene
 serverseitige Deskriptorausgabe ist kein offener Bestandteil von Phase 5a. Die
 weitere fachliche Reihenfolge erhält erst beim tatsächlichen Release konkrete

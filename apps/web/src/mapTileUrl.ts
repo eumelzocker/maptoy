@@ -5,6 +5,7 @@ export interface MapTileUrlOptions {
   cachedTilesOnly: boolean;
   displayGeneration: number;
   tileSelection?: MapComparisonTileSelection;
+  missingTile?: "error" | "transparent";
 }
 
 export function mapTileUrl({
@@ -12,15 +13,20 @@ export function mapTileUrl({
   cachedTilesOnly,
   displayGeneration,
   tileSelection = { kind: "current" },
+  missingTile = "error",
 }: MapTileUrlOptions): string {
   const url = `api/map-sets/${mapSetId}/tiles/{z}/{x}/{y}`;
+  const query: string[] = [];
   if (tileSelection.kind === "snapshot") {
-    return `${url}?snapshot=${encodeURIComponent(tileSelection.snapshotId)}`;
+    query.push(`snapshot=${encodeURIComponent(tileSelection.snapshotId)}`);
+  } else if (tileSelection.kind === "asOf") {
+    query.push(`asOf=${encodeURIComponent(tileSelection.timestamp)}`);
+  } else if (cachedTilesOnly) {
+    query.push("refresh=cache-only");
+    query.push(`displayGeneration=${displayGeneration}`);
   }
-  if (tileSelection.kind === "asOf") {
-    return `${url}?asOf=${encodeURIComponent(tileSelection.timestamp)}`;
+  if (missingTile === "transparent") {
+    query.push("missing=transparent");
   }
-  return cachedTilesOnly
-    ? `${url}?refresh=cache-only&displayGeneration=${displayGeneration}`
-    : url;
+  return query.length === 0 ? url : `${url}?${query.join("&")}`;
 }

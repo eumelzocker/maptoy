@@ -769,23 +769,28 @@ describe("maptoy server", () => {
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toEqual({ status: "ready" });
     expect(mapRenderers.json()).toMatchObject({
-      items: [{ id: "leaflet-xyz", sdkVersion: "2.2.0" }],
+      items: [{ id: "leaflet-xyz", sdkVersion: "2.3.0" }],
     });
     expect(layerPlugins.json()).toMatchObject({
       items: [
         {
+          id: "map-set-layer",
+          sdkVersion: "2.1.0",
+          category: { id: "map-sets", displayName: "Map Sets" },
+        },
+        {
           id: "track-layer",
-          sdkVersion: "2.0.0",
+          sdkVersion: "2.1.0",
           category: { id: "tracks", displayName: "Tracks" },
         },
         {
           id: "photo-layer",
-          sdkVersion: "2.0.0",
+          sdkVersion: "2.1.0",
           category: { id: "photos", displayName: "Photos" },
         },
         {
           id: "tile-grid-layer",
-          sdkVersion: "2.0.0",
+          sdkVersion: "2.1.0",
           category: { id: "decorations", displayName: "Decorations" },
         },
       ],
@@ -1439,6 +1444,18 @@ describe("maptoy server", () => {
       width: 256,
       height: 256,
     });
+
+    const transparentMiss = await server.inject({
+      method: "GET",
+      url: `/api/map-sets/${mapSet.id}/tiles/10/549/335?refresh=cache-only&missing=transparent`,
+    });
+    expect(transparentMiss.statusCode).toBe(200);
+    expect(transparentMiss.headers["x-maptoy-cache"]).toBe("miss");
+    const transparentPixel = await sharp(transparentMiss.rawPayload)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(transparentPixel.info.channels).toBe(4);
+    expect(transparentPixel.data.every((channel) => channel === 0)).toBe(true);
 
     const tested = await server.inject({
       method: "POST",

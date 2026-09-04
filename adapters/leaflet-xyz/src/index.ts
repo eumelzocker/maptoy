@@ -6,6 +6,7 @@ import {
   isMapLineLayerData,
   isMapPointLayerData,
   isMapRectangleLayerData,
+  isMapXyzTileLayerData,
   isMapXyzTileGridLayerData,
   type MapLayerDescriptor,
   type MapPointFeature,
@@ -182,6 +183,7 @@ export const leafletXyzManifest = {
     "point-collection",
     "line-collection",
     "area-collection",
+    "xyz-tile-layer",
     "xyz-tile-grid",
     "composite",
   ],
@@ -965,6 +967,27 @@ async function createLeafletInstance(
     });
   };
 
+  const createXyzTileLayer = (
+    descriptor: MapLayerDescriptor,
+  ): Leaflet.TileLayer | null => {
+    if (
+      descriptor.type !== "xyz-tile-layer" ||
+      !isMapXyzTileLayerData(descriptor.data)
+    ) {
+      return null;
+    }
+    const data = descriptor.data;
+    const layerZoomOptions = leafletXyzZoomOptions(data);
+    return L.tileLayer(data.tileUrl, {
+      minZoom: layerZoomOptions.minZoom,
+      maxZoom: layerZoomOptions.maxZoom,
+      tileSize: data.tileSize,
+      zoomOffset: layerZoomOptions.zoomOffset,
+      opacity: descriptor.opacity,
+      zIndex: 300,
+    });
+  };
+
   const createDescriptorLayer = (
     descriptor: MapLayerDescriptor,
   ): Leaflet.Layer | null => {
@@ -990,6 +1013,7 @@ async function createLeafletInstance(
       createPointLayer(descriptor) ??
       createLineLayer(descriptor) ??
       createAreaLayer(descriptor) ??
+      createXyzTileLayer(descriptor) ??
       createXyzTileGridLayer(descriptor)
     );
   };

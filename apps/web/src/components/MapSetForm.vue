@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { MapSetInput } from "@maptoy/contracts";
 import { computed, reactive, ref, watch } from "vue";
+// biome-ignore lint/correctness/noUnusedImports: referenced by the Vue template
+import { formatDurationMinutes } from "../durationFormat.js";
 
 const props = defineProps<{
   modelValue: MapSetInput;
@@ -321,7 +323,11 @@ function submit(): void {
           v-model.number="draft.cachePolicy.maximumAgeSeconds"
           type="number"
           min="0"
+          aria-describedby="maximum-cache-age-duration"
         />
+        <small id="maximum-cache-age-duration">
+          {{ formatDurationMinutes(Math.round(draft.cachePolicy.maximumAgeSeconds / 60)) }}
+        </small>
       </label>
       <label>
         <span>Maximum storage (bytes, optional)</span>

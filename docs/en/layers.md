@@ -28,8 +28,9 @@ change visibility without changing the editor selection. Opening the Layers tool
 without an explicit target restores the last locally stored Layer, or selects the
 first visible Layer if that preference is unavailable. The general **Opacity**
 slider applies to the complete Layer in both the interactive map and exports.
-Layers form one global overlay stack independent of Map Sets. Changing the
-Map Set replaces only the base map and reattaches the same overlays with their
+Layers form one global overlay stack. Data and decoration Layers are independent
+of Map Sets, while a Map Set Layer explicitly references one Map Set as a tiled
+raster overlay. Changing the base Map Set reattaches the same overlays with their
 existing order, visibility, opacity, Zoom range, and configuration. A missing or
 incompatible build-time plugin disables its layer and reports a diagnostic without
 deleting stored data. Plugins cannot be installed through the browser or API.
@@ -40,6 +41,28 @@ The first hierarchy level comes from the plugin category, such as **Tracks** or
 this path; no separate folder records are created. Categories and every generated
 folder level can be collapsed independently. Those display preferences are retained
 in the browser.
+
+## Map Set raster overlays
+
+Create a **Map Sets** Layer to draw an existing Map Set above the base map. The
+Layer stores only the Map Set reference and its access option; URL template,
+headers, cache policy, Tile format, and provider information continue to belong to
+the referenced Map Set. PNG and WebP Tiles retain their transparency. JPEG Tiles
+are also supported, and the general **Opacity** control can make their base map
+visible underneath.
+
+**Load missing Tiles from provider** is off by default. In that mode the Layer
+reads only existing Tile Archive revisions, never contacts the provider as a side
+effect of viewing the map, and displays cache misses as transparent Tiles. Turning
+the option on permits normal on-demand provider requests. The global **Cached Tiles
+only** display option always takes precedence and disables provider requests for
+the Layer as well. Explicit uploads and Download Jobs remain available independently.
+
+The Layer editor shows the referenced Map Set's Tile format, attribution, and link
+to its provider terms. Overlay attribution is not added to the attribution control
+on the map; review the provider's current requirements before using that setting.
+If the referenced Map Set is later deleted, the Layer remains stored but is
+disabled with a diagnostic until another Map Set is selected.
 
 ## Tile Grid decoration
 

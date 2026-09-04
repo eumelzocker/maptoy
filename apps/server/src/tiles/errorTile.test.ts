@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { generateErrorTile } from "./errorTile.js";
+import { generateErrorTile, generateTransparentTile } from "./errorTile.js";
 
 const coordinate = { zoom: 10, x: 549, y: 335 };
 
@@ -114,4 +114,22 @@ describe("error tile generation", () => {
     }
     expect(mismatchedEdge).toBeNull();
   });
+
+  it.each([256, 512] as const)(
+    "generates a transparent %i px PNG for overlay cache misses",
+    async (tileSize) => {
+      const image = sharp(await generateTransparentTile(tileSize));
+      await expect(image.metadata()).resolves.toMatchObject({
+        format: "png",
+        width: tileSize,
+        height: tileSize,
+        hasAlpha: true,
+      });
+      const { data, info } = await image.raw().toBuffer({
+        resolveWithObject: true,
+      });
+      expect(info.channels).toBe(4);
+      expect(data.every((channel) => channel === 0)).toBe(true);
+    },
+  );
 });
